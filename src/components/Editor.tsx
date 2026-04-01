@@ -17,6 +17,7 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import Showdown from "showdown";
 import { rewriteImageUrls, loadAuthenticatedImages } from "@/lib/github-api";
 import { preRenderMermaid } from "@/lib/mermaid";
+import { useWideFormat } from "@/lib/use-wide-format";
 import {
   Bold,
   Italic,
@@ -43,6 +44,8 @@ import {
   Check as CheckIcon,
   ChevronDown,
   ChevronRight,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 
 interface EditorProps {
@@ -380,6 +383,7 @@ function CommentSidePanel({
 
 export default function Editor({ content, onContentChange, filePath, repoFullName, branch }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
+  const { wide, toggle: toggleWide, contentClass } = useWideFormat();
   const [comments, setComments] = useState<EditorComment[]>([]);
   const [showComments, setShowComments] = useState(false);
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
@@ -636,8 +640,15 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
             title="Redo (⌘⇧Z)"
           />
 
-          {/* Comment toggle — right side */}
+          {/* Wide format + comment toggle — right side */}
           <div className="ml-auto flex items-center gap-1">
+            <button
+              onClick={toggleWide}
+              className={`toolbar-btn ${wide ? "active" : ""}`}
+              title={wide ? "Normal width" : "Wide format"}
+            >
+              {wide ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            </button>
             <button
               onClick={() => setShowComments(!showComments)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
@@ -659,7 +670,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
 
         {/* Editor area */}
         <div className="flex-1 overflow-y-auto" ref={editorContainerRef as React.RefObject<HTMLDivElement>}>
-          <div className="max-w-5xl mx-auto px-8 py-8 relative">
+          <div className={contentClass}>
             {/* File path breadcrumb */}
             <div className="text-xs text-[var(--text-muted)] mb-4 font-mono flex items-center gap-2">
               {filePath}

@@ -13,10 +13,13 @@ import {
   Check,
   X,
   Send,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import ContextMenu from "./ContextMenu";
 import { mapSelectionToLines, rewriteImageUrls, loadAuthenticatedImages } from "@/lib/github-api";
 import { renderMermaidBlocks } from "@/lib/mermaid";
+import { useWideFormat } from "@/lib/use-wide-format";
 
 interface DiffViewerProps {
   file: PRFile;
@@ -413,6 +416,7 @@ export default function DiffViewer({
 }: DiffViewerProps) {
   const [viewMode, setViewMode] = useState<"rendered" | "split">("rendered");
   const [showPanel, setShowPanel] = useState(true);
+  const { wide, toggle: toggleWide } = useWideFormat();
 
   // Single source of truth: comments prop from PRDetail (no local duplicate)
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
@@ -647,6 +651,14 @@ export default function DiffViewer({
               : "Comments"}
           </button>
 
+          <button
+            onClick={toggleWide}
+            className={`toolbar-btn ${wide ? "active" : ""}`}
+            title={wide ? "Normal width" : "Wide format"}
+          >
+            {wide ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
+
           <div className="flex items-center gap-1 bg-[var(--surface-secondary)] rounded-md p-0.5">
             <button
               onClick={() => setViewMode("rendered")}
@@ -738,7 +750,7 @@ export default function DiffViewer({
                 onComment={handleSelectionComment}
               />
 
-              <div className="max-w-5xl mx-auto px-8 py-6">
+              <div className={wide ? "mx-auto px-12 py-6" : "max-w-5xl mx-auto px-8 py-6"}>
                 {/* Hint */}
                 <div className="text-[10px] text-[var(--text-muted)] mb-4 flex items-center gap-1.5">
                   <MessageSquarePlus size={10} />
