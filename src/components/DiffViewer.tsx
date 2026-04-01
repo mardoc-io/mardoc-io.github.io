@@ -414,7 +414,7 @@ export default function DiffViewer({
   onAddComment,
   onResolveComment,
 }: DiffViewerProps) {
-  const [viewMode, setViewMode] = useState<"rendered" | "split">("rendered");
+  const [viewMode, setViewMode] = useState<"rendered" | "split" | "preview">("rendered");
   const [showPanel, setShowPanel] = useState(true);
   const { wide, toggle: toggleWide } = useWideFormat();
 
@@ -668,7 +668,7 @@ export default function DiffViewer({
                   : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
               }`}
             >
-              Rendered Diff
+              Inline Diff
             </button>
             <button
               onClick={() => setViewMode("split")}
@@ -679,6 +679,16 @@ export default function DiffViewer({
               }`}
             >
               Side by Side
+            </button>
+            <button
+              onClick={() => setViewMode("preview")}
+              className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                viewMode === "preview"
+                  ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              }`}
+            >
+              Preview
             </button>
           </div>
         </div>
@@ -817,7 +827,7 @@ export default function DiffViewer({
                 ))}
               </div>
             </div>
-          ) : (
+          ) : viewMode === "split" ? (
             /* Split view — with commenting support */
             <div className="relative h-full" ref={contentRef}>
               <FloatingToolbar
@@ -858,6 +868,38 @@ export default function DiffViewer({
                       />
                     ))}
                   </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Preview — clean render of head content with commenting */
+            <div className="relative" ref={contentRef}>
+              <FloatingToolbar
+                containerRef={contentRef}
+                onComment={handleSelectionComment}
+              />
+              <ContextMenu
+                containerRef={contentRef}
+                onComment={handleSelectionComment}
+              />
+
+              <div className={wide ? "mx-auto px-12 py-6" : "max-w-5xl mx-auto px-8 py-6"}>
+                <div className="text-[10px] text-[var(--text-muted)] mb-4 flex items-center gap-1.5">
+                  <MessageSquarePlus size={10} />
+                  Select any text to add a comment — all comments appear in the right panel
+                </div>
+
+                <div className="diff-content">
+                  {parseBlocks(file.headContent).map((block, idx) => (
+                    <div
+                      key={idx}
+                      className="rendered-block mb-1"
+                      dangerouslySetInnerHTML={{
+                        __html: renderBlockHtml(headBlockToHtml(block)),
+                      }}
+                      onClick={handleMarkClick}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
