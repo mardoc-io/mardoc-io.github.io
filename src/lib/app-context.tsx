@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { RepoFile, PullRequest, PRFile, PRComment, ViewMode } from "@/types";
-import { initOctokit, fetchRepoTree, fetchPullRequests, fetchFileContent, fetchPRFiles, fetchPRComments } from "./github-api";
+import { initOctokit, fetchRepoTree, fetchPullRequests, fetchFileContent, fetchPRFiles, fetchPRComments, fetchDefaultBranch } from "./github-api";
 import { repoFiles as mockFiles, pullRequests as mockPRs, findFile } from "./mock-data";
 
 interface AppState {
@@ -14,6 +14,7 @@ interface AppState {
 
   // Repo
   currentRepo: string | null;
+  defaultBranch: string;
   setCurrentRepo: (repo: string) => void;
   repoFiles: RepoFile[];
   pullRequests: PullRequest[];
@@ -52,18 +53,13 @@ const TOKEN_KEY = "mardoc_github_token";
 const REPO_KEY = "mardoc_current_repo";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  // Auth state — rehydrate from localStorage
-  const [githubToken, setGithubTokenState] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem(TOKEN_KEY);
-  });
-  const [isDemoMode, setIsDemoMode] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return !localStorage.getItem(TOKEN_KEY);
-  });
+  // Auth state — server-safe defaults, hydrated in useEffect
+  const [githubToken, setGithubTokenState] = useState<string | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(true);
 
   // Repo state
   const [currentRepo, setCurrentRepoState] = useState<string | null>(null);
+  const [defaultBranch, setDefaultBranch] = useState("main");
   const [repoFilesList, setRepoFiles] = useState<RepoFile[]>(mockFiles);
   const [prList, setPRList] = useState<PullRequest[]>(mockPRs);
 
@@ -103,16 +99,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Restore session on mount: init Octokit and reload last repo
+  // Hydrate auth state from localStorage after mount (avoids SSR mismatch)
   useEffect(() => {
-    if (!githubToken) return;
-    initOctokit(githubToken);
-    const savedRepo = localStorage.getItem(REPO_KEY);
-    if (savedRepo) {
-      setCurrentRepo(savedRepo);
+    const savedToken = localStorage.getItem(TOKEN_KEY);
+    if (savedToken) {
+      setGithubTokenState(savedToken);
+      setIsDemoMode(false);
+      initOctokit(savedToken);
+      const savedRepo = localStorage.getItem(REPO_KEY);
+      if (savedRepo) {
+        setCurrentRepo(savedRepo);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally run once on mount
+  }, []);
 
   // Set current repo and load data
   const setCurrentRepo = useCallback(
@@ -123,10 +123,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (!githubToken) return;
 
-      // Load files
+      // Fetch default branch, then load files using it
+      let branch = "main";
+      try {
+        branch = await fetchDefaultBranch(repo);
+        setDefaultBranch(branch);
+      } catch {
+        // Fall back to "main" if we can't determine default branch
+      }
+
       setLoadingFiles(true);
       try {
-        const files = await fetchRepoTree(repo);
+        const files = await fetchRepoTree(repo, branch);
         setRepoFiles(files);
       } catch (err: any) {
         setError(`Failed to load repository: ${err.message}`);
@@ -230,6 +238,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setGithubToken,
         isDemoMode,
         currentRepo,
+        defaultBranch,
         setCurrentRepo,
         repoFiles: repoFilesList,
         pullRequests: prList,

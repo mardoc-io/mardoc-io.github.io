@@ -30,6 +30,7 @@ export default function Home() {
     error,
     isDemoMode,
     currentRepo,
+    defaultBranch,
     repoFiles,
     pullRequests,
   } = useApp();
@@ -94,6 +95,8 @@ export default function Home() {
               <Editor
                 content={fileContent}
                 filePath={selectedFile.path}
+                repoFullName={currentRepo || undefined}
+                branch={defaultBranch}
                 onContentChange={(html) => {
                   console.log("Content changed");
                 }}

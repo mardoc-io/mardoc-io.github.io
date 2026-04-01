@@ -15,7 +15,7 @@ import {
   Send,
 } from "lucide-react";
 import ContextMenu from "./ContextMenu";
-import { mapSelectionToLines, rewriteImageUrls } from "@/lib/github-api";
+import { mapSelectionToLines, rewriteImageUrls, loadAuthenticatedImages } from "@/lib/github-api";
 
 interface DiffViewerProps {
   file: PRFile;
@@ -420,6 +420,11 @@ export default function DiffViewer({
 
   const contentRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
+  // Fetch images with auth for private repos after content renders
+  useEffect(() => {
+    if (!contentRef.current) return;
+    loadAuthenticatedImages(contentRef.current);
+  }, [file, viewMode]);
 
   // Map PR comments into panel format for display
   const allPanelComments: PanelComment[] = useMemo(() => {
