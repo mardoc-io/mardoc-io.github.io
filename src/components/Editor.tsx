@@ -16,6 +16,7 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import Showdown from "showdown";
 import { rewriteImageUrls, loadAuthenticatedImages } from "@/lib/github-api";
+import { renderMermaidBlocks } from "@/lib/mermaid";
 import {
   Bold,
   Italic,
@@ -384,10 +385,11 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const [commentInput, setCommentInput] = useState("");
-  // Fetch images with auth for private repos after content renders
+  // Post-render: fetch private repo images and render mermaid diagrams
   useEffect(() => {
     if (!editorContainerRef.current) return;
     loadAuthenticatedImages(editorContainerRef.current);
+    renderMermaidBlocks(editorContainerRef.current);
   }, [filePath]);
 
   const editor = useEditor({

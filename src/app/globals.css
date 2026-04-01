@@ -224,6 +224,18 @@ body {
   padding: 0;
 }
 
+/* Mermaid diagrams */
+.mermaid-diagram {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 0;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* Diff styles */
 .diff-added {
   background-color: var(--diff-add);
