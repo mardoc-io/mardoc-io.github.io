@@ -35,6 +35,39 @@ export async function fetchDefaultBranch(repoFullName: string): Promise<string> 
   return data.default_branch;
 }
 
+export async function fetchBranches(
+  repoFullName: string
+): Promise<{ name: string; isDefault: boolean }[]> {
+  const octokit = getOctokit();
+  if (!octokit) throw new Error("Not authenticated");
+
+  const { owner, repo } = parseOwnerRepo(repoFullName);
+
+  // Fetch default branch and branch list in parallel
+  const [repoData, branchPages] = await Promise.all([
+    octokit.repos.get({ owner, repo }),
+    octokit.paginate(octokit.repos.listBranches, {
+      owner,
+      repo,
+      per_page: 100,
+    }),
+  ]);
+
+  const defaultBranch = repoData.data.default_branch;
+
+  return branchPages
+    .map((b) => ({
+      name: b.name,
+      isDefault: b.name === defaultBranch,
+    }))
+    .sort((a, b) => {
+      // Default branch first, then alphabetical
+      if (a.isDefault) return -1;
+      if (b.isDefault) return 1;
+      return a.name.localeCompare(b.name);
+    });
+}
+
 // ─── Repository Files ──────────────────────────────────────────────────────
 
 export async function fetchRepoTree(

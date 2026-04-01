@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   FileText,
   Folder,
   FolderOpen,
+  GitBranch,
   GitPullRequest,
   GitMerge,
   ChevronRight,
@@ -18,6 +19,7 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  Check,
 } from "lucide-react";
 import { RepoFile, PRFile } from "@/types";
 import { useApp } from "@/lib/app-context";
@@ -235,11 +237,29 @@ export default function Sidebar() {
     selectedPRFileIdx,
     setSelectedPRFileIdx,
     loadingPRFiles,
+    selectedBranch,
+    availableBranches,
+    setSelectedBranch,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<"files" | "prs">("files");
   const [prFileFilter, setPRFileFilter] = useState("");
   const [collapsed, setCollapsed] = useState(false);
+  const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
+  const [branchFilter, setBranchFilter] = useState("");
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close branch dropdown on outside click
+  useEffect(() => {
+    if (!branchDropdownOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (branchDropdownRef.current && !branchDropdownRef.current.contains(e.target as Node)) {
+        setBranchDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [branchDropdownOpen]);
 
   const isViewingPR = currentView === "pr-diff" && selectedPR;
 
@@ -312,6 +332,68 @@ export default function Sidebar() {
           <PanelLeftClose size={14} />
         </button>
       </div>
+
+      {/* Branch selector — visible on Files tab when browsing repo (not PR) */}
+      {activeTab === "files" && !isViewingPR && availableBranches.length > 0 && (
+        <div ref={branchDropdownRef} className="relative px-2 py-1.5 border-b border-[var(--border)]">
+          <button
+            onClick={() => {
+              setBranchDropdownOpen(!branchDropdownOpen);
+              setBranchFilter("");
+            }}
+            className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-hover)] transition-colors text-[var(--text-primary)]"
+          >
+            <GitBranch size={12} className="text-[var(--text-muted)] shrink-0" />
+            <span className="truncate flex-1 text-left">{selectedBranch}</span>
+            <ChevronDown size={12} className={`text-[var(--text-muted)] shrink-0 transition-transform ${branchDropdownOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {branchDropdownOpen && (
+            <div className="absolute left-2 right-2 top-full mt-1 z-50 rounded-md border border-[var(--border)] bg-[var(--surface)] shadow-lg max-h-64 flex flex-col">
+              {availableBranches.length > 5 && (
+                <div className="p-1.5 border-b border-[var(--border)]">
+                  <input
+                    type="text"
+                    value={branchFilter}
+                    onChange={(e) => setBranchFilter(e.target.value)}
+                    placeholder="Filter branches..."
+                    className="w-full px-2 py-1 text-xs rounded border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                    autoFocus
+                  />
+                </div>
+              )}
+              <div className="overflow-y-auto">
+                {availableBranches
+                  .filter((b) => !branchFilter || b.name.toLowerCase().includes(branchFilter.toLowerCase()))
+                  .map((branch) => (
+                    <button
+                      key={branch.name}
+                      onClick={() => {
+                        setSelectedBranch(branch.name);
+                        setBranchDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-1.5 px-3 py-1.5 text-xs text-left transition-colors ${
+                        branch.name === selectedBranch
+                          ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                          : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
+                      }`}
+                    >
+                      {branch.name === selectedBranch ? (
+                        <Check size={12} className="shrink-0" />
+                      ) : (
+                        <span className="w-3 shrink-0" />
+                      )}
+                      <span className="truncate">{branch.name}</span>
+                      {branch.isDefault && (
+                        <span className="ml-auto text-[10px] text-[var(--text-muted)] shrink-0">default</span>
+                      )}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-2">

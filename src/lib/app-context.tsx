@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { RepoFile, PullRequest, PRFile, PRComment, ViewMode } from "@/types";
-import { initOctokit, fetchRepoTree, fetchPullRequests, fetchFileContent, fetchPRFiles, fetchPRComments, fetchDefaultBranch } from "./github-api";
+import { initOctokit, fetchRepoTree, fetchPullRequests, fetchFileContent, fetchPRFiles, fetchPRComments, fetchDefaultBranch, fetchBranches } from "./github-api";
 import { repoFiles as mockFiles, pullRequests as mockPRs, findFile } from "./mock-data";
 
 interface AppState {
@@ -15,6 +15,9 @@ interface AppState {
   // Repo
   currentRepo: string | null;
   defaultBranch: string;
+  selectedBranch: string;
+  availableBranches: { name: string; isDefault: boolean }[];
+  setSelectedBranch: (branch: string) => void;
   setCurrentRepo: (repo: string) => void;
   repoFiles: RepoFile[];
   pullRequests: PullRequest[];
@@ -60,6 +63,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Repo state
   const [currentRepo, setCurrentRepoState] = useState<string | null>(null);
   const [defaultBranch, setDefaultBranch] = useState("main");
+  const [selectedBranch, setSelectedBranchState] = useState("main");
+  const [availableBranches, setAvailableBranches] = useState<{ name: string; isDefault: boolean }[]>([]);
   const [repoFilesList, setRepoFiles] = useState<RepoFile[]>(mockFiles);
   const [prList, setPRList] = useState<PullRequest[]>(mockPRs);
 
@@ -128,6 +133,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         branch = await fetchDefaultBranch(repo);
         setDefaultBranch(branch);
+        setSelectedBranchState(branch);
       } catch {
         // Fall back to "main" if we can't determine default branch
       }
@@ -143,11 +149,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setLoadingFiles(false);
       }
 
-      // Load PRs
+      // Load PRs and branches in parallel
       setLoadingPRs(true);
       try {
-        const prs = await fetchPullRequests(repo, "all");
+        const [prs, branches] = await Promise.all([
+          fetchPullRequests(repo, "all"),
+          fetchBranches(repo).catch(() => [] as { name: string; isDefault: boolean }[]),
+        ]);
         setPRList(prs);
+        setAvailableBranches(branches);
       } catch (err: any) {
         console.error("Failed to load PRs:", err);
         setPRList([]);
@@ -156,6 +166,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [githubToken]
+  );
+
+  // Switch branch and reload file tree
+  const setSelectedBranch = useCallback(
+    async (branch: string) => {
+      setSelectedBranchState(branch);
+      setSelectedFile(null);
+      setFileContent("");
+
+      if (!currentRepo || !githubToken) return;
+
+      setLoadingFiles(true);
+      try {
+        const files = await fetchRepoTree(currentRepo, branch);
+        setRepoFiles(files);
+      } catch (err: any) {
+        setError(`Failed to load branch: ${err.message}`);
+        setRepoFiles([]);
+      } finally {
+        setLoadingFiles(false);
+      }
+    },
+    [currentRepo, githubToken]
   );
 
   // Open a file and load its content
@@ -176,7 +209,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setLoadingContent(true);
       try {
-        const content = await fetchFileContent(currentRepo, file.path);
+        const content = await fetchFileContent(currentRepo, file.path, selectedBranch);
         setFileContent(content);
         // Also store it on the file object for caching
         file.content = content;
@@ -187,7 +220,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setLoadingContent(false);
       }
     },
-    [isDemoMode, currentRepo, githubToken]
+    [isDemoMode, currentRepo, githubToken, selectedBranch]
   );
 
   // Open a PR and fetch its files + comments
@@ -239,6 +272,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         isDemoMode,
         currentRepo,
         defaultBranch,
+        selectedBranch,
+        availableBranches,
+        setSelectedBranch,
         setCurrentRepo,
         repoFiles: repoFilesList,
         pullRequests: prList,
