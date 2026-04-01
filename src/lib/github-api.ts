@@ -500,9 +500,9 @@ export async function createReviewPR(
     sha: ref.object.sha,
   });
 
-  // Get the file content and create a trivial update (add a trailing newline or comment)
+  // Get the file content and create a trivial change (append a space)
   const content = await fetchFileContent(repoFullName, filePath, defaultBranch);
-  const updatedContent = content.endsWith("\n") ? content + "\n" : content + "\n";
+  const updatedContent = content + " ";
 
   await octokit.repos.createOrUpdateFileContents({
     owner,
