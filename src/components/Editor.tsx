@@ -15,6 +15,7 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import Showdown from "showdown";
+import { rewriteImageUrls, loadAuthenticatedImages } from "@/lib/github-api";
 import {
   Bold,
   Italic,
@@ -47,6 +48,8 @@ interface EditorProps {
   content: string;
   onContentChange?: (markdown: string) => void;
   filePath: string;
+  repoFullName?: string;
+  branch?: string;
 }
 
 interface EditorComment {
@@ -74,8 +77,12 @@ const showdownConverter = new Showdown.Converter({
   ghCompatibleHeaderId: true,
 });
 
-function markdownToHtml(md: string): string {
-  return showdownConverter.makeHtml(md);
+function markdownToHtml(md: string, repoFullName?: string, branch?: string, filePath?: string): string {
+  const html = showdownConverter.makeHtml(md);
+  if (repoFullName && branch && filePath) {
+    return rewriteImageUrls(html, repoFullName, branch, filePath);
+  }
+  return html;
 }
 
 function ToolbarButton({
@@ -370,13 +377,18 @@ function CommentSidePanel({
 
 // ─── Main Editor Component ──────────────────────────────────────────────
 
-export default function Editor({ content, onContentChange, filePath }: EditorProps) {
+export default function Editor({ content, onContentChange, filePath, repoFullName, branch }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const [comments, setComments] = useState<EditorComment[]>([]);
   const [showComments, setShowComments] = useState(false);
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const [commentInput, setCommentInput] = useState("");
+  // Fetch images with auth for private repos after content renders
+  useEffect(() => {
+    if (!editorContainerRef.current) return;
+    loadAuthenticatedImages(editorContainerRef.current);
+  }, [filePath]);
 
   const editor = useEditor({
     extensions: [
@@ -403,7 +415,7 @@ export default function Editor({ content, onContentChange, filePath }: EditorPro
       TableCell,
       TableHeader,
     ],
-    content: markdownToHtml(content),
+    content: markdownToHtml(content, repoFullName, branch, filePath),
     onUpdate: ({ editor }) => {
       onContentChange?.(editor.getHTML());
     },
@@ -417,7 +429,7 @@ export default function Editor({ content, onContentChange, filePath }: EditorPro
   // Update content when file changes — also reset comments
   useEffect(() => {
     if (editor && content) {
-      const newHtml = markdownToHtml(content);
+      const newHtml = markdownToHtml(content, repoFullName, branch, filePath);
       editor.commands.setContent(newHtml);
     }
     setComments([]);

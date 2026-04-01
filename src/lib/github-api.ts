@@ -24,6 +24,17 @@ function parseOwnerRepo(repo: string): { owner: string; repo: string } {
   return { owner, repo: repoName };
 }
 
+// ─── Repository Metadata ──────────────────────────────────────────────────
+
+export async function fetchDefaultBranch(repoFullName: string): Promise<string> {
+  const octokit = getOctokit();
+  if (!octokit) throw new Error("Not authenticated");
+
+  const { owner, repo } = parseOwnerRepo(repoFullName);
+  const { data } = await octokit.repos.get({ owner, repo });
+  return data.default_branch;
+}
+
 // ─── Repository Files ──────────────────────────────────────────────────────
 
 export async function fetchRepoTree(
@@ -506,22 +517,63 @@ export function rewriteImageUrls(
       if (/^(https?:\/\/|data:|#)/.test(src)) return _match;
 
       let resolvedPath: string;
-      if (src.startsWith("./") || src.startsWith("../")) {
-        // Resolve relative to the markdown file's directory
-        const parts = [...fileDir.split("/"), ...src.split("/")];
+      if (src.startsWith("/")) {
+        // Absolute repo-root path
+        resolvedPath = src.slice(1);
+      } else {
+        // All other paths (./foo, ../foo, foo) resolve relative to the file's directory
+        const parts = [...fileDir.split("/").filter(Boolean), ...src.split("/")];
         const resolved: string[] = [];
         for (const p of parts) {
           if (p === ".." && resolved.length) resolved.pop();
           else if (p !== "." && p !== "") resolved.push(p);
         }
         resolvedPath = resolved.join("/");
-      } else {
-        // Treat as repo-root-relative
-        resolvedPath = src;
       }
 
-      return `${before}https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${resolvedPath}${after}`;
+      return `${before}https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${resolvedPath}" data-gh-owner="${owner}" data-gh-repo="${repo}" data-gh-ref="${ref}" data-gh-path="${resolvedPath}${after}`;
     }
+  );
+}
+
+/**
+ * Fetch all repo images in a container via Octokit (works for private repos).
+ * Reads data-gh-* attributes set by rewriteImageUrls, fetches base64 content,
+ * and replaces src with data URIs.
+ */
+export async function loadAuthenticatedImages(
+  container: HTMLElement
+): Promise<void> {
+  const octokit = getOctokit();
+  if (!octokit) return;
+
+  const imgs = container.querySelectorAll<HTMLImageElement>("img[data-gh-path]");
+  if (imgs.length === 0) return;
+
+  const mimeTypes: Record<string, string> = {
+    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
+    gif: "image/gif", svg: "image/svg+xml", webp: "image/webp",
+    ico: "image/x-icon", bmp: "image/bmp",
+  };
+
+  await Promise.allSettled(
+    Array.from(imgs).map(async (img) => {
+      const owner = img.dataset.ghOwner;
+      const repo = img.dataset.ghRepo;
+      const ref = img.dataset.ghRef;
+      const path = img.dataset.ghPath;
+      if (!owner || !repo || !ref || !path) return;
+
+      const { data } = await octokit.repos.getContent({
+        owner, repo, path, ref,
+      });
+
+      if ("content" in data && data.encoding === "base64") {
+        const ext = path.split(".").pop()?.toLowerCase() || "png";
+        const mime = mimeTypes[ext] || "application/octet-stream";
+        img.src = `data:${mime};base64,${data.content.replace(/\n/g, "")}`;
+      }
+    })
   );
 }
 
