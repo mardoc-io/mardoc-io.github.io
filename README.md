@@ -1,6 +1,6 @@
 # MarDoc
 
-**Review markdown like a reader, not a developer.**
+**A PWA overlay that makes working with markdown in your GitHub repos easier.**
 
 MarDoc renders your GitHub PR diffs as rich, formatted documents — not raw text with `+` and `-` lines. Select any passage, leave a comment, and have it posted back to GitHub as an inline review comment tied to the exact line range.
 
@@ -31,6 +31,8 @@ Markdown PRs are hard to review on GitHub. You're staring at raw syntax, mentall
 4. Open a PR and start reviewing
 
 No install. No signup. Runs entirely in your browser — your token never leaves your machine.
+
+Need help creating a token? See the [PAT setup guide](docs/setup-github-pat.md).
 
 ## Try it first
 

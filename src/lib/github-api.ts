@@ -485,6 +485,46 @@ export async function createReviewPR(
   return { number: pr.number, url: pr.html_url };
 }
 
+// ─── Image URL Rewriting ──────────────────────────────────────────────────
+
+/**
+ * Rewrite relative image `src` attributes in rendered HTML to point at
+ * raw.githubusercontent.com so images from the repo render correctly.
+ */
+export function rewriteImageUrls(
+  html: string,
+  repoFullName: string,
+  ref: string,
+  filePath: string
+): string {
+  const { owner, repo } = parseOwnerRepo(repoFullName);
+  const fileDir = filePath.split("/").slice(0, -1).join("/");
+
+  return html.replace(
+    /(<img\s+[^>]*?src=")([^"]+)("[^>]*?>)/gi,
+    (_match, before, src, after) => {
+      if (/^(https?:\/\/|data:|#)/.test(src)) return _match;
+
+      let resolvedPath: string;
+      if (src.startsWith("./") || src.startsWith("../")) {
+        // Resolve relative to the markdown file's directory
+        const parts = [...fileDir.split("/"), ...src.split("/")];
+        const resolved: string[] = [];
+        for (const p of parts) {
+          if (p === ".." && resolved.length) resolved.pop();
+          else if (p !== "." && p !== "") resolved.push(p);
+        }
+        resolvedPath = resolved.join("/");
+      } else {
+        // Treat as repo-root-relative
+        resolvedPath = src;
+      }
+
+      return `${before}https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${resolvedPath}${after}`;
+    }
+  );
+}
+
 // ─── User repos ────────────────────────────────────────────────────────────
 
 export async function fetchUserRepos(): Promise<

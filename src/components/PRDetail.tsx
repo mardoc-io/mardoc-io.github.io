@@ -282,6 +282,9 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
         ) : (
           <DiffViewer
             file={files[selectedFileIdx]}
+            repoFullName={currentRepo || ""}
+            baseBranch={pr.baseBranch}
+            headBranch={pr.headBranch}
             comments={comments.filter(
               (c) => true /* In a real app, filter by file */
             )}

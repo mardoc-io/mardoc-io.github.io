@@ -15,10 +15,13 @@ import {
   Send,
 } from "lucide-react";
 import ContextMenu from "./ContextMenu";
-import { mapSelectionToLines } from "@/lib/github-api";
+import { mapSelectionToLines, rewriteImageUrls } from "@/lib/github-api";
 
 interface DiffViewerProps {
   file: PRFile;
+  repoFullName: string;
+  baseBranch: string;
+  headBranch: string;
   comments: PRComment[];
   onAddComment: (
     blockIndex: number,
@@ -400,6 +403,9 @@ function CommentPanel({
 
 export default function DiffViewer({
   file,
+  repoFullName,
+  baseBranch,
+  headBranch,
   comments,
   onAddComment,
   onResolveComment,
@@ -444,6 +450,23 @@ export default function DiffViewer({
       commentInputRef.current.focus();
     }
   }, [pendingSelection]);
+
+  // Render markdown block to HTML with repo-relative image URLs resolved
+  const baseBlockToHtml = useCallback(
+    (block: string) =>
+      repoFullName
+        ? rewriteImageUrls(blockToHtml(block), repoFullName, baseBranch, file.path)
+        : blockToHtml(block),
+    [repoFullName, baseBranch, file.path]
+  );
+
+  const headBlockToHtml = useCallback(
+    (block: string) =>
+      repoFullName
+        ? rewriteImageUrls(blockToHtml(block), repoFullName, headBranch, file.path)
+        : blockToHtml(block),
+    [repoFullName, headBranch, file.path]
+  );
 
   const diffBlocks = useMemo(() => {
     const baseBlocks = parseBlocks(file.baseContent);
@@ -722,7 +745,7 @@ export default function DiffViewer({
                       <div
                         className="rendered-block diff-content"
                         dangerouslySetInnerHTML={{
-                          __html: renderBlockHtml(blockToHtml(block.headText)),
+                          __html: renderBlockHtml(headBlockToHtml(block.headText)),
                         }}
                         onClick={handleMarkClick}
                       />
@@ -735,7 +758,7 @@ export default function DiffViewer({
                         </div>
                         <div
                           dangerouslySetInnerHTML={{
-                            __html: renderBlockHtml(blockToHtml(block.headText)),
+                            __html: renderBlockHtml(headBlockToHtml(block.headText)),
                           }}
                           onClick={handleMarkClick}
                         />
@@ -749,7 +772,7 @@ export default function DiffViewer({
                         </div>
                         <div
                           dangerouslySetInnerHTML={{
-                            __html: renderBlockHtml(blockToHtml(block.baseText)),
+                            __html: renderBlockHtml(baseBlockToHtml(block.baseText)),
                           }}
                         />
                       </div>
@@ -764,7 +787,7 @@ export default function DiffViewer({
                           className="text-sm leading-relaxed"
                           dangerouslySetInnerHTML={{
                             __html: renderBlockHtml(
-                              blockToHtml(block.diffHtml || block.headText)
+                              headBlockToHtml(block.diffHtml || block.headText)
                             ),
                           }}
                           onClick={handleMarkClick}
@@ -796,7 +819,7 @@ export default function DiffViewer({
                       <div
                         key={idx}
                         className="mb-1"
-                        dangerouslySetInnerHTML={{ __html: renderBlockHtml(blockToHtml(block)) }}
+                        dangerouslySetInnerHTML={{ __html: renderBlockHtml(baseBlockToHtml(block)) }}
                         onClick={handleMarkClick}
                       />
                     ))}
@@ -811,7 +834,7 @@ export default function DiffViewer({
                       <div
                         key={idx}
                         className="mb-1"
-                        dangerouslySetInnerHTML={{ __html: renderBlockHtml(blockToHtml(block)) }}
+                        dangerouslySetInnerHTML={{ __html: renderBlockHtml(headBlockToHtml(block)) }}
                         onClick={handleMarkClick}
                       />
                     ))}

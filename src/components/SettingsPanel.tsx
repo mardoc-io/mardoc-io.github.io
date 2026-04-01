@@ -192,8 +192,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
                   <div className="mt-4 pt-4 border-t border-[var(--border)]">
                     <p className="text-xs text-[var(--text-muted)]">
-                      When Auth0 is configured, you can log in with GitHub OAuth instead.
-                      Currently running in {isDemoMode ? "demo" : "connected"} mode.
+                      Your token never leaves your browser. MarDoc runs entirely client-side — there is no server.
+                      Your token is stored in local storage and used to call the GitHub API directly from your machine.
                     </p>
                   </div>
                 </div>
