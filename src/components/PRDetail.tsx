@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   GitPullRequest,
   GitMerge,
@@ -10,9 +10,9 @@ import {
   FileText,
   Loader2,
 } from "lucide-react";
-import { PullRequest, PRFile, PRComment } from "@/types";
+import { PullRequest, PRComment } from "@/types";
 import { useApp } from "@/lib/app-context";
-import { createPRComment, createInlineComment, fetchPRFiles, fetchPRComments } from "@/lib/github-api";
+import { createPRComment, createInlineComment } from "@/lib/github-api";
 import DiffViewer from "./DiffViewer";
 import Showdown from "showdown";
 
@@ -31,34 +31,28 @@ interface PRDetailProps {
 }
 
 export default function PRDetail({ pr, onBack }: PRDetailProps) {
-  const { currentRepo, isDemoMode } = useApp();
-  const [selectedFileIdx, setSelectedFileIdx] = useState(0);
-  const [files, setFiles] = useState<PRFile[]>(pr.files);
-  const [comments, setComments] = useState<PRComment[]>(pr.comments);
-  const [loadingFiles, setLoadingFiles] = useState(false);
+  const {
+    currentRepo,
+    isDemoMode,
+    prFiles,
+    prComments,
+    selectedPRFileIdx,
+  } = useApp();
+
+  const [comments, setComments] = useState<PRComment[]>(prComments);
   const [reviewStatus, setReviewStatus] = useState<
     "pending" | "approved" | "changes-requested" | null
   >(null);
   const [postingComment, setPostingComment] = useState(false);
 
-  // Fetch PR files and comments for real repos (they come back empty from the list endpoint)
-  useEffect(() => {
-    if (isDemoMode || !currentRepo || files.length > 0) return;
+  // Sync comments from context when they load
+  React.useEffect(() => {
+    if (prComments.length > 0 && comments.length === 0) {
+      setComments(prComments);
+    }
+  }, [prComments, comments.length]);
 
-    setLoadingFiles(true);
-    Promise.all([
-      fetchPRFiles(currentRepo, pr.number),
-      fetchPRComments(currentRepo, pr.number),
-    ])
-      .then(([fetchedFiles, fetchedComments]) => {
-        setFiles(fetchedFiles);
-        setComments(fetchedComments);
-      })
-      .catch((err) => {
-        console.error("Failed to load PR details:", err);
-      })
-      .finally(() => setLoadingFiles(false));
-  }, [isDemoMode, currentRepo, pr.number, files.length]);
+  const selectedFile = prFiles[selectedPRFileIdx];
 
   const handleAddComment = useCallback(async (
     blockIndex: number,
@@ -67,9 +61,8 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     startLine?: number,
     endLine?: number
   ) => {
-    const file = files[selectedFileIdx];
+    const file = prFiles[selectedPRFileIdx];
 
-    // Optimistically add locally first
     const newComment: PRComment = {
       id: `c-${Date.now()}`,
       author: "you",
@@ -82,13 +75,10 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     };
     setComments((prev) => [...prev, newComment]);
 
-    // Post to GitHub if connected
     if (!isDemoMode && currentRepo && pr.number && file) {
       setPostingComment(true);
       try {
         if (selectedText && endLine) {
-          // Use inline review comment API (tied to file + line range)
-          // Build body with quoted context
           let commentBody = body;
           if (selectedText) {
             commentBody = `> _"${selectedText}"_\n\n${body}`;
@@ -104,7 +94,6 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
             "RIGHT"
           );
         } else {
-          // Fall back to general PR comment for non-selection comments
           let fullBody = body;
           if (file) {
             fullBody = `**${file.path}**\n\n${fullBody}`;
@@ -113,7 +102,6 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
         }
       } catch (err) {
         console.error("Failed to post comment to GitHub:", err);
-        // If inline comment fails (e.g., line out of range), fall back to general comment
         try {
           let fallbackBody = body;
           if (selectedText) {
@@ -130,7 +118,7 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
         setPostingComment(false);
       }
     }
-  }, [currentRepo, isDemoMode, pr.number, files, selectedFileIdx]);
+  }, [currentRepo, isDemoMode, pr.number, prFiles, selectedPRFileIdx]);
 
   const handleResolveComment = (commentId: string) => {
     setComments((prev) =>
@@ -142,80 +130,58 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     <div className="h-full flex flex-col">
       {/* PR Header */}
       <div className="border-b border-[var(--border)] bg-[var(--surface)]">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--accent)] mb-3 transition-colors"
-          >
-            <ArrowLeft size={12} />
-            Back to PR list
-          </button>
+        <div className="px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                onClick={onBack}
+                className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors shrink-0"
+              >
+                <ArrowLeft size={12} />
+                Back
+              </button>
 
-          <div className="flex items-start gap-3">
-            {pr.status === "merged" ? (
-              <GitMerge size={20} className="text-purple-500 shrink-0 mt-0.5" />
-            ) : (
-              <GitPullRequest size={20} className="text-green-500 shrink-0 mt-0.5" />
-            )}
-            <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-semibold text-[var(--text-primary)]">
-                {pr.title}{" "}
-                <span className="text-[var(--text-muted)] font-normal">
-                  #{pr.number}
-                </span>
-              </h1>
-              <div className="flex items-center gap-3 mt-1 text-xs text-[var(--text-secondary)]">
-                <span>
-                  <strong>{pr.author}</strong> wants to merge{" "}
-                  <span className="font-mono bg-[var(--surface-secondary)] px-1.5 py-0.5 rounded">
-                    {pr.headBranch}
-                  </span>{" "}
-                  into{" "}
-                  <span className="font-mono bg-[var(--surface-secondary)] px-1.5 py-0.5 rounded">
-                    {pr.baseBranch}
-                  </span>
-                </span>
-                <span className="text-[var(--text-muted)]">
-                  {new Date(pr.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-              {pr.description && (
-                <details className="mt-2">
-                  <summary className="text-xs text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-secondary)] transition-colors">
-                    Description
-                  </summary>
-                  <div
-                    className="text-sm text-[var(--text-secondary)] mt-1 prose prose-sm dark:prose-invert max-w-none max-h-48 overflow-y-auto pr-description"
-                    dangerouslySetInnerHTML={{
-                      __html: descriptionConverter.makeHtml(pr.description),
-                    }}
-                  />
-                </details>
+              {pr.status === "merged" ? (
+                <GitMerge size={16} className="text-purple-500 shrink-0" />
+              ) : (
+                <GitPullRequest size={16} className="text-green-500 shrink-0" />
               )}
-            </div>
-          </div>
 
-          {/* File tabs and review actions */}
-          <div className="flex items-center justify-between mt-4">
-            <div className="flex items-center gap-1">
-              {files.map((file, idx) => (
-                <button
-                  key={file.path}
-                  onClick={() => setSelectedFileIdx(idx)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
-                    selectedFileIdx === idx
-                      ? "bg-[var(--accent-muted)] text-[var(--accent)] font-medium"
-                      : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
-                  }`}
-                >
-                  <FileText size={12} />
-                  {file.path.split("/").pop()}
-                </button>
-              ))}
+              <div className="min-w-0">
+                <h1 className="text-sm font-semibold text-[var(--text-primary)] truncate">
+                  {pr.title}{" "}
+                  <span className="text-[var(--text-muted)] font-normal">#{pr.number}</span>
+                </h1>
+                <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                  <span>
+                    <strong>{pr.author}</strong>{" "}
+                    <span className="font-mono text-[10px] bg-[var(--surface-secondary)] px-1 py-0.5 rounded">
+                      {pr.headBranch}
+                    </span>
+                    {" → "}
+                    <span className="font-mono text-[10px] bg-[var(--surface-secondary)] px-1 py-0.5 rounded">
+                      {pr.baseBranch}
+                    </span>
+                  </span>
+                  {pr.description && (
+                    <details className="inline">
+                      <summary className="text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-secondary)] transition-colors">
+                        Description
+                      </summary>
+                    </details>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Review actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
+              {selectedFile && (
+                <span className="text-xs text-[var(--text-muted)] font-mono hidden sm:block">
+                  {selectedFile.path}
+                </span>
+              )}
+
               <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
                 {postingComment ? (
                   <>
@@ -225,7 +191,7 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
                 ) : (
                   <>
                     <MessageSquare size={12} />
-                    {comments.filter((c) => !c.resolved).length} active
+                    {comments.filter((c) => !c.resolved).length}
                   </>
                 )}
               </div>
@@ -239,9 +205,7 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
                   }`}
                 >
                   <Check size={12} />
-                  {reviewStatus === "approved"
-                    ? "Approved"
-                    : "Changes Requested"}
+                  {reviewStatus === "approved" ? "Approved" : "Changes Requested"}
                 </span>
               ) : (
                 <div className="flex items-center gap-1">
@@ -261,37 +225,34 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
               )}
             </div>
           </div>
+
+          {/* Expanded description */}
+          {pr.description && (
+            <div className="mt-2 text-sm text-[var(--text-secondary)] prose prose-sm dark:prose-invert max-w-none max-h-32 overflow-y-auto hidden [details[open]~&]:block">
+            </div>
+          )}
         </div>
       </div>
 
       {/* Diff viewer */}
       <div className="flex-1 overflow-hidden">
-        {loadingFiles ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="flex items-center gap-2 text-[var(--text-muted)]">
-              <Loader2 size={18} className="animate-spin" />
-              <span className="text-sm">Loading PR files...</span>
-            </div>
-          </div>
-        ) : files.length === 0 ? (
+        {prFiles.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <p className="text-sm text-[var(--text-muted)]">
               No markdown files changed in this PR.
             </p>
           </div>
-        ) : (
+        ) : selectedFile ? (
           <DiffViewer
-            file={files[selectedFileIdx]}
+            file={selectedFile}
             repoFullName={currentRepo || ""}
             baseBranch={pr.baseBranch}
             headBranch={pr.headBranch}
-            comments={comments.filter(
-              (c) => true /* In a real app, filter by file */
-            )}
+            comments={comments}
             onAddComment={handleAddComment}
             onResolveComment={handleResolveComment}
           />
-        )}
+        ) : null}
       </div>
     </div>
   );

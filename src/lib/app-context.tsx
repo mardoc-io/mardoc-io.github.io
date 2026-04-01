@@ -1,8 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
-import { RepoFile, PullRequest, ViewMode } from "@/types";
-import { initOctokit, fetchRepoTree, fetchPullRequests, fetchFileContent } from "./github-api";
+import { RepoFile, PullRequest, PRFile, PRComment, ViewMode } from "@/types";
+import { initOctokit, fetchRepoTree, fetchPullRequests, fetchFileContent, fetchPRFiles, fetchPRComments } from "./github-api";
 import { repoFiles as mockFiles, pullRequests as mockPRs, findFile } from "./mock-data";
 
 interface AppState {
@@ -27,6 +27,13 @@ interface AppState {
   setSelectedPR: (pr: PullRequest | null) => void;
   fileContent: string;
 
+  // PR detail state (shared between sidebar and PRDetail)
+  prFiles: PRFile[];
+  prComments: PRComment[];
+  selectedPRFileIdx: number;
+  setSelectedPRFileIdx: (idx: number) => void;
+  loadingPRFiles: boolean;
+
   // Loading states
   loadingFiles: boolean;
   loadingPRs: boolean;
@@ -36,6 +43,7 @@ interface AppState {
   // Actions
   refreshRepo: () => Promise<void>;
   openFile: (file: RepoFile) => Promise<void>;
+  openPR: (pr: PullRequest) => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -64,6 +72,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [selectedFile, setSelectedFile] = useState<RepoFile | null>(null);
   const [selectedPR, setSelectedPR] = useState<PullRequest | null>(null);
   const [fileContent, setFileContent] = useState("");
+
+  // PR detail state
+  const [prFiles, setPRFiles] = useState<PRFile[]>([]);
+  const [prComments, setPRComments] = useState<PRComment[]>([]);
+  const [selectedPRFileIdx, setSelectedPRFileIdx] = useState(0);
+  const [loadingPRFiles, setLoadingPRFiles] = useState(false);
 
   // Loading
   const [loadingFiles, setLoadingFiles] = useState(false);
@@ -168,6 +182,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [isDemoMode, currentRepo, githubToken]
   );
 
+  // Open a PR and fetch its files + comments
+  const openPR = useCallback(
+    (pr: PullRequest) => {
+      setSelectedPR(pr);
+      setSelectedFile(null);
+      setCurrentView("pr-diff");
+      setSelectedPRFileIdx(0);
+
+      // Use demo data if available
+      if (pr.files.length > 0) {
+        setPRFiles(pr.files);
+        setPRComments(pr.comments);
+        return;
+      }
+
+      // Fetch from GitHub
+      if (!currentRepo || isDemoMode) return;
+
+      setLoadingPRFiles(true);
+      Promise.all([
+        fetchPRFiles(currentRepo, pr.number),
+        fetchPRComments(currentRepo, pr.number),
+      ])
+        .then(([files, comments]) => {
+          setPRFiles(files);
+          setPRComments(comments);
+        })
+        .catch((err) => console.error("Failed to load PR details:", err))
+        .finally(() => setLoadingPRFiles(false));
+    },
+    [currentRepo, isDemoMode]
+  );
+
   // Refresh the current repo
   const refreshRepo = useCallback(async () => {
     if (currentRepo && githubToken) {
@@ -193,12 +240,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         selectedPR,
         setSelectedPR,
         fileContent,
+        prFiles,
+        prComments,
+        selectedPRFileIdx,
+        setSelectedPRFileIdx,
+        loadingPRFiles,
         loadingFiles,
         loadingPRs,
         loadingContent,
         error,
         refreshRepo,
         openFile,
+        openPR,
       }}
     >
       {children}

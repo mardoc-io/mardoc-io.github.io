@@ -26,6 +26,7 @@ export default function Home() {
     setSelectedPR,
     fileContent,
     loadingContent,
+    loadingPRFiles,
     error,
     isDemoMode,
     currentRepo,
@@ -99,13 +100,22 @@ export default function Home() {
               />
             )
           ) : currentView === "pr-diff" && selectedPR ? (
-            <PRDetail
-              pr={selectedPR}
-              onBack={() => {
-                setSelectedPR(null);
-                setCurrentView("editor");
-              }}
-            />
+            loadingPRFiles ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                  <Loader2 size={18} className="animate-spin" />
+                  <span className="text-sm">Loading PR files...</span>
+                </div>
+              </div>
+            ) : (
+              <PRDetail
+                pr={selectedPR}
+                onBack={() => {
+                  setSelectedPR(null);
+                  setCurrentView("editor");
+                }}
+              />
+            )
           ) : currentView === "pr-review" ? (
             <PRReview
               onCreatePR={(title, description, filePath) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   FileText,
   Folder,
@@ -11,9 +11,18 @@ import {
   ChevronDown,
   Plus,
   Loader2,
+  FilePlus,
+  FileMinus,
+  FileEdit,
+  Search,
+  X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
-import { RepoFile } from "@/types";
+import { RepoFile, PRFile } from "@/types";
 import { useApp } from "@/lib/app-context";
+
+// ─── Repo file tree item ──────────────────────────────────────────────────
 
 function FileTreeItem({
   file,
@@ -82,6 +91,132 @@ function FileTreeItem({
   );
 }
 
+// ─── PR changed files tree ────────────────────────────────────────────────
+
+interface PRFileTreeNode {
+  name: string;
+  path: string;
+  type: "folder" | "file";
+  children: PRFileTreeNode[];
+  fileIdx?: number;
+  status?: PRFile["status"];
+}
+
+function buildPRFileTree(files: PRFile[]): PRFileTreeNode[] {
+  const root: PRFileTreeNode[] = [];
+  const dirMap = new Map<string, PRFileTreeNode>();
+
+  for (let i = 0; i < files.length; i++) {
+    const parts = files[i].path.split("/");
+    let currentLevel = root;
+
+    // Create directory nodes
+    for (let j = 0; j < parts.length - 1; j++) {
+      const dirPath = parts.slice(0, j + 1).join("/");
+      let dirNode = dirMap.get(dirPath);
+      if (!dirNode) {
+        dirNode = { name: parts[j], path: dirPath, type: "folder", children: [] };
+        dirMap.set(dirPath, dirNode);
+        currentLevel.push(dirNode);
+      }
+      currentLevel = dirNode.children;
+    }
+
+    // Add file node
+    currentLevel.push({
+      name: parts[parts.length - 1],
+      path: files[i].path,
+      type: "file",
+      children: [],
+      fileIdx: i,
+      status: files[i].status,
+    });
+  }
+
+  return root;
+}
+
+const statusIcon = (status: PRFile["status"]) => {
+  switch (status) {
+    case "added":
+      return <FilePlus size={14} className="text-green-500 shrink-0" />;
+    case "deleted":
+      return <FileMinus size={14} className="text-red-500 shrink-0" />;
+    default:
+      return <FileEdit size={14} className="text-yellow-500 shrink-0" />;
+  }
+};
+
+function PRFileTreeItem({
+  node,
+  depth,
+  selectedIdx,
+  onSelect,
+}: {
+  node: PRFileTreeNode;
+  depth: number;
+  selectedIdx: number;
+  onSelect: (idx: number) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  if (node.type === "folder") {
+    return (
+      <div>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full flex items-center gap-1.5 px-2 py-1 text-sm rounded-md hover:bg-[var(--surface-hover)] transition-colors"
+          style={{ paddingLeft: `${depth * 14 + 8}px` }}
+        >
+          {expanded ? (
+            <ChevronDown size={12} className="text-[var(--text-muted)] shrink-0" />
+          ) : (
+            <ChevronRight size={12} className="text-[var(--text-muted)] shrink-0" />
+          )}
+          {expanded ? (
+            <FolderOpen size={14} className="text-[var(--accent)] shrink-0" />
+          ) : (
+            <Folder size={14} className="text-[var(--accent)] shrink-0" />
+          )}
+          <span className="text-[var(--text-primary)] truncate text-xs">{node.name}</span>
+        </button>
+        {expanded && (
+          <div>
+            {node.children.map((child) => (
+              <PRFileTreeItem
+                key={child.path}
+                node={child}
+                depth={depth + 1}
+                selectedIdx={selectedIdx}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const isSelected = node.fileIdx === selectedIdx;
+
+  return (
+    <button
+      onClick={() => node.fileIdx !== undefined && onSelect(node.fileIdx)}
+      className={`w-full flex items-center gap-1.5 px-2 py-1 text-xs rounded-md transition-colors ${
+        isSelected
+          ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+          : "hover:bg-[var(--surface-hover)] text-[var(--text-secondary)]"
+      }`}
+      style={{ paddingLeft: `${depth * 14 + 8 + 16}px` }}
+    >
+      {statusIcon(node.status!)}
+      <span className="truncate">{node.name}</span>
+    </button>
+  );
+}
+
+// ─── Main Sidebar ─────────────────────────────────────────────────────────
+
 export default function Sidebar() {
   const {
     repoFiles,
@@ -91,13 +226,53 @@ export default function Sidebar() {
     loadingFiles,
     loadingPRs,
     openFile,
-    setSelectedPR,
+    openPR,
     setCurrentView,
     selectedFile,
     selectedPR,
+    currentView,
+    prFiles,
+    selectedPRFileIdx,
+    setSelectedPRFileIdx,
+    loadingPRFiles,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<"files" | "prs">("files");
+  const [prFileFilter, setPRFileFilter] = useState("");
+  const [collapsed, setCollapsed] = useState(false);
+
+  const isViewingPR = currentView === "pr-diff" && selectedPR;
+
+  // Auto-switch to Files tab when a PR is opened (to show changed files)
+  React.useEffect(() => {
+    if (isViewingPR) {
+      setActiveTab("files");
+      setPRFileFilter("");
+    }
+  }, [isViewingPR]);
+
+  // Build PR file tree, filtered
+  const prFileTree = useMemo(() => {
+    if (!isViewingPR) return [];
+    const filtered = prFileFilter.trim()
+      ? prFiles.filter((f) => f.path.toLowerCase().includes(prFileFilter.toLowerCase()))
+      : prFiles;
+    return buildPRFileTree(filtered);
+  }, [isViewingPR, prFiles, prFileFilter]);
+
+  if (collapsed) {
+    return (
+      <aside className="w-10 shrink-0 h-full border-r border-[var(--border)] bg-[var(--surface-secondary)] flex flex-col items-center pt-2">
+        <button
+          onClick={() => setCollapsed(false)}
+          className="toolbar-btn"
+          title="Expand sidebar"
+        >
+          <PanelLeftOpen size={16} />
+        </button>
+      </aside>
+    );
+  }
 
   return (
     <aside className="w-64 shrink-0 h-full border-r border-[var(--border)] bg-[var(--surface-secondary)] flex flex-col">
@@ -129,12 +304,77 @@ export default function Sidebar() {
             PRs
           </span>
         </button>
+        <button
+          onClick={() => setCollapsed(true)}
+          className="px-2 py-2.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+          title="Collapse sidebar"
+        >
+          <PanelLeftClose size={14} />
+        </button>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-2">
         {activeTab === "files" ? (
-          loadingFiles ? (
+          // When viewing a PR, show changed files; otherwise show repo tree
+          isViewingPR ? (
+            <div>
+              <div className="flex items-center justify-between mb-2 px-1">
+                <span className="text-xs font-medium text-[var(--text-primary)]">
+                  Changed files
+                  {prFiles.length > 0 && (
+                    <span className="text-[var(--text-muted)] font-normal ml-1">
+                      ({prFiles.length})
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {/* Filter */}
+              {prFiles.length > 3 && (
+                <div className="relative mb-2">
+                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                  <input
+                    type="text"
+                    value={prFileFilter}
+                    onChange={(e) => setPRFileFilter(e.target.value)}
+                    placeholder="Filter files..."
+                    className="w-full pl-7 pr-7 py-1 text-xs rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                  />
+                  {prFileFilter && (
+                    <button
+                      onClick={() => setPRFileFilter("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    >
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {loadingPRFiles ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 size={18} className="animate-spin text-[var(--text-muted)]" />
+                </div>
+              ) : prFileTree.length === 0 ? (
+                <p className="text-xs text-[var(--text-muted)] text-center py-4">
+                  {prFileFilter ? "No files matching filter." : "No markdown files changed."}
+                </p>
+              ) : (
+                <div className="space-y-0.5">
+                  {prFileTree.map((node) => (
+                    <PRFileTreeItem
+                      key={node.path}
+                      node={node}
+                      depth={0}
+                      selectedIdx={selectedPRFileIdx}
+                      onSelect={setSelectedPRFileIdx}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : loadingFiles ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 size={18} className="animate-spin text-[var(--text-muted)]" />
             </div>
@@ -182,10 +422,7 @@ export default function Sidebar() {
               pullRequests.map((pr) => (
                 <button
                   key={pr.id}
-                  onClick={() => {
-                    setSelectedPR(pr);
-                    setCurrentView("pr-diff");
-                  }}
+                  onClick={() => openPR(pr)}
                   className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${
                     selectedPR?.id === pr.id
                       ? "bg-[var(--accent-muted)]"
