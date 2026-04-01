@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   GitPullRequest,
   GitMerge,
@@ -10,9 +10,9 @@ import {
   FileText,
   Loader2,
 } from "lucide-react";
-import { PullRequest, PRComment } from "@/types";
+import { PullRequest, PRFile, PRComment } from "@/types";
 import { useApp } from "@/lib/app-context";
-import { createPRComment, createInlineComment } from "@/lib/github-api";
+import { createPRComment, createInlineComment, fetchPRFiles, fetchPRComments } from "@/lib/github-api";
 import DiffViewer from "./DiffViewer";
 
 interface PRDetailProps {
@@ -23,11 +23,32 @@ interface PRDetailProps {
 export default function PRDetail({ pr, onBack }: PRDetailProps) {
   const { currentRepo, isDemoMode } = useApp();
   const [selectedFileIdx, setSelectedFileIdx] = useState(0);
+  const [files, setFiles] = useState<PRFile[]>(pr.files);
   const [comments, setComments] = useState<PRComment[]>(pr.comments);
+  const [loadingFiles, setLoadingFiles] = useState(false);
   const [reviewStatus, setReviewStatus] = useState<
     "pending" | "approved" | "changes-requested" | null
   >(null);
   const [postingComment, setPostingComment] = useState(false);
+
+  // Fetch PR files and comments for real repos (they come back empty from the list endpoint)
+  useEffect(() => {
+    if (isDemoMode || !currentRepo || files.length > 0) return;
+
+    setLoadingFiles(true);
+    Promise.all([
+      fetchPRFiles(currentRepo, pr.number),
+      fetchPRComments(currentRepo, pr.number),
+    ])
+      .then(([fetchedFiles, fetchedComments]) => {
+        setFiles(fetchedFiles);
+        setComments(fetchedComments);
+      })
+      .catch((err) => {
+        console.error("Failed to load PR details:", err);
+      })
+      .finally(() => setLoadingFiles(false));
+  }, [isDemoMode, currentRepo, pr.number, files.length]);
 
   const handleAddComment = useCallback(async (
     blockIndex: number,
@@ -36,7 +57,7 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     startLine?: number,
     endLine?: number
   ) => {
-    const file = pr.files[selectedFileIdx];
+    const file = files[selectedFileIdx];
 
     // Optimistically add locally first
     const newComment: PRComment = {
@@ -99,7 +120,7 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
         setPostingComment(false);
       }
     }
-  }, [currentRepo, isDemoMode, pr.number, pr.files, selectedFileIdx]);
+  }, [currentRepo, isDemoMode, pr.number, files, selectedFileIdx]);
 
   const handleResolveComment = (commentId: string) => {
     setComments((prev) =>
@@ -159,7 +180,7 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
           {/* File tabs and review actions */}
           <div className="flex items-center justify-between mt-4">
             <div className="flex items-center gap-1">
-              {pr.files.map((file, idx) => (
+              {files.map((file, idx) => (
                 <button
                   key={file.path}
                   onClick={() => setSelectedFileIdx(idx)}
@@ -227,14 +248,29 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
 
       {/* Diff viewer */}
       <div className="flex-1 overflow-hidden">
-        <DiffViewer
-          file={pr.files[selectedFileIdx]}
-          comments={comments.filter(
-            (c) => true /* In a real app, filter by file */
-          )}
-          onAddComment={handleAddComment}
-          onResolveComment={handleResolveComment}
-        />
+        {loadingFiles ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="flex items-center gap-2 text-[var(--text-muted)]">
+              <Loader2 size={18} className="animate-spin" />
+              <span className="text-sm">Loading PR files...</span>
+            </div>
+          </div>
+        ) : files.length === 0 ? (
+          <div className="h-full flex items-center justify-center">
+            <p className="text-sm text-[var(--text-muted)]">
+              No markdown files changed in this PR.
+            </p>
+          </div>
+        ) : (
+          <DiffViewer
+            file={files[selectedFileIdx]}
+            comments={comments.filter(
+              (c) => true /* In a real app, filter by file */
+            )}
+            onAddComment={handleAddComment}
+            onResolveComment={handleResolveComment}
+          />
+        )}
       </div>
     </div>
   );
