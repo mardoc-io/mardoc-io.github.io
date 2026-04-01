@@ -15,7 +15,8 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import Showdown from "showdown";
-import { rewriteImageUrls, loadAuthenticatedImages } from "@/lib/github-api";
+import { rewriteImageUrls, loadAuthenticatedImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent } from "@/lib/github-api";
+import { useApp } from "@/lib/app-context";
 import { preRenderMermaid } from "@/lib/mermaid";
 import { useWideFormat } from "@/lib/use-wide-format";
 import {
@@ -46,6 +47,9 @@ import {
   ChevronRight,
   Maximize2,
   Minimize2,
+  GitPullRequest,
+  ExternalLink,
+  Loader2,
 } from "lucide-react";
 
 interface EditorProps {
@@ -383,12 +387,16 @@ function CommentSidePanel({
 
 export default function Editor({ content, onContentChange, filePath, repoFullName, branch }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
+  const { isDemoMode, refreshRepo } = useApp();
   const { wide, toggle: toggleWide, contentClass } = useWideFormat();
   const [comments, setComments] = useState<EditorComment[]>([]);
   const [showComments, setShowComments] = useState(false);
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const [commentInput, setCommentInput] = useState("");
+  const [submittingPR, setSubmittingPR] = useState(false);
+  const [submittedPR, setSubmittedPR] = useState<{ url: string; number: number } | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -447,6 +455,8 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     setComments([]);
     setShowComments(false);
     setActiveCommentId(null);
+    setSubmittedPR(null);
+    setSubmitError(null);
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath, editor]);
@@ -518,6 +528,59 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       prev.map((c) => (c.id === commentId ? { ...c, resolved: true } : c))
     );
   }, []);
+
+  const handleSubmitAsPR = useCallback(async () => {
+    if (!repoFullName || isDemoMode) return;
+
+    const activeComments = comments.filter((c) => !c.resolved);
+    if (activeComments.length === 0) return;
+
+    setSubmittingPR(true);
+    setSubmitError(null);
+
+    try {
+      // Build a description from the comments
+      const description = activeComments
+        .map((c) => `> ${c.selectedText}\n\n${c.body}`)
+        .join("\n\n---\n\n");
+
+      // Create the review PR (creates branch, appends space, opens PR)
+      const pr = await createReviewPR(
+        repoFullName,
+        `Review comments on ${filePath}`,
+        description,
+        filePath
+      );
+
+      // Fetch the file content to map selections to line numbers
+      const fileSource = content;
+
+      // Post each comment as an inline review comment
+      for (const comment of activeComments) {
+        const { startLine, endLine } = mapSelectionToLines(fileSource, comment.selectedText);
+        try {
+          await createInlineComment(
+            repoFullName,
+            pr.number,
+            comment.body,
+            filePath,
+            endLine,
+            startLine !== endLine ? startLine : undefined
+          );
+        } catch {
+          // If inline fails, the comment is still in the PR description
+        }
+      }
+
+      setSubmittedPR(pr);
+      // Refresh PR list so the new PR appears in the sidebar
+      refreshRepo();
+    } catch (err: any) {
+      setSubmitError(err.message || "Failed to create PR");
+    } finally {
+      setSubmittingPR(false);
+    }
+  }, [repoFullName, isDemoMode, comments, filePath, content, refreshRepo]);
 
   if (!editor) return null;
 
@@ -640,8 +703,38 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
             title="Redo (⌘⇧Z)"
           />
 
-          {/* Wide format + comment toggle — right side */}
+          {/* Wide format + comment toggle + submit PR — right side */}
           <div className="ml-auto flex items-center gap-1">
+            {/* Submit as PR — only when authenticated and comments exist */}
+            {!isDemoMode && activeCount > 0 && !submittedPR && (
+              <button
+                onClick={handleSubmitAsPR}
+                disabled={submittingPR}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
+                title="Submit comments as a PR review"
+              >
+                {submittingPR ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <GitPullRequest size={13} />
+                )}
+                {submittingPR ? "Creating..." : "Submit as PR"}
+              </button>
+            )}
+            {submittedPR && (
+              <a
+                href={submittedPR.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors"
+              >
+                <ExternalLink size={13} />
+                PR #{submittedPR.number}
+              </a>
+            )}
+            {submitError && (
+              <span className="text-xs text-red-500 px-2">{submitError}</span>
+            )}
             <button
               onClick={toggleWide}
               className={`toolbar-btn ${wide ? "active" : ""}`}
