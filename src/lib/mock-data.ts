@@ -103,6 +103,92 @@ The editor supports GitHub webhooks for real-time synchronization. Configure you
 `,
       },
       {
+        id: "9",
+        name: "creating-a-github-pat.md",
+        path: "docs/creating-a-github-pat.md",
+        type: "file",
+        content: `# Creating a GitHub Personal Access Token
+
+mardoc.app connects to your GitHub repositories using a **Personal Access Token (PAT)**. This guide walks you through creating one with the right permissions.
+
+## Step 1: Open GitHub Token Settings
+
+Navigate to [github.com/settings/tokens](https://github.com/settings/tokens) and click **Generate new token** → **Generate new token (classic)**.
+
+> **Tip**: You can also use fine-grained tokens for tighter scope control. The steps below cover classic tokens, which are simpler to set up.
+
+## Step 2: Configure the Token
+
+| Setting | Value |
+|---------|-------|
+| **Note** | \`mardoc.app\` (or any label you'll recognize) |
+| **Expiration** | 90 days recommended — you can always regenerate |
+| **Scopes** | See below |
+
+### Required Scopes
+
+Select these scopes:
+
+- \`repo\` — Full control of private repositories (read/write access to code, PRs, and issues)
+
+That's it. mardoc.app only needs \`repo\` scope.
+
+\`\`\`
+✅  repo
+  ✅  repo:status
+  ✅  repo_deployment
+  ✅  public_repo
+  ✅  repo:invite
+  ✅  security_events
+\`\`\`
+
+### Optional Scopes
+
+These are **not required** but enable additional features:
+
+| Scope | Enables |
+|-------|---------|
+| \`read:org\` | Browsing organization repositories |
+| \`read:user\` | Displaying your profile info in the app |
+
+## Step 3: Generate and Copy
+
+1. Click **Generate token**
+2. **Copy the token immediately** — GitHub will not show it again
+3. Store it somewhere safe (a password manager is ideal)
+
+## Step 4: Connect to mardoc.app
+
+1. Open mardoc.app
+2. Click the **⚙ Settings** icon in the sidebar
+3. Paste your token into the **GitHub Token** field
+4. Click **Connect**
+
+You should see your repositories appear in the sidebar. You're all set!
+
+## Troubleshooting
+
+### "Bad credentials" error
+
+- Double-check that you copied the full token (it starts with \`ghp_\`)
+- Verify the token hasn't expired in your [GitHub settings](https://github.com/settings/tokens)
+
+### Can't see a repository
+
+- Ensure the token has \`repo\` scope
+- For organization repos, you may need \`read:org\` scope and SSO authorization
+- Check that you have at least read access to the repository
+
+### Token expired
+
+Generate a new token following the steps above, then update it in mardoc.app Settings.
+
+---
+
+*Need help? Open an issue at [github.com/mardoc-io/mardoc-io.github.io](https://github.com/mardoc-io/mardoc-io.github.io/issues).*
+`,
+      },
+      {
         id: "8",
         name: "contributing.md",
         path: "docs/contributing.md",
@@ -147,23 +233,103 @@ Please use GitHub Issues to report bugs. Include:
     type: "file",
     content: `# mardoc.app
 
-A collaborative markdown editor with GitHub integration, PR review capabilities, and inline commenting.
+A modern markdown workspace backed by GitHub. Edit, review, and collaborate on documentation — without leaving your browser.
 
 ## Overview
 
 mardoc.app brings a Notion-like editing experience to your GitHub-backed markdown files. Review PRs with rendered diffs, leave inline comments, and collaborate seamlessly.
 
-## Key Features
+## Features
 
-- Rich WYSIWYG markdown editing
-- GitHub repository integration
-- Pull request review with rendered diffs
-- Inline commenting and review threads
-- Light and dark mode support
+### Rich Editing
+
+Write in a WYSIWYG editor powered by TipTap — or drop into raw markdown. The editor supports everything you'd expect:
+
+| Syntax | Renders as | Shortcut |
+|--------|-----------|----------|
+| \`**bold**\` | **bold** | ⌘B |
+| \`*italic*\` | *italic* | ⌘I |
+| \`~~strike~~\` | ~~strike~~ | — |
+| \`> quote\` | blockquote | — |
+
+### Code Blocks
+
+Full syntax highlighting for all major languages:
+
+` + "```typescript\n" + `interface Document {
+  path: string;
+  content: string;
+  lastModified: Date;
+}
+
+async function loadDocument(path: string): Promise<Document> {
+  const response = await fetch(\`/api/files/\${path}\`);
+  return response.json();
+}
+` + "```\n\n```python\n" + `# Python works too
+def render_markdown(source: str) -> str:
+    """Convert markdown source to HTML."""
+    return markdown.convert(source)
+` + "```\n\n" + `### Diagrams with Mermaid
+
+Embed diagrams directly in your markdown — they render inline:
+
+` + "```mermaid\n" + `sequenceDiagram
+    participant User
+    participant mardoc
+    participant GitHub
+
+    User->>mardoc: Edit document
+    mardoc->>GitHub: Create branch
+    mardoc->>GitHub: Commit changes
+    mardoc->>GitHub: Open pull request
+    GitHub-->>mardoc: PR created
+    mardoc-->>User: Review link ready
+` + "```\n\n```mermaid\n" + `graph LR
+    A[Markdown Files] --> B[mardoc.app]
+    B --> C[GitHub Repository]
+    C --> D[Pull Requests]
+    D --> E[Review & Merge]
+    E --> A
+` + "```\n\n" + `### Pull Request Reviews
+
+Review documentation changes with rendered diffs — not raw markdown:
+
+| View Mode | Best For |
+|-----------|----------|
+| **Inline Diff** | Seeing what changed in the final output |
+| **Side by Side** | Comparing before and after, line by line |
+| **Preview** | Reading the result as a reader would |
+
+### Inline Comments
+
+Click any paragraph, heading, or code block to leave a comment anchored to that specific content. Comments thread into GitHub PR reviews.
+
+## GitHub Integration
+
+mardoc.app is a thin layer on top of GitHub. Your repository is the source of truth.
+
+` + "```mermaid\n" + `graph TD
+    A[Your Repository] -->|read| B[mardoc.app]
+    B -->|branch + commit| A
+    A -->|PR review| B
+    B -->|comments| A
+` + "```\n\n" + `| Permission | Why |
+|-----------|-----|
+| \`repo\` | Read files, create branches, open PRs |
+| \`read:org\` | *(optional)* Browse organization repos |
+
+We never store your code. Every read and write goes directly to the GitHub API. See the [PAT setup guide](docs/creating-a-github-pat.md) to get started.
+
+## Display Options
+
+- **Dark & Light Mode** — toggle in the header
+- **Wide Format** — expand the content area for tables and diagrams
+- **Branch Selector** — switch branches without leaving the editor
 
 ## Getting Started
 
-See the [Getting Started Guide](docs/getting-started.md) for installation and setup instructions.
+See the [Getting Started Guide](docs/getting-started.md) for setup instructions.
 
 ## License
 
@@ -177,19 +343,34 @@ MIT
     type: "file",
     content: `# Changelog
 
-## v0.1.0 - 2026-03-31
+## v0.3.0 - 2026-04-01
+
+### Added
+- Wide format toggle — expand content area for tables and diagrams
+- Branch selector — switch branches without leaving the editor
+- Restore last repo on return — picks up where you left off
+
+### Improved
+- Mermaid diagram rendering in Editor and DiffViewer
+- Image rendering from private repos via authenticated GitHub API
+
+## v0.2.0 - 2026-03-31
+
+### Added
+- PR file tree sidebar with collapsible navigation
+- Mermaid diagram support in rendered views
+- Private repo image rendering via GitHub API
+- Editor image and mermaid rendering fixes
+
+## v0.1.0 - 2026-03-30
 
 ### Added
 - Initial release with core editor functionality
-- GitHub mock integration
+- GitHub integration with PAT authentication
 - PR diff viewer with rendered comparison
 - Inline commenting system
 - Light and dark mode themes
 - File tree sidebar navigation
-
-### Known Issues
-- GitHub API integration is mocked (coming in v0.2.0)
-- Real-time collaboration not yet supported
 `,
   },
 ];
