@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { PullRequest, PRComment } from "@/types";
 import { useApp } from "@/lib/app-context";
-import { createPRComment, createInlineComment, replyToReviewComment, fetchPRComments } from "@/lib/github-api";
+import { createPRComment, createInlineComment, replyToReviewComment, fetchPRComments, resolveReviewThread } from "@/lib/github-api";
 import DiffViewer from "./DiffViewer";
 import Showdown from "showdown";
 
@@ -137,11 +137,23 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     }
   }, [currentRepo, isDemoMode, pr.number, prFiles, selectedPRFileIdx]);
 
-  const handleResolveComment = (commentId: string) => {
+  const handleResolveComment = useCallback(async (commentId: string) => {
+    const comment = comments.find((c) => c.id === commentId);
+
+    // Optimistic local update
     setComments((prev) =>
       prev.map((c) => (c.id === commentId ? { ...c, resolved: true } : c))
     );
-  };
+
+    // Push to GitHub if the comment has a thread ID
+    if (!isDemoMode && comment?.threadId) {
+      try {
+        await resolveReviewThread(comment.threadId, true);
+      } catch (err) {
+        console.error("Failed to resolve thread on GitHub:", err);
+      }
+    }
+  }, [comments, isDemoMode]);
 
   const handleReplyComment = useCallback(async (commentId: string, body: string) => {
     const comment = comments.find((c) => c.id === commentId);
