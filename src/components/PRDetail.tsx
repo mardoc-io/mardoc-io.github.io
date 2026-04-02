@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   GitPullRequest,
   GitMerge,
@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { PullRequest, PRComment } from "@/types";
 import { useApp } from "@/lib/app-context";
-import { createPRComment, createInlineComment } from "@/lib/github-api";
+import { createPRComment, createInlineComment, replyToReviewComment, fetchPRComments } from "@/lib/github-api";
 import DiffViewer from "./DiffViewer";
 import Showdown from "showdown";
 
@@ -52,6 +52,22 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     }
   }, [prComments, comments.length]);
 
+  // Poll for new comments every 30s when authenticated
+  useEffect(() => {
+    if (isDemoMode || !currentRepo || !pr.number) return;
+
+    const poll = setInterval(async () => {
+      try {
+        const fresh = await fetchPRComments(currentRepo, pr.number);
+        setComments(fresh);
+      } catch {
+        // Silently skip — next poll will retry
+      }
+    }, 30_000);
+
+    return () => clearInterval(poll);
+  }, [isDemoMode, currentRepo, pr.number]);
+
   const selectedFile = prFiles[selectedPRFileIdx];
 
   const handleAddComment = useCallback(async (
@@ -72,6 +88,7 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
       blockIndex,
       selectedText,
       resolved: false,
+      replies: [],
     };
     setComments((prev) => [...prev, newComment]);
 
@@ -125,6 +142,44 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
       prev.map((c) => (c.id === commentId ? { ...c, resolved: true } : c))
     );
   };
+
+  const handleReplyComment = useCallback(async (commentId: string, body: string) => {
+    const comment = comments.find((c) => c.id === commentId);
+
+    // Optimistic local update
+    const localReply = {
+      id: `r-${Date.now()}`,
+      author: "you",
+      avatarColor: "#2a9d8f",
+      body,
+      createdAt: new Date().toISOString(),
+    };
+    setComments((prev) =>
+      prev.map((c) =>
+        c.id === commentId
+          ? { ...c, replies: [...c.replies, localReply] }
+          : c
+      )
+    );
+
+    // Post to GitHub if authenticated and comment has a GitHub ID
+    if (!isDemoMode && currentRepo && pr.number && comment?.githubId) {
+      try {
+        await replyToReviewComment(currentRepo, pr.number, comment.githubId, body);
+      } catch (err) {
+        console.error("Failed to post reply to GitHub:", err);
+        // Fall back to a general PR comment with context
+        try {
+          const fallbackBody = comment.selectedText
+            ? `> _Re: "${comment.selectedText}"_\n\n${body}`
+            : body;
+          await createPRComment(currentRepo, pr.number, fallbackBody);
+        } catch (fallbackErr) {
+          console.error("Fallback reply also failed:", fallbackErr);
+        }
+      }
+    }
+  }, [comments, isDemoMode, currentRepo, pr.number]);
 
   return (
     <div className="h-full flex flex-col">
@@ -251,6 +306,7 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
             comments={comments}
             onAddComment={handleAddComment}
             onResolveComment={handleResolveComment}
+            onReplyComment={handleReplyComment}
           />
         ) : null}
       </div>

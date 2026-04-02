@@ -503,6 +503,15 @@ The application uses a modern React stack with Next.js for server-side rendering
         createdAt: "2026-03-30T15:00:00Z",
         blockIndex: 1,
         resolved: false,
+        replies: [
+          {
+            id: "c1-r1",
+            author: "joe.barnett",
+            avatarColor: "#264653",
+            body: "Thanks! I wanted to make sure the onboarding experience is smooth.",
+            createdAt: "2026-03-30T15:30:00Z",
+          },
+        ],
       },
       {
         id: "c2",
@@ -512,6 +521,7 @@ The application uses a modern React stack with Next.js for server-side rendering
         createdAt: "2026-03-30T16:30:00Z",
         blockIndex: 3,
         resolved: false,
+        replies: [],
       },
     ],
   },
@@ -654,6 +664,7 @@ The editor supports GitHub webhooks for real-time synchronization. Configure you
         createdAt: "2026-03-29T10:15:00Z",
         blockIndex: 5,
         resolved: false,
+        replies: [],
       },
     ],
   },

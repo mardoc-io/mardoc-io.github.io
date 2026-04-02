@@ -315,23 +315,56 @@ export async function fetchPRComments(
 
   const colors = ["#e76f51", "#2a9d8f", "#264653", "#e9c46a", "#f4a261"];
 
+  // Build a color map per author for consistency
+  const authorColors = new Map<string, string>();
+  const getColor = (author: string) => {
+    if (!authorColors.has(author)) {
+      authorColors.set(author, colors[authorColors.size % colors.length]);
+    }
+    return authorColors.get(author)!;
+  };
+
+  // Separate top-level review comments from replies using in_reply_to_id
+  const topLevel: typeof reviewComments.data = [];
+  const replyMap = new Map<number, typeof reviewComments.data>();
+
+  for (const c of reviewComments.data) {
+    const parentId = (c as any).in_reply_to_id;
+    if (parentId) {
+      if (!replyMap.has(parentId)) replyMap.set(parentId, []);
+      replyMap.get(parentId)!.push(c);
+    } else {
+      topLevel.push(c);
+    }
+  }
+
   const allComments: PRComment[] = [
-    ...reviewComments.data.map((c, i) => ({
+    ...topLevel.map((c) => ({
       id: `rc-${c.id}`,
+      githubId: c.id,
       author: c.user?.login || "unknown",
-      avatarColor: colors[i % colors.length],
+      avatarColor: getColor(c.user?.login || "unknown"),
       body: c.body,
       createdAt: c.created_at,
       blockIndex: c.line || c.original_line || 0,
       resolved: false,
+      replies: (replyMap.get(c.id) || []).map((r) => ({
+        id: `rc-${r.id}`,
+        author: r.user?.login || "unknown",
+        avatarColor: getColor(r.user?.login || "unknown"),
+        body: r.body,
+        createdAt: r.created_at,
+      })),
     })),
-    ...issueComments.data.map((c, i) => ({
+    ...issueComments.data.map((c) => ({
       id: `ic-${c.id}`,
+      githubId: c.id,
       author: c.user?.login || "unknown",
-      avatarColor: colors[(i + 2) % colors.length],
+      avatarColor: getColor(c.user?.login || "unknown"),
       body: c.body || "",
       createdAt: c.created_at,
       resolved: false,
+      replies: [],
     })),
   ];
 
@@ -401,6 +434,36 @@ export async function createInlineComment(
   }
 
   await octokit.pulls.createReviewComment(params as any);
+}
+
+/**
+ * Reply to an existing review comment on a PR.
+ * Uses the pull request review comment reply endpoint.
+ */
+export async function replyToReviewComment(
+  repoFullName: string,
+  prNumber: number,
+  commentId: number,
+  body: string
+): Promise<{ id: number; author: string; createdAt: string }> {
+  const octokit = getOctokit();
+  if (!octokit) throw new Error("Not authenticated");
+
+  const { owner, repo } = parseOwnerRepo(repoFullName);
+
+  const { data } = await octokit.pulls.createReplyForReviewComment({
+    owner,
+    repo,
+    pull_number: prNumber,
+    comment_id: commentId,
+    body,
+  });
+
+  return {
+    id: data.id,
+    author: data.user?.login || "unknown",
+    createdAt: data.created_at,
+  };
 }
 
 /**

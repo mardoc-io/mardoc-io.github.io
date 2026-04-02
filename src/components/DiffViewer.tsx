@@ -35,6 +35,7 @@ interface DiffViewerProps {
     endLine?: number
   ) => void;
   onResolveComment: (commentId: string) => void;
+  onReplyComment?: (commentId: string, body: string) => void;
 }
 
 interface DiffBlock {
@@ -413,6 +414,7 @@ export default function DiffViewer({
   comments,
   onAddComment,
   onResolveComment,
+  onReplyComment,
 }: DiffViewerProps) {
   const [viewMode, setViewMode] = useState<"rendered" | "split" | "preview">("rendered");
   const [showPanel, setShowPanel] = useState(true);
@@ -443,7 +445,12 @@ export default function DiffViewer({
       createdAt: c.createdAt,
       blockIndex: c.blockIndex || 0,
       resolved: c.resolved,
-      replies: [],
+      replies: (c.replies || []).map((r) => ({
+        author: r.author,
+        avatarColor: r.avatarColor,
+        body: r.body,
+        createdAt: r.createdAt,
+      })),
       source: "github" as const,
     }));
   }, [comments]);
@@ -546,10 +553,10 @@ export default function DiffViewer({
   }, [pendingSelection, pendingCommentInput, file.headContent, onAddComment]);
 
   const handleReply = useCallback((commentId: string, body: string) => {
-    // For now, replies are handled locally in the panel
-    // TODO: wire to GitHub API for reply threading
-    console.log("Reply to", commentId, body);
-  }, []);
+    if (onReplyComment) {
+      onReplyComment(commentId, body);
+    }
+  }, [onReplyComment]);
 
   const handleResolve = useCallback((commentId: string) => {
     onResolveComment(commentId);

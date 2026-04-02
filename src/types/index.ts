@@ -7,8 +7,17 @@ export interface RepoFile {
   content?: string;
 }
 
+export interface PRCommentReply {
+  id: string;
+  author: string;
+  avatarColor: string;
+  body: string;
+  createdAt: string;
+}
+
 export interface PRComment {
   id: string;
+  githubId?: number; // numeric GitHub comment ID for API calls (replies, resolve)
   author: string;
   avatarColor: string;
   body: string;
@@ -16,6 +25,7 @@ export interface PRComment {
   blockIndex?: number; // which rendered block this comment is on
   selectedText?: string; // the text that was selected when the comment was created
   resolved: boolean;
+  replies: PRCommentReply[];
 }
 
 export interface PullRequest {
