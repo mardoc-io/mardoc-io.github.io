@@ -338,24 +338,31 @@ export async function fetchPRComments(
     }
   }
 
+  // Fetch thread resolution status via GraphQL
+  const threadResolution = await fetchThreadResolution(owner, repo, prNumber);
+
   const allComments: PRComment[] = [
-    ...topLevel.map((c) => ({
-      id: `rc-${c.id}`,
-      githubId: c.id,
-      author: c.user?.login || "unknown",
-      avatarColor: getColor(c.user?.login || "unknown"),
-      body: c.body,
-      createdAt: c.created_at,
-      blockIndex: c.line || c.original_line || 0,
-      resolved: false,
-      replies: (replyMap.get(c.id) || []).map((r) => ({
-        id: `rc-${r.id}`,
-        author: r.user?.login || "unknown",
-        avatarColor: getColor(r.user?.login || "unknown"),
-        body: r.body,
-        createdAt: r.created_at,
-      })),
-    })),
+    ...topLevel.map((c) => {
+      const thread = threadResolution.get(c.id);
+      return {
+        id: `rc-${c.id}`,
+        githubId: c.id,
+        threadId: thread?.threadId,
+        author: c.user?.login || "unknown",
+        avatarColor: getColor(c.user?.login || "unknown"),
+        body: c.body,
+        createdAt: c.created_at,
+        blockIndex: c.line || c.original_line || 0,
+        resolved: thread?.isResolved ?? false,
+        replies: (replyMap.get(c.id) || []).map((r) => ({
+          id: `rc-${r.id}`,
+          author: r.user?.login || "unknown",
+          avatarColor: getColor(r.user?.login || "unknown"),
+          body: r.body,
+          createdAt: r.created_at,
+        })),
+      };
+    }),
     ...issueComments.data.map((c) => ({
       id: `ic-${c.id}`,
       githubId: c.id,
@@ -369,6 +376,74 @@ export async function fetchPRComments(
   ];
 
   return allComments;
+}
+
+/**
+ * Fetch review thread resolution status via GraphQL.
+ * Returns a map of comment database ID → { threadId, isResolved }.
+ */
+async function fetchThreadResolution(
+  owner: string,
+  repo: string,
+  prNumber: number
+): Promise<Map<number, { threadId: string; isResolved: boolean }>> {
+  const octokit = getOctokit();
+  if (!octokit) return new Map();
+
+  try {
+    const result: any = await (octokit as any).graphql(`
+      query($owner: String!, $repo: String!, $prNumber: Int!) {
+        repository(owner: $owner, name: $repo) {
+          pullRequest(number: $prNumber) {
+            reviewThreads(first: 100) {
+              nodes {
+                id
+                isResolved
+                comments(first: 1) {
+                  nodes {
+                    databaseId
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `, { owner, repo, prNumber });
+
+    const map = new Map<number, { threadId: string; isResolved: boolean }>();
+    const threads = result.repository?.pullRequest?.reviewThreads?.nodes || [];
+    for (const thread of threads) {
+      const firstCommentId = thread.comments?.nodes?.[0]?.databaseId;
+      if (firstCommentId) {
+        map.set(firstCommentId, {
+          threadId: thread.id,
+          isResolved: thread.isResolved,
+        });
+      }
+    }
+    return map;
+  } catch {
+    // GraphQL may fail if token doesn't have sufficient scope — fall back gracefully
+    return new Map();
+  }
+}
+
+/**
+ * Resolve or unresolve a review thread via GraphQL.
+ */
+export async function resolveReviewThread(
+  threadId: string,
+  resolve: boolean
+): Promise<void> {
+  const octokit = getOctokit();
+  if (!octokit) throw new Error("Not authenticated");
+
+  const mutation = resolve
+    ? `mutation($threadId: ID!) { resolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } } }`
+    : `mutation($threadId: ID!) { unresolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } } }`;
+
+  await (octokit as any).graphql(mutation, { threadId });
 }
 
 export async function createPRComment(
