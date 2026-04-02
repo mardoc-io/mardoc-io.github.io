@@ -773,38 +773,22 @@ export async function fetchUserRepos(): Promise<
   const octokit = getOctokit();
   if (!octokit) throw new Error("Not authenticated");
 
-  // Paginate to get all repos (up to 200)
-  const allRepos: { fullName: string; description: string; isPrivate: boolean }[] = [];
-  let page = 1;
-  const maxPages = 4; // 4 pages × 100 = up to 400 repos
+  const data = await octokit.paginate(octokit.repos.listForAuthenticatedUser, {
+    sort: "full_name",
+    direction: "asc",
+    per_page: 100,
+    type: "all",
+  });
 
-  while (page <= maxPages) {
-    const { data } = await octokit.repos.listForAuthenticatedUser({
-      sort: "full_name",
-      direction: "asc",
-      per_page: 100,
-      page,
-      type: "all",
-    });
-
-    if (data.length === 0) break;
-
-    allRepos.push(
-      ...data.map((r) => ({
-        fullName: r.full_name,
-        description: r.description || "",
-        isPrivate: r.private,
-      }))
+  return data
+    .map((r) => ({
+      fullName: r.full_name,
+      description: r.description || "",
+      isPrivate: r.private,
+    }))
+    .sort((a, b) =>
+      a.fullName.toLowerCase().localeCompare(b.fullName.toLowerCase())
     );
-
-    if (data.length < 100) break; // Last page
-    page++;
-  }
-
-  // Sort alphabetically by full name (case-insensitive)
-  return allRepos.sort((a, b) =>
-    a.fullName.toLowerCase().localeCompare(b.fullName.toLowerCase())
-  );
 }
 
 export async function fetchOrgRepos(

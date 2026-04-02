@@ -42,12 +42,24 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     );
   }, [userRepos, repoFilter]);
 
-  // Load user repos when authenticated
+  // Load user repos: show cached immediately, refresh in background
   useEffect(() => {
     if (isAuthenticated && isOpen) {
-      setLoadingRepos(true);
+      // Show cached repos instantly
+      const cached = localStorage.getItem("mardoc_user_repos");
+      if (cached) {
+        try {
+          setUserRepos(JSON.parse(cached));
+        } catch { /* ignore corrupt cache */ }
+      }
+
+      // Fetch fresh list in background
+      setLoadingRepos(!cached);
       fetchUserRepos()
-        .then(setUserRepos)
+        .then((repos) => {
+          setUserRepos(repos);
+          localStorage.setItem("mardoc_user_repos", JSON.stringify(repos));
+        })
         .catch(console.error)
         .finally(() => setLoadingRepos(false));
     }
@@ -64,6 +76,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     setGithubToken(null);
     setTokenInput("");
     setUserRepos([]);
+    localStorage.removeItem("mardoc_user_repos");
     setActiveTab("connect");
   };
 
@@ -243,7 +256,10 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                       onClick={() => {
                         setLoadingRepos(true);
                         fetchUserRepos()
-                          .then(setUserRepos)
+                          .then((repos) => {
+                            setUserRepos(repos);
+                            localStorage.setItem("mardoc_user_repos", JSON.stringify(repos));
+                          })
                           .catch(console.error)
                           .finally(() => setLoadingRepos(false));
                       }}
