@@ -1,9 +1,10 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { RepoFile, PullRequest, PRFile, PRComment, ViewMode } from "@/types";
 import { initOctokit, fetchRepoTree, fetchPullRequests, fetchFileContent, fetchPRFiles, fetchPRComments, fetchDefaultBranch, fetchBranches } from "./github-api";
-import { repoFiles as mockFiles, pullRequests as mockPRs, findFile } from "./mock-data";
+import { repoFiles as mockFiles, pullRequests as mockPRs, findFile, flattenFiles } from "./mock-data";
+import { parseHash, buildFileHash, buildPRHash, buildRepoHash } from "./hash-router";
 
 interface AppState {
   // Auth
@@ -88,6 +89,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const isAuthenticated = !!githubToken;
 
+  // Suppress hashchange handling when we're the ones updating the hash
+  const suppressHashChange = useRef(false);
+  const setHash = useCallback((hash: string) => {
+    suppressHashChange.current = true;
+    window.location.hash = hash;
+    // Reset after the hashchange event fires
+    setTimeout(() => { suppressHashChange.current = false; }, 0);
+  }, []);
+
   // Initialize octokit when token changes, persist to localStorage
   const setGithubToken = useCallback((token: string | null) => {
     setGithubTokenState(token);
@@ -120,6 +130,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCurrentRepoState(repo);
       localStorage.setItem(REPO_KEY, repo);
       setError(null);
+      setHash(buildRepoHash(repo));
 
       if (!githubToken) return;
 
@@ -163,9 +174,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [githubToken]
   );
 
-  // Auto-restore saved repo once authentication is ready
+  // Auto-restore: hash route wins over localStorage
   useEffect(() => {
     if (!githubToken || currentRepo) return;
+
+    const route = parseHash(window.location.hash);
+    if (route.type !== "none" && route.repoFullName) {
+      // Hash route present — repo will be loaded by the hash navigation effect
+      return;
+    }
+
     const savedRepo = localStorage.getItem(REPO_KEY);
     if (savedRepo) {
       setCurrentRepo(savedRepo);
@@ -202,6 +220,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setSelectedPR(null);
       setCurrentView("editor");
 
+      // Update URL hash
+      if (currentRepo) {
+        setHash(buildFileHash(currentRepo, selectedBranch, file.path));
+      }
+
       if (isDemoMode) {
         // Use mock data content
         const mockFile = findFile(mockFiles, file.path);
@@ -235,6 +258,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCurrentView("pr-diff");
       setSelectedPRFileIdx(0);
 
+      // Update URL hash
+      if (currentRepo) {
+        setHash(buildPRHash(currentRepo, pr.number));
+      }
+
       // Use demo data if available
       if (pr.files.length > 0) {
         setPRFiles(pr.files);
@@ -259,6 +287,77 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     },
     [currentRepo, isDemoMode]
   );
+
+  // Update hash when PR file selection changes
+  const setSelectedPRFileIdxWithHash = useCallback((idx: number) => {
+    setSelectedPRFileIdx(idx);
+    if (currentRepo && selectedPR) {
+      setHash(buildPRHash(currentRepo, selectedPR.number, idx));
+    }
+  }, [currentRepo, selectedPR, setHash]);
+
+  // Navigate to a hash route — used on init and on hashchange
+  const navigateToHash = useCallback(async (hash: string) => {
+    const route = parseHash(hash);
+    if (route.type === "none") return;
+
+    // Load repo if needed
+    if (route.repoFullName && route.repoFullName !== currentRepo) {
+      await setCurrentRepo(route.repoFullName);
+    }
+
+    if (route.type === "file" && route.filePath) {
+      // Need to find the file in the tree — it may not be loaded yet
+      // We'll set branch if specified, then navigate
+      if (route.branch && route.branch !== selectedBranch) {
+        setSelectedBranchState(route.branch);
+      }
+      // Create a minimal RepoFile to open
+      const file: RepoFile = {
+        id: `hash-${route.filePath}`,
+        name: route.filePath.split("/").pop() || route.filePath,
+        path: route.filePath,
+        type: "file",
+      };
+      await openFile(file);
+    } else if (route.type === "pr" && route.prNumber) {
+      // Find the PR in the loaded list, or create a stub
+      const pr = prList.find((p) => p.number === route.prNumber);
+      if (pr) {
+        openPR(pr);
+        if (route.prFileIdx !== undefined) {
+          setSelectedPRFileIdx(route.prFileIdx);
+        }
+      }
+    }
+  }, [currentRepo, selectedBranch, prList, setCurrentRepo, openFile, openPR]);
+
+  // Handle hash route on mount and hashchange (back/forward)
+  useEffect(() => {
+    // Initial hash navigation
+    if (window.location.hash) {
+      const route = parseHash(window.location.hash);
+      if (route.type !== "none" && githubToken) {
+        navigateToHash(window.location.hash);
+      } else if (route.type !== "none" && isDemoMode && route.type === "file") {
+        // Demo mode file navigation
+        const route = parseHash(window.location.hash);
+        if (route.filePath) {
+          const mockFile = findFile(mockFiles, route.filePath);
+          if (mockFile) {
+            openFile(mockFile);
+          }
+        }
+      }
+    }
+
+    const onHashChange = () => {
+      if (suppressHashChange.current) return;
+      navigateToHash(window.location.hash);
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [githubToken, isDemoMode, navigateToHash, openFile]);
 
   // Refresh the current repo
   const refreshRepo = useCallback(async () => {
@@ -292,7 +391,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         prFiles,
         prComments,
         selectedPRFileIdx,
-        setSelectedPRFileIdx,
+        setSelectedPRFileIdx: setSelectedPRFileIdxWithHash,
         loadingPRFiles,
         loadingFiles,
         loadingPRs,
