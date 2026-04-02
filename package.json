@@ -29,6 +29,7 @@
     "@tiptap/react": "^2.11.5",
     "@tiptap/starter-kit": "^2.11.5",
     "diff": "^7.0.0",
+    "hast-util-to-html": "9.0.5",
     "lowlight": "^3.2.0",
     "lucide-react": "^0.468.0",
     "mermaid": "11.13.0",

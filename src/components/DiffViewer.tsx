@@ -19,6 +19,7 @@ import {
 import ContextMenu from "./ContextMenu";
 import { mapSelectionToLines, rewriteImageUrls, loadAuthenticatedImages } from "@/lib/github-api";
 import { renderMermaidBlocks } from "@/lib/mermaid";
+import { highlightCodeBlocks } from "@/lib/highlight";
 import { useWideFormat } from "@/lib/use-wide-format";
 
 interface DiffViewerProps {
@@ -110,7 +111,7 @@ const diffShowdownConverter = new Showdown.Converter({
 });
 
 function blockToHtml(block: string): string {
-  return diffShowdownConverter.makeHtml(block);
+  return highlightCodeBlocks(diffShowdownConverter.makeHtml(block));
 }
 
 function computeWordDiff(oldText: string, newText: string): string {

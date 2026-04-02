@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import "highlight.js/styles/github.css";
+
 :root {
   --surface: #ffffff;
   --surface-secondary: #f7f7f5;
@@ -379,3 +381,26 @@ body {
   background: var(--accent-muted);
   color: var(--accent);
 }
+
+/* Dark mode highlight.js overrides (base theme is github.css light) */
+.dark .hljs {
+  background: var(--surface-secondary);
+  color: #c9d1d9;
+}
+.dark .hljs-keyword,
+.dark .hljs-selector-tag { color: #ff7b72; }
+.dark .hljs-string,
+.dark .hljs-addition { color: #a5d6ff; }
+.dark .hljs-comment,
+.dark .hljs-quote { color: #8b949e; }
+.dark .hljs-number,
+.dark .hljs-literal { color: #79c0ff; }
+.dark .hljs-title,
+.dark .hljs-section,
+.dark .hljs-built_in { color: #d2a8ff; }
+.dark .hljs-type,
+.dark .hljs-attr { color: #7ee787; }
+.dark .hljs-name,
+.dark .hljs-selector-class { color: #7ee787; }
+.dark .hljs-deletion { color: #ffa198; }
+.dark .hljs-meta { color: #79c0ff; }

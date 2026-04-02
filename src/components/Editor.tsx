@@ -14,7 +14,11 @@ import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import { common, createLowlight } from "lowlight";
 import Showdown from "showdown";
+
+const lowlight = createLowlight(common);
 import { rewriteImageUrls, loadAuthenticatedImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent } from "@/lib/github-api";
 import { useApp } from "@/lib/app-context";
 import { preRenderMermaid } from "@/lib/mermaid";
@@ -402,7 +406,9 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
+        codeBlock: false,
       }),
+      CodeBlockLowlight.configure({ lowlight }),
       Placeholder.configure({
         placeholder: "Start writing…",
       }),
