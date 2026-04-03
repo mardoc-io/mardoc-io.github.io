@@ -49,6 +49,7 @@ interface AppState {
   refreshRepo: () => Promise<void>;
   openFile: (file: RepoFile) => Promise<void>;
   openPR: (pr: PullRequest) => void;
+  createNewFile: () => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -250,6 +251,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [isDemoMode, currentRepo, githubToken, selectedBranch]
   );
 
+  // Create a new (unsaved) file and open it in the editor
+  const createNewFile = useCallback(() => {
+    const newFile: RepoFile = {
+      id: `new-${Date.now()}`,
+      name: "untitled.md",
+      path: "__new__/untitled.md",
+      type: "file",
+    };
+    setSelectedFile(newFile);
+    setSelectedPR(null);
+    setCurrentView("editor");
+    setFileContent("");
+  }, []);
+
   // Open a PR and fetch its files + comments
   const openPR = useCallback(
     (pr: PullRequest) => {
@@ -400,6 +415,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         refreshRepo,
         openFile,
         openPR,
+        createNewFile,
       }}
     >
       {children}

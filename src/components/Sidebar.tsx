@@ -229,6 +229,7 @@ export default function Sidebar() {
     loadingPRs,
     openFile,
     openPR,
+    createNewFile,
     setCurrentView,
     selectedFile,
     selectedPR,
@@ -470,6 +471,13 @@ export default function Sidebar() {
             </div>
           ) : (
             <div className="space-y-0.5">
+              <button
+                onClick={createNewFile}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs rounded-md text-[var(--accent)] hover:bg-[var(--surface-hover)] transition-colors mb-1"
+              >
+                <FilePlus size={14} />
+                New File
+              </button>
               {repoFiles.map((file) => (
                 <FileTreeItem
                   key={file.id}

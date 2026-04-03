@@ -17,9 +17,10 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
 import Showdown from "showdown";
+import TurndownService from "turndown";
 
 const lowlight = createLowlight(common);
-import { rewriteImageUrls, loadAuthenticatedImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent } from "@/lib/github-api";
+import { rewriteImageUrls, loadAuthenticatedImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent, createFileAsPR } from "@/lib/github-api";
 import { useApp } from "@/lib/app-context";
 import { preRenderMermaid } from "@/lib/mermaid";
 import { useWideFormat } from "@/lib/use-wide-format";
@@ -54,6 +55,8 @@ import {
   GitPullRequest,
   ExternalLink,
   Loader2,
+  FilePlus,
+  Save,
 } from "lucide-react";
 
 interface EditorProps {
@@ -401,6 +404,13 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   const [submittingPR, setSubmittingPR] = useState(false);
   const [submittedPR, setSubmittedPR] = useState<{ url: string; number: number } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // New file state
+  const isNewFile = filePath.startsWith("__new__/");
+  const [newFilePath, setNewFilePath] = useState("docs/");
+  const [newFileTitle, setNewFileTitle] = useState("");
+  const [showNewFileModal, setShowNewFileModal] = useState(false);
+  const [savingNewFile, setSavingNewFile] = useState(false);
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -444,18 +454,22 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   useEffect(() => {
     let cancelled = false;
 
-    if (editor && content) {
-      const rawHtml = markdownToHtml(content, repoFullName, branch, filePath);
-      preRenderMermaid(rawHtml).then((html) => {
-        if (cancelled) return;
-        editor.commands.setContent(html);
-        // Fetch private repo images after TipTap renders
-        setTimeout(() => {
-          if (!cancelled && editorContainerRef.current) {
-            loadAuthenticatedImages(editorContainerRef.current);
-          }
-        }, 50);
-      });
+    if (editor) {
+      if (content) {
+        const rawHtml = markdownToHtml(content, repoFullName, branch, filePath);
+        preRenderMermaid(rawHtml).then((html) => {
+          if (cancelled) return;
+          editor.commands.setContent(html);
+          // Fetch private repo images after TipTap renders
+          setTimeout(() => {
+            if (!cancelled && editorContainerRef.current) {
+              loadAuthenticatedImages(editorContainerRef.current);
+            }
+          }, 50);
+        });
+      } else {
+        editor.commands.clearContent();
+      }
     }
 
     setComments([]);
@@ -588,6 +602,41 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     }
   }, [repoFullName, isDemoMode, comments, filePath, content, refreshRepo]);
 
+  const handleSaveNewFile = useCallback(async () => {
+    if (!repoFullName || isDemoMode || !editor) return;
+    if (!newFilePath.trim() || !newFileTitle.trim()) return;
+
+    setSavingNewFile(true);
+    setSubmitError(null);
+
+    try {
+      // Convert TipTap HTML to markdown
+      const turndown = new TurndownService({
+        headingStyle: "atx",
+        codeBlockStyle: "fenced",
+      });
+      const html = editor.getHTML();
+      const markdown = turndown.turndown(html);
+
+      const path = newFilePath.endsWith(".md") ? newFilePath : `${newFilePath}.md`;
+
+      const pr = await createFileAsPR(
+        repoFullName,
+        path,
+        markdown,
+        newFileTitle,
+      );
+
+      setSubmittedPR(pr);
+      setShowNewFileModal(false);
+      refreshRepo();
+    } catch (err: any) {
+      setSubmitError(err.message || "Failed to create file");
+    } finally {
+      setSavingNewFile(false);
+    }
+  }, [repoFullName, isDemoMode, editor, newFilePath, newFileTitle, refreshRepo]);
+
   if (!editor) return null;
 
   const activeCount = comments.filter((c) => !c.resolved).length;
@@ -711,8 +760,19 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
 
           {/* Wide format + comment toggle + submit PR — right side */}
           <div className="ml-auto flex items-center gap-1">
+            {/* Save new file as PR */}
+            {isNewFile && !submittedPR && (
+              <button
+                onClick={() => setShowNewFileModal(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition-colors"
+                title="Save to repository as a PR"
+              >
+                <Save size={13} />
+                Save to Repo
+              </button>
+            )}
             {/* Submit as PR — only when authenticated and comments exist */}
-            {!isDemoMode && activeCount > 0 && !submittedPR && (
+            {!isNewFile && !isDemoMode && activeCount > 0 && !submittedPR && (
               <button
                 onClick={handleSubmitAsPR}
                 disabled={submittingPR}
@@ -772,10 +832,22 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
           <div className={contentClass}>
             {/* File path breadcrumb */}
             <div className="text-xs text-[var(--text-muted)] mb-4 font-mono flex items-center gap-2">
-              {filePath}
-              <span className="text-[10px] text-[var(--text-muted)] opacity-60">
-                — select text to comment
-              </span>
+              {isNewFile ? (
+                <>
+                  <FilePlus size={12} className="text-[var(--accent)]" />
+                  <span className="text-[var(--accent)] font-medium">New file</span>
+                  <span className="text-[10px] opacity-60">
+                    — write content, then save to repo as a PR
+                  </span>
+                </>
+              ) : (
+                <>
+                  {filePath}
+                  <span className="text-[10px] text-[var(--text-muted)] opacity-60">
+                    — select text to comment
+                  </span>
+                </>
+              )}
             </div>
 
             {/* Floating comment button */}
@@ -866,6 +938,88 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
           onResolve={handleResolve}
           onClose={() => setShowComments(false)}
         />
+      )}
+
+      {/* New file save modal */}
+      {showNewFileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div
+            className="bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-2xl w-[420px] p-5"
+            style={{ animation: "fadeInUp 0.15s ease-out" }}
+          >
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+              <GitPullRequest size={16} className="text-[var(--accent)]" />
+              Save to Repository
+            </h3>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1 block">
+                  File path
+                </label>
+                <input
+                  type="text"
+                  value={newFilePath}
+                  onChange={(e) => setNewFilePath(e.target.value)}
+                  placeholder="docs/my-document.md"
+                  className="w-full text-sm px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] font-mono placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                />
+                {newFilePath && !newFilePath.endsWith(".md") && (
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1">.md will be appended</p>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1 block">
+                  PR title
+                </label>
+                <input
+                  type="text"
+                  value={newFileTitle}
+                  onChange={(e) => setNewFileTitle(e.target.value)}
+                  placeholder={`Add ${newFilePath || "new document"}`}
+                  className="w-full text-sm px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newFilePath.trim() && newFileTitle.trim()) {
+                      handleSaveNewFile();
+                    }
+                  }}
+                />
+              </div>
+
+              {isDemoMode && (
+                <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 px-3 py-2 rounded-md">
+                  Connect a GitHub repository in Settings to save files.
+                </p>
+              )}
+
+              {submitError && (
+                <p className="text-xs text-red-500">{submitError}</p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button
+                onClick={() => { setShowNewFileModal(false); setSubmitError(null); }}
+                className="text-xs px-3 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveNewFile}
+                disabled={savingNewFile || !newFilePath.trim() || !newFileTitle.trim() || isDemoMode}
+                className="flex items-center gap-1.5 text-xs px-4 py-1.5 bg-[var(--accent)] text-white rounded-md hover:bg-[var(--accent-hover)] disabled:opacity-40 transition-colors"
+              >
+                {savingNewFile ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <GitPullRequest size={13} />
+                )}
+                {savingNewFile ? "Creating..." : "Create PR"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

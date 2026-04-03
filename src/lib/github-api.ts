@@ -729,6 +729,73 @@ export async function createReviewPR(
   return { number: pr.number, url: pr.html_url };
 }
 
+/**
+ * Create a new file in a repo by committing it on a new branch and opening a PR.
+ */
+export async function createFileAsPR(
+  repoFullName: string,
+  filePath: string,
+  content: string,
+  title: string,
+  description?: string
+): Promise<{ number: number; url: string }> {
+  const octokit = getOctokit();
+  if (!octokit) throw new Error("Not authenticated");
+
+  const { owner, repo } = parseOwnerRepo(repoFullName);
+
+  // Get default branch
+  const { data: repoData } = await octokit.repos.get({ owner, repo });
+  const defaultBranch = repoData.default_branch;
+
+  // Get the latest commit on default branch
+  const { data: ref } = await octokit.git.getRef({
+    owner,
+    repo,
+    ref: `heads/${defaultBranch}`,
+  });
+
+  // Create a new branch
+  const slug = filePath.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").slice(0, 40);
+  const branchName = `new-file/${slug}-${Date.now()}`;
+  await octokit.git.createRef({
+    owner,
+    repo,
+    ref: `refs/heads/${branchName}`,
+    sha: ref.object.sha,
+  });
+
+  // Encode content for the GitHub API
+  const contentBytes = new TextEncoder().encode(content);
+  let binaryString = "";
+  for (let i = 0; i < contentBytes.length; i++) {
+    binaryString += String.fromCharCode(contentBytes[i]);
+  }
+  const encoded = btoa(binaryString);
+
+  // Commit the new file
+  await octokit.repos.createOrUpdateFileContents({
+    owner,
+    repo,
+    path: filePath,
+    message: `docs: add ${filePath}`,
+    content: encoded,
+    branch: branchName,
+  });
+
+  // Create the PR
+  const { data: pr } = await octokit.pulls.create({
+    owner,
+    repo,
+    title,
+    body: description || `Add new file \`${filePath}\``,
+    head: branchName,
+    base: defaultBranch,
+  });
+
+  return { number: pr.number, url: pr.html_url };
+}
+
 // ─── Image URL Rewriting ──────────────────────────────────────────────────
 
 /**
