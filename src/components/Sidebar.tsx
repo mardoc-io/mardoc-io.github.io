@@ -230,6 +230,7 @@ export default function Sidebar() {
     openFile,
     openPR,
     createNewFile,
+    addFileToPR,
     setCurrentView,
     selectedFile,
     selectedPR,
@@ -411,6 +412,16 @@ export default function Sidebar() {
                     </span>
                   )}
                 </span>
+                {selectedPR && selectedPR.status === "open" && (
+                  <button
+                    onClick={() => addFileToPR(selectedPR)}
+                    className="flex items-center gap-1 text-[10px] text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+                    title="Add a new file to this PR"
+                  >
+                    <FilePlus size={12} />
+                    Add file
+                  </button>
+                )}
               </div>
 
               {/* Filter */}

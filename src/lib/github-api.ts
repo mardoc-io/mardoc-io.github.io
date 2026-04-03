@@ -796,6 +796,38 @@ export async function createFileAsPR(
   return { number: pr.number, url: pr.html_url };
 }
 
+/**
+ * Commit a new file directly to an existing PR branch.
+ */
+export async function commitFileToPRBranch(
+  repoFullName: string,
+  branch: string,
+  filePath: string,
+  content: string,
+  message: string
+): Promise<void> {
+  const octokit = getOctokit();
+  if (!octokit) throw new Error("Not authenticated");
+
+  const { owner, repo } = parseOwnerRepo(repoFullName);
+
+  const contentBytes = new TextEncoder().encode(content);
+  let binaryString = "";
+  for (let i = 0; i < contentBytes.length; i++) {
+    binaryString += String.fromCharCode(contentBytes[i]);
+  }
+  const encoded = btoa(binaryString);
+
+  await octokit.repos.createOrUpdateFileContents({
+    owner,
+    repo,
+    path: filePath,
+    message,
+    content: encoded,
+    branch,
+  });
+}
+
 // ─── Image URL Rewriting ──────────────────────────────────────────────────
 
 /**

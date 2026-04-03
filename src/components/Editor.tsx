@@ -20,7 +20,7 @@ import Showdown from "showdown";
 import TurndownService from "turndown";
 
 const lowlight = createLowlight(common);
-import { rewriteImageUrls, loadAuthenticatedImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent, createFileAsPR } from "@/lib/github-api";
+import { rewriteImageUrls, loadAuthenticatedImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent, createFileAsPR, commitFileToPRBranch } from "@/lib/github-api";
 import { useApp } from "@/lib/app-context";
 import { preRenderMermaid } from "@/lib/mermaid";
 import { useWideFormat } from "@/lib/use-wide-format";
@@ -394,7 +394,7 @@ function CommentSidePanel({
 
 export default function Editor({ content, onContentChange, filePath, repoFullName, branch }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
-  const { isDemoMode, refreshRepo } = useApp();
+  const { isDemoMode, refreshRepo, prBranchForNewFile, prNumberForNewFile, openPR, pullRequests } = useApp();
   const { wide, toggle: toggleWide, contentClass } = useWideFormat();
   const [comments, setComments] = useState<EditorComment[]>([]);
   const [showComments, setShowComments] = useState(false);
@@ -602,9 +602,11 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     }
   }, [repoFullName, isDemoMode, comments, filePath, content, refreshRepo]);
 
+  const isAddingToPR = isNewFile && !!prBranchForNewFile;
+
   const handleSaveNewFile = useCallback(async () => {
     if (!repoFullName || isDemoMode || !editor) return;
-    if (!newFilePath.trim() || !newFileTitle.trim()) return;
+    if (!newFilePath.trim()) return;
 
     setSavingNewFile(true);
     setSubmitError(null);
@@ -620,22 +622,46 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
 
       const path = newFilePath.endsWith(".md") ? newFilePath : `${newFilePath}.md`;
 
-      const pr = await createFileAsPR(
-        repoFullName,
-        path,
-        markdown,
-        newFileTitle,
-      );
+      if (prBranchForNewFile) {
+        // Commit directly to the PR branch
+        await commitFileToPRBranch(
+          repoFullName,
+          prBranchForNewFile,
+          path,
+          markdown,
+          `docs: add ${path}`
+        );
 
-      setSubmittedPR(pr);
-      setShowNewFileModal(false);
-      refreshRepo();
+        setShowNewFileModal(false);
+        // Navigate back to the PR
+        if (prNumberForNewFile) {
+          const pr = pullRequests.find((p) => p.number === prNumberForNewFile);
+          if (pr) {
+            openPR(pr);
+          }
+        }
+        refreshRepo();
+      } else {
+        // Create a new PR
+        if (!newFileTitle.trim()) return;
+
+        const pr = await createFileAsPR(
+          repoFullName,
+          path,
+          markdown,
+          newFileTitle,
+        );
+
+        setSubmittedPR(pr);
+        setShowNewFileModal(false);
+        refreshRepo();
+      }
     } catch (err: any) {
-      setSubmitError(err.message || "Failed to create file");
+      setSubmitError(err.message || "Failed to save file");
     } finally {
       setSavingNewFile(false);
     }
-  }, [repoFullName, isDemoMode, editor, newFilePath, newFileTitle, refreshRepo]);
+  }, [repoFullName, isDemoMode, editor, newFilePath, newFileTitle, prBranchForNewFile, prNumberForNewFile, pullRequests, openPR, refreshRepo]);
 
   if (!editor) return null;
 
@@ -765,10 +791,10 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
               <button
                 onClick={() => setShowNewFileModal(true)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition-colors"
-                title="Save to repository as a PR"
+                title={isAddingToPR ? "Add file to PR branch" : "Save to repository as a PR"}
               >
                 <Save size={13} />
-                Save to Repo
+                {isAddingToPR ? "Add to PR" : "Save to Repo"}
               </button>
             )}
             {/* Submit as PR — only when authenticated and comments exist */}
@@ -836,9 +862,15 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
                 <>
                   <FilePlus size={12} className="text-[var(--accent)]" />
                   <span className="text-[var(--accent)] font-medium">New file</span>
-                  <span className="text-[10px] opacity-60">
-                    — write content, then save to repo as a PR
-                  </span>
+                  {isAddingToPR ? (
+                    <span className="text-[10px] opacity-60">
+                      — adding to PR #{prNumberForNewFile} on <span className="font-mono">{prBranchForNewFile}</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] opacity-60">
+                      — write content, then save to repo as a PR
+                    </span>
+                  )}
                 </>
               ) : (
                 <>
@@ -949,8 +981,14 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
           >
             <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
               <GitPullRequest size={16} className="text-[var(--accent)]" />
-              Save to Repository
+              {isAddingToPR ? `Add File to PR #${prNumberForNewFile}` : "Save to Repository"}
             </h3>
+
+            {isAddingToPR && (
+              <p className="text-xs text-[var(--text-secondary)] mb-3">
+                Committing to branch <span className="font-mono text-[var(--text-primary)]">{prBranchForNewFile}</span>
+              </p>
+            )}
 
             <div className="space-y-3">
               <div>
@@ -958,34 +996,42 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
                   File path
                 </label>
                 <input
+                  autoFocus
                   type="text"
                   value={newFilePath}
                   onChange={(e) => setNewFilePath(e.target.value)}
                   placeholder="docs/my-document.md"
                   className="w-full text-sm px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] font-mono placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newFilePath.trim() && (isAddingToPR || newFileTitle.trim())) {
+                      handleSaveNewFile();
+                    }
+                  }}
                 />
                 {newFilePath && !newFilePath.endsWith(".md") && (
                   <p className="text-[10px] text-[var(--text-muted)] mt-1">.md will be appended</p>
                 )}
               </div>
 
-              <div>
-                <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1 block">
-                  PR title
-                </label>
-                <input
-                  type="text"
-                  value={newFileTitle}
-                  onChange={(e) => setNewFileTitle(e.target.value)}
-                  placeholder={`Add ${newFilePath || "new document"}`}
-                  className="w-full text-sm px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && newFilePath.trim() && newFileTitle.trim()) {
-                      handleSaveNewFile();
-                    }
-                  }}
-                />
-              </div>
+              {!isAddingToPR && (
+                <div>
+                  <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1 block">
+                    PR title
+                  </label>
+                  <input
+                    type="text"
+                    value={newFileTitle}
+                    onChange={(e) => setNewFileTitle(e.target.value)}
+                    placeholder={`Add ${newFilePath || "new document"}`}
+                    className="w-full text-sm px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newFilePath.trim() && newFileTitle.trim()) {
+                        handleSaveNewFile();
+                      }
+                    }}
+                  />
+                </div>
+              )}
 
               {isDemoMode && (
                 <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 px-3 py-2 rounded-md">
@@ -1007,7 +1053,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
               </button>
               <button
                 onClick={handleSaveNewFile}
-                disabled={savingNewFile || !newFilePath.trim() || !newFileTitle.trim() || isDemoMode}
+                disabled={savingNewFile || !newFilePath.trim() || (!isAddingToPR && !newFileTitle.trim()) || isDemoMode}
                 className="flex items-center gap-1.5 text-xs px-4 py-1.5 bg-[var(--accent)] text-white rounded-md hover:bg-[var(--accent-hover)] disabled:opacity-40 transition-colors"
               >
                 {savingNewFile ? (
@@ -1015,7 +1061,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
                 ) : (
                   <GitPullRequest size={13} />
                 )}
-                {savingNewFile ? "Creating..." : "Create PR"}
+                {savingNewFile ? "Committing..." : isAddingToPR ? "Commit to PR" : "Create PR"}
               </button>
             </div>
           </div>
