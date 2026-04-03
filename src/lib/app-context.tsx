@@ -45,11 +45,16 @@ interface AppState {
   loadingContent: boolean;
   error: string | null;
 
+  // New file for PR
+  prBranchForNewFile: string | null;
+  prNumberForNewFile: number | null;
+
   // Actions
   refreshRepo: () => Promise<void>;
   openFile: (file: RepoFile) => Promise<void>;
   openPR: (pr: PullRequest) => void;
   createNewFile: () => void;
+  addFileToPR: (pr: PullRequest) => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -251,6 +256,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [isDemoMode, currentRepo, githubToken, selectedBranch]
   );
 
+  // PR-scoped new file state
+  const [prBranchForNewFile, setPRBranchForNewFile] = useState<string | null>(null);
+  const [prNumberForNewFile, setPRNumberForNewFile] = useState<number | null>(null);
+
   // Create a new (unsaved) file and open it in the editor
   const createNewFile = useCallback(() => {
     const newFile: RepoFile = {
@@ -261,6 +270,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setSelectedFile(newFile);
     setSelectedPR(null);
+    setPRBranchForNewFile(null);
+    setPRNumberForNewFile(null);
+    setCurrentView("editor");
+    setFileContent("");
+  }, []);
+
+  // Add a new file to an existing PR branch
+  const addFileToPR = useCallback((pr: PullRequest) => {
+    const newFile: RepoFile = {
+      id: `pr-new-${Date.now()}`,
+      name: "untitled.md",
+      path: "__new__/untitled.md",
+      type: "file",
+    };
+    setSelectedFile(newFile);
+    setPRBranchForNewFile(pr.headBranch);
+    setPRNumberForNewFile(pr.number);
     setCurrentView("editor");
     setFileContent("");
   }, []);
@@ -412,10 +438,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         loadingPRs,
         loadingContent,
         error,
+        prBranchForNewFile,
+        prNumberForNewFile,
         refreshRepo,
         openFile,
         openPR,
         createNewFile,
+        addFileToPR,
       }}
     >
       {children}
