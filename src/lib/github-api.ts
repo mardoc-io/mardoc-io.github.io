@@ -512,6 +512,68 @@ export async function createInlineComment(
 }
 
 /**
+ * Apply a suggestion by committing the replacement text to the PR branch.
+ * Fetches the file at the head branch, replaces the specified lines, and commits.
+ */
+export async function applySuggestion(
+  repoFullName: string,
+  headBranch: string,
+  filePath: string,
+  startLine: number,
+  endLine: number,
+  replacementText: string
+): Promise<void> {
+  const octokit = getOctokit();
+  if (!octokit) throw new Error("Not authenticated");
+
+  const { owner, repo } = parseOwnerRepo(repoFullName);
+
+  // Get current file content + SHA from the PR head branch
+  const { data } = await octokit.repos.getContent({
+    owner,
+    repo,
+    path: filePath,
+    ref: headBranch,
+  });
+
+  if (!("content" in data) || !("sha" in data)) {
+    throw new Error("Unexpected response format");
+  }
+
+  // Decode file content
+  const binaryStr = atob(data.content);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  const currentContent = new TextDecoder("utf-8").decode(bytes);
+
+  // Replace the specified lines with the suggestion text
+  const lines = currentContent.split("\n");
+  const before = lines.slice(0, startLine - 1);
+  const after = lines.slice(endLine);
+  const newContent = [...before, replacementText, ...after].join("\n");
+
+  // Encode and commit
+  const contentBytes = new TextEncoder().encode(newContent);
+  let binaryString = "";
+  for (let i = 0; i < contentBytes.length; i++) {
+    binaryString += String.fromCharCode(contentBytes[i]);
+  }
+  const encoded = btoa(binaryString);
+
+  await octokit.repos.createOrUpdateFileContents({
+    owner,
+    repo,
+    path: filePath,
+    message: "Apply suggestion from review",
+    content: encoded,
+    sha: data.sha,
+    branch: headBranch,
+  });
+}
+
+/**
  * Reply to an existing review comment on a PR.
  * Uses the pull request review comment reply endpoint.
  */

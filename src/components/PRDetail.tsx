@@ -10,9 +10,9 @@ import {
   FileText,
   Loader2,
 } from "lucide-react";
-import { PullRequest, PRComment } from "@/types";
+import { PullRequest, PRComment, PendingSuggestion } from "@/types";
 import { useApp } from "@/lib/app-context";
-import { createPRComment, createInlineComment, replyToReviewComment, fetchPRComments, resolveReviewThread } from "@/lib/github-api";
+import { createPRComment, createInlineComment, replyToReviewComment, fetchPRComments, resolveReviewThread, applySuggestion, mapSelectionToLines } from "@/lib/github-api";
 import DiffViewer from "./DiffViewer";
 import Showdown from "showdown";
 
@@ -193,6 +193,100 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     }
   }, [comments, isDemoMode, currentRepo, pr.number]);
 
+  const handleSubmitSuggestions = useCallback(async (suggestions: PendingSuggestion[]) => {
+    const file = prFiles[selectedPRFileIdx];
+    if (!file) return;
+
+    for (const suggestion of suggestions) {
+      const body = `\`\`\`suggestion\n${suggestion.editedMarkdown}\n\`\`\``;
+
+      // Optimistic local comment
+      const newComment: PRComment = {
+        id: `s-${Date.now()}-${suggestion.blockIndex}`,
+        author: "you",
+        avatarColor: "#264653",
+        body,
+        createdAt: new Date().toISOString(),
+        blockIndex: suggestion.blockIndex,
+        selectedText: suggestion.originalMarkdown.slice(0, 60),
+        resolved: false,
+        replies: [],
+      };
+      setComments((prev) => [...prev, newComment]);
+
+      if (!isDemoMode && currentRepo && pr.number) {
+        try {
+          await createInlineComment(
+            currentRepo,
+            pr.number,
+            body,
+            file.path,
+            suggestion.endLine,
+            suggestion.startLine !== suggestion.endLine ? suggestion.startLine : undefined,
+            "RIGHT"
+          );
+        } catch (err) {
+          console.error("Failed to post suggestion to GitHub:", err);
+          // Fallback to general PR comment
+          try {
+            const fallbackBody = `**${file.path}** (L${suggestion.startLine}–L${suggestion.endLine})\n\n${body}`;
+            await createPRComment(currentRepo, pr.number, fallbackBody);
+          } catch (fallbackErr) {
+            console.error("Fallback suggestion also failed:", fallbackErr);
+          }
+        }
+      }
+    }
+  }, [currentRepo, isDemoMode, pr.number, prFiles, selectedPRFileIdx]);
+
+  const handleAcceptSuggestion = useCallback(async (commentId: string) => {
+    const comment = comments.find((c) => c.id === commentId);
+    if (!comment) return;
+
+    const file = prFiles[selectedPRFileIdx];
+    if (!file) return;
+
+    // Parse suggestion from comment body
+    const match = comment.body.match(/```suggestion\n([\s\S]*?)\n```/);
+    if (!match) return;
+
+    const replacementText = match[1];
+
+    // Get line range from the comment's selected text
+    const selectedText = comment.selectedText || "";
+    const { startLine, endLine } = mapSelectionToLines(file.headContent, selectedText);
+
+    if (!isDemoMode && currentRepo) {
+      try {
+        await applySuggestion(
+          currentRepo,
+          pr.headBranch,
+          file.path,
+          startLine,
+          endLine,
+          replacementText
+        );
+
+        // Resolve the comment thread after applying
+        if (comment.threadId) {
+          await resolveReviewThread(comment.threadId, true);
+        }
+
+        // Mark resolved locally
+        setComments((prev) =>
+          prev.map((c) => (c.id === commentId ? { ...c, resolved: true } : c))
+        );
+      } catch (err) {
+        console.error("Failed to apply suggestion:", err);
+      }
+    } else {
+      // Demo mode: just resolve locally
+      setComments((prev) =>
+        prev.map((c) => (c.id === commentId ? { ...c, resolved: true } : c))
+      );
+    }
+  }, [comments, currentRepo, isDemoMode, pr.headBranch, prFiles, selectedPRFileIdx]);
+
   return (
     <div className="h-full flex flex-col">
       {/* PR Header */}
@@ -319,6 +413,8 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
             onAddComment={handleAddComment}
             onResolveComment={handleResolveComment}
             onReplyComment={handleReplyComment}
+            onSubmitSuggestions={handleSubmitSuggestions}
+            onAcceptSuggestion={handleAcceptSuggestion}
           />
         ) : null}
       </div>

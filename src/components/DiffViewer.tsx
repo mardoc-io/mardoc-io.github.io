@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { diffWords } from "diff";
 import Showdown from "showdown";
-import { PRFile, PRComment } from "@/types";
+import { PRFile, PRComment, PendingSuggestion } from "@/types";
 import {
   MessageSquare,
   MessageSquarePlus,
@@ -15,6 +15,8 @@ import {
   Send,
   Maximize2,
   Minimize2,
+  Pencil,
+  Eye,
 } from "lucide-react";
 import ContextMenu from "./ContextMenu";
 import { mapSelectionToLines, rewriteImageUrls, loadAuthenticatedImages } from "@/lib/github-api";
@@ -37,6 +39,8 @@ interface DiffViewerProps {
   ) => void;
   onResolveComment: (commentId: string) => void;
   onReplyComment?: (commentId: string, body: string) => void;
+  onSubmitSuggestions?: (suggestions: PendingSuggestion[]) => void;
+  onAcceptSuggestion?: (commentId: string) => void;
 }
 
 interface DiffBlock {
@@ -94,6 +98,31 @@ function parseBlocks(md: string): string[] {
   }
   if (currentBlock.trim()) blocks.push(currentBlock.trim());
   return blocks;
+}
+
+function computeBlockLineRanges(
+  source: string,
+  blocks: string[]
+): { startLine: number; endLine: number }[] {
+  const ranges: { startLine: number; endLine: number }[] = [];
+  let searchFrom = 0;
+
+  for (const block of blocks) {
+    const idx = source.indexOf(block, searchFrom);
+    if (idx === -1) {
+      // Fallback: approximate from current position
+      ranges.push({ startLine: 1, endLine: 1 });
+      continue;
+    }
+    const beforeStart = source.slice(0, idx);
+    const beforeEnd = source.slice(0, idx + block.length);
+    const startLine = (beforeStart.match(/\n/g) || []).length + 1;
+    const endLine = (beforeEnd.match(/\n/g) || []).length + 1;
+    ranges.push({ startLine, endLine });
+    searchFrom = idx + block.length;
+  }
+
+  return ranges;
 }
 
 // Use showdown for robust markdown → HTML conversion in diff blocks
@@ -215,6 +244,7 @@ function CommentPanel({
   onSelect,
   onReply,
   onResolve,
+  onAccept,
   onClose,
 }: {
   comments: PanelComment[];
@@ -222,6 +252,7 @@ function CommentPanel({
   onSelect: (id: string) => void;
   onReply: (id: string, body: string) => void;
   onResolve: (id: string) => void;
+  onAccept?: (id: string) => void;
   onClose: () => void;
 }) {
   const [replyText, setReplyText] = useState<Record<string, string>>({});
@@ -302,9 +333,33 @@ function CommentPanel({
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                  {comment.body}
-                </p>
+                {(() => {
+                  const suggestionMatch = comment.body.match(/```suggestion\n([\s\S]*?)\n```/);
+                  if (suggestionMatch) {
+                    return (
+                      <div className="mt-1">
+                        <div className="text-[9px] text-[var(--accent)] font-medium mb-1">Suggested change:</div>
+                        <div className="text-[11px] font-mono bg-[var(--accent-muted)] text-[var(--text-primary)] px-2 py-1.5 rounded border border-[var(--accent)] leading-relaxed whitespace-pre-wrap">
+                          {suggestionMatch[1]}
+                        </div>
+                        {onAccept && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onAccept(comment.id); }}
+                            className="flex items-center gap-1 text-[10px] mt-1.5 px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors font-medium"
+                          >
+                            <Check size={10} />
+                            Accept suggestion
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                      {comment.body}
+                    </p>
+                  );
+                })()}
               </div>
 
               {/* Replies */}
@@ -416,8 +471,10 @@ export default function DiffViewer({
   onAddComment,
   onResolveComment,
   onReplyComment,
+  onSubmitSuggestions,
+  onAcceptSuggestion,
 }: DiffViewerProps) {
-  const [viewMode, setViewMode] = useState<"rendered" | "split" | "preview">("rendered");
+  const [viewMode, setViewMode] = useState<"rendered" | "split" | "suggest" | "preview">("rendered");
   const [showPanel, setShowPanel] = useState(true);
   const { wide, toggle: toggleWide } = useWideFormat();
 
@@ -425,6 +482,13 @@ export default function DiffViewer({
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const [pendingCommentInput, setPendingCommentInput] = useState("");
+
+  // Suggest mode state
+  const [pendingSuggestions, setPendingSuggestions] = useState<PendingSuggestion[]>([]);
+  const [editingBlockIndex, setEditingBlockIndex] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [showSuggestionsInPreview, setShowSuggestionsInPreview] = useState(false);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
@@ -487,6 +551,115 @@ export default function DiffViewer({
     [repoFullName, headBranch, file.path]
   );
 
+  // Parsed head blocks with line ranges for suggest mode
+  const headBlocks = useMemo(() => parseBlocks(file.headContent), [file.headContent]);
+  const headBlockRanges = useMemo(
+    () => computeBlockLineRanges(file.headContent, headBlocks),
+    [file.headContent, headBlocks]
+  );
+
+  // Suggest mode: start editing a block
+  const startEditingBlock = useCallback((blockIndex: number) => {
+    setEditingBlockIndex(blockIndex);
+    setEditingText(headBlocks[blockIndex]);
+  }, [headBlocks]);
+
+  // Suggest mode: save or discard edits on a block
+  const finishEditingBlock = useCallback(() => {
+    if (editingBlockIndex === null) return;
+
+    const original = headBlocks[editingBlockIndex];
+    if (editingText.trim() !== original.trim()) {
+      const range = headBlockRanges[editingBlockIndex];
+      setPendingSuggestions((prev) => {
+        // Replace existing suggestion for same block
+        const filtered = prev.filter((s) => s.blockIndex !== editingBlockIndex);
+        return [
+          ...filtered,
+          {
+            blockIndex: editingBlockIndex,
+            originalMarkdown: original,
+            editedMarkdown: editingText,
+            startLine: range.startLine,
+            endLine: range.endLine,
+          },
+        ];
+      });
+    }
+
+    setEditingBlockIndex(null);
+    setEditingText("");
+  }, [editingBlockIndex, editingText, headBlocks, headBlockRanges]);
+
+  // Suggest mode: discard a pending suggestion
+  const discardSuggestion = useCallback((blockIndex: number) => {
+    setPendingSuggestions((prev) => prev.filter((s) => s.blockIndex !== blockIndex));
+  }, []);
+
+  // Suggest mode: submit all pending suggestions
+  const submitSuggestions = useCallback(() => {
+    if (pendingSuggestions.length === 0) return;
+    onSubmitSuggestions?.(pendingSuggestions);
+    setPendingSuggestions([]);
+  }, [pendingSuggestions, onSubmitSuggestions]);
+
+  // Extract submitted suggestions from existing PR comments
+  const commentSuggestions = useMemo(() => {
+    const results: PendingSuggestion[] = [];
+    const suggestionRegex = /```suggestion\n([\s\S]*?)\n```/;
+
+    for (const comment of comments) {
+      const match = comment.body.match(suggestionRegex);
+      if (!match) continue;
+
+      const editedMarkdown = match[1];
+      const originalText = comment.selectedText || "";
+
+      // Find which block this maps to
+      const blockIdx = headBlocks.findIndex((block) => block.includes(originalText));
+      if (blockIdx === -1) continue;
+
+      const range = headBlockRanges[blockIdx];
+      results.push({
+        blockIndex: blockIdx,
+        originalMarkdown: headBlocks[blockIdx],
+        editedMarkdown,
+        startLine: range.startLine,
+        endLine: range.endLine,
+      });
+    }
+    return results;
+  }, [comments, headBlocks, headBlockRanges]);
+
+  // All suggestions: pending local + already submitted as comments
+  const allSuggestions = useMemo(() => {
+    const merged = [...pendingSuggestions];
+    for (const cs of commentSuggestions) {
+      if (!merged.some((s) => s.blockIndex === cs.blockIndex)) {
+        merged.push(cs);
+      }
+    }
+    return merged;
+  }, [pendingSuggestions, commentSuggestions]);
+
+  // Preview mode: apply suggestions to produce preview content
+  const previewBlocks = useMemo(() => {
+    if (!showSuggestionsInPreview || allSuggestions.length === 0) {
+      return headBlocks;
+    }
+    return headBlocks.map((block, idx) => {
+      const suggestion = allSuggestions.find((s) => s.blockIndex === idx);
+      return suggestion ? suggestion.editedMarkdown : block;
+    });
+  }, [headBlocks, allSuggestions, showSuggestionsInPreview]);
+
+  // Focus textarea when editing starts
+  useEffect(() => {
+    if (editingBlockIndex !== null && editTextareaRef.current) {
+      editTextareaRef.current.focus();
+    }
+  }, [editingBlockIndex]);
+
   const diffBlocks = useMemo(() => {
     const baseBlocks = parseBlocks(file.baseContent);
     const headBlocks = parseBlocks(file.headContent);
@@ -539,6 +712,16 @@ export default function DiffViewer({
     setPendingSelection(text);
     setShowPanel(true);
   }, []);
+
+  // Handle "Suggest change" from context menu — switch to suggest mode
+  // and find + open the block containing the selected text
+  const handleSuggestFromContext = useCallback((text: string) => {
+    setViewMode("suggest");
+    const blockIdx = headBlocks.findIndex((block) => block.includes(text));
+    if (blockIdx !== -1) {
+      setTimeout(() => startEditingBlock(blockIdx), 50);
+    }
+  }, [headBlocks, startEditingBlock]);
 
   const submitSelectionComment = useCallback(() => {
     if (!pendingSelection || !pendingCommentInput.trim()) return;
@@ -689,6 +872,22 @@ export default function DiffViewer({
               Side by Side
             </button>
             <button
+              onClick={() => setViewMode("suggest")}
+              className={`text-xs px-2.5 py-1 rounded transition-colors flex items-center gap-1 ${
+                viewMode === "suggest"
+                  ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              }`}
+            >
+              <Pencil size={10} />
+              Suggest
+              {pendingSuggestions.length > 0 && (
+                <span className="ml-0.5 px-1.5 py-0 text-[9px] rounded-full bg-[var(--accent)] text-white font-medium">
+                  {pendingSuggestions.length}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setViewMode("preview")}
               className={`text-xs px-2.5 py-1 rounded transition-colors ${
                 viewMode === "preview"
@@ -766,6 +965,7 @@ export default function DiffViewer({
               <ContextMenu
                 containerRef={contentRef}
                 onComment={handleSelectionComment}
+                onSuggestChange={handleSuggestFromContext}
               />
 
               <div className={wide ? "mx-auto px-12 py-6" : "max-w-5xl mx-auto px-8 py-6"}>
@@ -845,6 +1045,7 @@ export default function DiffViewer({
               <ContextMenu
                 containerRef={contentRef}
                 onComment={handleSelectionComment}
+                onSuggestChange={handleSuggestFromContext}
               />
               <div className="flex h-full">
                 <div className="flex-1 border-r border-[var(--border)] overflow-y-auto">
@@ -879,8 +1080,129 @@ export default function DiffViewer({
                 </div>
               </div>
             </div>
+          ) : viewMode === "suggest" ? (
+            /* Suggest — editable blocks, click to edit raw markdown */
+            <div className="relative" ref={contentRef}>
+              <div className={wide ? "mx-auto px-12 py-6" : "max-w-5xl mx-auto px-8 py-6"}>
+                <div className="text-[10px] text-[var(--text-muted)] mb-4 flex items-center gap-1.5">
+                  <Pencil size={10} />
+                  Click any block to edit — changes become suggestions on the PR
+                </div>
+
+                {headBlocks.map((block, idx) => {
+                  const hasSuggestion = pendingSuggestions.some((s) => s.blockIndex === idx);
+                  const isEditing = editingBlockIndex === idx;
+
+                  if (isEditing) {
+                    return (
+                      <div key={idx} className="mb-2 rounded-lg border-2 border-[var(--accent)] bg-[var(--surface)] overflow-hidden">
+                        <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--accent-muted)] border-b border-[var(--accent)]">
+                          <span className="text-[10px] text-[var(--accent)] font-medium">
+                            Editing block — Lines {headBlockRanges[idx].startLine}–{headBlockRanges[idx].endLine}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={finishEditingBlock}
+                              className="text-[10px] px-2 py-0.5 bg-[var(--accent)] text-white rounded hover:bg-[var(--accent-hover)] transition-colors"
+                            >
+                              Done
+                            </button>
+                            <button
+                              onClick={() => { setEditingBlockIndex(null); setEditingText(""); }}
+                              className="text-[10px] px-2 py-0.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                        <textarea
+                          ref={editTextareaRef}
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") {
+                              setEditingBlockIndex(null);
+                              setEditingText("");
+                            }
+                            if (e.key === "Enter" && e.metaKey) {
+                              finishEditingBlock();
+                            }
+                          }}
+                          className="w-full p-3 text-sm font-mono bg-[var(--surface)] text-[var(--text-primary)] border-none outline-none resize-y min-h-[80px]"
+                          rows={Math.max(3, editingText.split("\n").length + 1)}
+                        />
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => startEditingBlock(idx)}
+                      className={`group relative mb-1 cursor-pointer rounded-md transition-all ${
+                        hasSuggestion
+                          ? "border-l-3 border-[var(--accent)] pl-3 bg-[var(--accent-muted)]"
+                          : "hover:bg-[var(--surface-hover)] hover:outline hover:outline-1 hover:outline-[var(--border)]"
+                      }`}
+                    >
+                      {hasSuggestion && (
+                        <div className="flex items-center justify-between py-1">
+                          <span className="text-[9px] text-[var(--accent)] font-medium flex items-center gap-1">
+                            <Pencil size={8} /> Suggested change
+                          </span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); discardSuggestion(idx); }}
+                            className="text-[9px] text-[var(--text-muted)] hover:text-red-500 transition-colors"
+                          >
+                            Discard
+                          </button>
+                        </div>
+                      )}
+                      <div
+                        className="rendered-block diff-content"
+                        dangerouslySetInnerHTML={{
+                          __html: hasSuggestion
+                            ? headBlockToHtml(pendingSuggestions.find((s) => s.blockIndex === idx)!.editedMarkdown)
+                            : headBlockToHtml(block),
+                        }}
+                      />
+                      {!hasSuggestion && (
+                        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-[9px] text-[var(--text-muted)] bg-[var(--surface)] px-1.5 py-0.5 rounded border border-[var(--border)]">
+                            Click to edit
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Submit bar */}
+                {pendingSuggestions.length > 0 && (
+                  <div className="sticky bottom-0 mt-4 p-3 bg-[var(--surface)] border border-[var(--accent)] rounded-lg shadow-lg flex items-center justify-between">
+                    <span className="text-xs text-[var(--text-secondary)]">
+                      {pendingSuggestions.length} pending suggestion{pendingSuggestions.length > 1 ? "s" : ""}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPendingSuggestions([])}
+                        className="text-xs px-3 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                      >
+                        Discard all
+                      </button>
+                      <button
+                        onClick={submitSuggestions}
+                        className="text-xs px-4 py-1.5 bg-[var(--accent)] text-white rounded-md hover:bg-[var(--accent-hover)] transition-colors font-medium"
+                      >
+                        Submit suggestions
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
-            /* Preview — clean render of head content with commenting */
+            /* Preview — clean render with optional suggestions applied */
             <div className="relative" ref={contentRef}>
               <FloatingToolbar
                 containerRef={contentRef}
@@ -889,25 +1211,43 @@ export default function DiffViewer({
               <ContextMenu
                 containerRef={contentRef}
                 onComment={handleSelectionComment}
+                onSuggestChange={handleSuggestFromContext}
               />
 
               <div className={wide ? "mx-auto px-12 py-6" : "max-w-5xl mx-auto px-8 py-6"}>
-                <div className="text-[10px] text-[var(--text-muted)] mb-4 flex items-center gap-1.5">
-                  <MessageSquarePlus size={10} />
-                  Select any text to add a comment — all comments appear in the right panel
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-[10px] text-[var(--text-muted)] flex items-center gap-1.5">
+                    <MessageSquarePlus size={10} />
+                    Select any text to add a comment — all comments appear in the right panel
+                  </div>
+                  {allSuggestions.length > 0 && (
+                    <label className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={showSuggestionsInPreview}
+                        onChange={(e) => setShowSuggestionsInPreview(e.target.checked)}
+                        className="rounded border-[var(--border)] text-[var(--accent)] w-3 h-3"
+                      />
+                      <Eye size={10} />
+                      Show suggestions ({allSuggestions.length})
+                    </label>
+                  )}
                 </div>
 
                 <div className="diff-content">
-                  {parseBlocks(file.headContent).map((block, idx) => (
-                    <div
-                      key={idx}
-                      className="rendered-block mb-1"
-                      dangerouslySetInnerHTML={{
-                        __html: renderBlockHtml(headBlockToHtml(block)),
-                      }}
-                      onClick={handleMarkClick}
-                    />
-                  ))}
+                  {previewBlocks.map((block, idx) => {
+                    const hasSuggestion = showSuggestionsInPreview && allSuggestions.some((s) => s.blockIndex === idx);
+                    return (
+                      <div
+                        key={idx}
+                        className={`rendered-block mb-1 ${hasSuggestion ? "border-l-2 border-[var(--accent)] pl-3 bg-[var(--accent-muted)] rounded-r" : ""}`}
+                        dangerouslySetInnerHTML={{
+                          __html: renderBlockHtml(headBlockToHtml(block)),
+                        }}
+                        onClick={handleMarkClick}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -956,6 +1296,7 @@ export default function DiffViewer({
             }}
             onReply={handleReply}
             onResolve={handleResolve}
+            onAccept={onAcceptSuggestion}
             onClose={() => {
               setShowPanel(false);
               setActiveCommentId(null);
