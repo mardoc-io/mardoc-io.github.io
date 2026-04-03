@@ -409,6 +409,11 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   const isNewFile = filePath.startsWith("__new__/");
   const [newFilePath, setNewFilePath] = useState("docs/");
   const [newFileTitle, setNewFileTitle] = useState("");
+
+  // Dirty tracking for existing files
+  const [isDirty, setIsDirty] = useState(false);
+  const [showEditPRModal, setShowEditPRModal] = useState(false);
+  const [editPRTitle, setEditPRTitle] = useState("");
   const [showNewFileModal, setShowNewFileModal] = useState(false);
   const [savingNewFile, setSavingNewFile] = useState(false);
   const editor = useEditor({
@@ -442,6 +447,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     content: markdownToHtml(content, repoFullName, branch, filePath),
     onUpdate: ({ editor }) => {
       onContentChange?.(editor.getHTML());
+      if (!isNewFile) setIsDirty(true);
     },
     editorProps: {
       attributes: {
@@ -477,6 +483,9 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     setActiveCommentId(null);
     setSubmittedPR(null);
     setSubmitError(null);
+    setIsDirty(false);
+    setShowEditPRModal(false);
+    setEditPRTitle("");
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath, editor]);
@@ -663,6 +672,38 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     }
   }, [repoFullName, isDemoMode, editor, newFilePath, newFileTitle, prBranchForNewFile, prNumberForNewFile, pullRequests, openPR, refreshRepo]);
 
+  const handleSubmitEditsAsPR = useCallback(async () => {
+    if (!repoFullName || isDemoMode || !editor || !editPRTitle.trim()) return;
+
+    setSubmittingPR(true);
+    setSubmitError(null);
+
+    try {
+      const turndown = new TurndownService({
+        headingStyle: "atx",
+        codeBlockStyle: "fenced",
+      });
+      const html = editor.getHTML();
+      const markdown = turndown.turndown(html);
+
+      const pr = await createFileAsPR(
+        repoFullName,
+        filePath,
+        markdown,
+        editPRTitle,
+      );
+
+      setSubmittedPR(pr);
+      setShowEditPRModal(false);
+      setIsDirty(false);
+      refreshRepo();
+    } catch (err: any) {
+      setSubmitError(err.message || "Failed to create PR");
+    } finally {
+      setSubmittingPR(false);
+    }
+  }, [repoFullName, isDemoMode, editor, filePath, editPRTitle, refreshRepo]);
+
   if (!editor) return null;
 
   const activeCount = comments.filter((c) => !c.resolved).length;
@@ -797,7 +838,18 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
                 {isAddingToPR ? "Add to PR" : "Save to Repo"}
               </button>
             )}
-            {/* Submit as PR — only when authenticated and comments exist */}
+            {/* Submit edits as PR — when file is dirty */}
+            {!isNewFile && isDirty && !submittedPR && (
+              <button
+                onClick={() => { setEditPRTitle(`Update ${filePath}`); setShowEditPRModal(true); }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition-colors"
+                title="Submit your edits as a pull request"
+              >
+                <GitPullRequest size={13} />
+                Submit Edits as PR
+              </button>
+            )}
+            {/* Submit comments as PR — only when authenticated and comments exist */}
             {!isNewFile && !isDemoMode && activeCount > 0 && !submittedPR && (
               <button
                 onClick={handleSubmitAsPR}
@@ -1062,6 +1114,71 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
                   <GitPullRequest size={13} />
                 )}
                 {savingNewFile ? "Committing..." : isAddingToPR ? "Commit to PR" : "Create PR"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit PR modal */}
+      {showEditPRModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div
+            className="bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-2xl w-[420px] p-5"
+            style={{ animation: "fadeInUp 0.15s ease-out" }}
+          >
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+              <GitPullRequest size={16} className="text-[var(--accent)]" />
+              Submit Edits as PR
+            </h3>
+
+            <p className="text-xs text-[var(--text-secondary)] mb-3">
+              Your changes to <span className="font-mono text-[var(--text-primary)]">{filePath}</span> will be committed on a new branch and opened as a pull request.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1 block">
+                  PR title
+                </label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={editPRTitle}
+                  onChange={(e) => setEditPRTitle(e.target.value)}
+                  placeholder={`Update ${filePath}`}
+                  className="w-full text-sm px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && editPRTitle.trim()) {
+                      handleSubmitEditsAsPR();
+                    }
+                  }}
+                />
+              </div>
+
+              {submitError && (
+                <p className="text-xs text-red-500">{submitError}</p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button
+                onClick={() => { setShowEditPRModal(false); setSubmitError(null); }}
+                className="text-xs px-3 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitEditsAsPR}
+                disabled={submittingPR || !editPRTitle.trim()}
+                className="flex items-center gap-1.5 text-xs px-4 py-1.5 bg-[var(--accent)] text-white rounded-md hover:bg-[var(--accent-hover)] disabled:opacity-40 transition-colors"
+              >
+                {submittingPR ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <GitPullRequest size={13} />
+                )}
+                {submittingPR ? "Creating..." : "Create PR"}
               </button>
             </div>
           </div>
