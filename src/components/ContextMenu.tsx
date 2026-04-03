@@ -7,6 +7,7 @@ import {
   Quote,
   ExternalLink,
   MessageSquare,
+  Pencil,
 } from "lucide-react";
 
 interface ContextMenuItem {
@@ -27,11 +28,13 @@ interface ContextMenuProps {
   containerRef: React.RefObject<HTMLElement | null>;
   onComment: (selectedText: string) => void;
   onBlockComment?: (blockIndex: number) => void;
+  onSuggestChange?: (selectedText: string) => void;
 }
 
 export default function ContextMenu({
   containerRef,
   onComment,
+  onSuggestChange,
 }: ContextMenuProps) {
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -122,6 +125,16 @@ export default function ContextMenu({
         setVisible(false);
       },
     });
+    if (onSuggestChange) {
+      items.push({
+        label: "Suggest change",
+        icon: <Pencil size={14} />,
+        action: () => {
+          onSuggestChange(selectedText);
+          setVisible(false);
+        },
+      });
+    }
     items.push({ separator: true });
     items.push({
       label: "Copy text",

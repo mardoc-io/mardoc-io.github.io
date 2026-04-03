@@ -50,4 +50,12 @@ export interface PRFile {
   status: "added" | "modified" | "deleted";
 }
 
+export interface PendingSuggestion {
+  blockIndex: number;
+  originalMarkdown: string;
+  editedMarkdown: string;
+  startLine: number;
+  endLine: number;
+}
+
 export type ViewMode = "editor" | "pr-list" | "pr-diff" | "pr-review";
