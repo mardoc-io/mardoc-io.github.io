@@ -17,6 +17,21 @@ import {
   Minimize2,
   Pencil,
   Eye,
+  Bold,
+  Italic,
+  Heading1,
+  Heading2,
+  Heading3,
+  Code,
+  Link,
+  List,
+  ListOrdered,
+  CheckSquare,
+  Quote,
+  Strikethrough,
+  Highlighter,
+  FileCode,
+  Minus,
 } from "lucide-react";
 import ContextMenu from "./ContextMenu";
 import { mapSelectionToLines, rewriteImageUrls, loadAuthenticatedImages } from "@/lib/github-api";
@@ -232,6 +247,233 @@ function FloatingToolbar({
         Comment
       </button>
       <div className="w-0 h-0 mx-auto border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-[var(--accent)]" />
+    </div>
+  );
+}
+
+// ─── Markdown Formatting Toolbar ──────────────────────────────────────────
+
+type FormatAction = {
+  icon: React.ReactNode;
+  label: string;
+  hotkey?: string;
+  apply: (text: string, selStart: number, selEnd: number) => {
+    text: string;
+    selStart: number;
+    selEnd: number;
+  };
+};
+
+function applyWrap(
+  text: string,
+  selStart: number,
+  selEnd: number,
+  prefix: string,
+  suffix: string
+): { text: string; selStart: number; selEnd: number } {
+  const before = text.slice(0, selStart);
+  const selected = text.slice(selStart, selEnd);
+  const after = text.slice(selEnd);
+
+  if (selected) {
+    const newText = before + prefix + selected + suffix + after;
+    return { text: newText, selStart: selStart + prefix.length, selEnd: selEnd + prefix.length };
+  }
+  // No selection — insert placeholder
+  const placeholder = "text";
+  const newText = before + prefix + placeholder + suffix + after;
+  return { text: newText, selStart: selStart + prefix.length, selEnd: selStart + prefix.length + placeholder.length };
+}
+
+function applyLinePrefix(
+  text: string,
+  selStart: number,
+  selEnd: number,
+  prefix: string
+): { text: string; selStart: number; selEnd: number } {
+  // Find start of current line
+  const lineStart = text.lastIndexOf("\n", selStart - 1) + 1;
+  const lineEnd = text.indexOf("\n", selEnd);
+  const actualEnd = lineEnd === -1 ? text.length : lineEnd;
+
+  const before = text.slice(0, lineStart);
+  const line = text.slice(lineStart, actualEnd);
+  const after = text.slice(actualEnd);
+
+  // Toggle: if line already starts with prefix, remove it
+  if (line.startsWith(prefix)) {
+    const newText = before + line.slice(prefix.length) + after;
+    return { text: newText, selStart: Math.max(lineStart, selStart - prefix.length), selEnd: selEnd - prefix.length };
+  }
+
+  const newText = before + prefix + line + after;
+  return { text: newText, selStart: selStart + prefix.length, selEnd: selEnd + prefix.length };
+}
+
+// Group 1: Headings
+const HEADING_ACTIONS: FormatAction[] = [
+  {
+    icon: <Heading1 size={15} />, label: "Heading 1",
+    apply: (t, s, e) => applyLinePrefix(t, s, e, "# "),
+  },
+  {
+    icon: <Heading2 size={15} />, label: "Heading 2",
+    apply: (t, s, e) => applyLinePrefix(t, s, e, "## "),
+  },
+  {
+    icon: <Heading3 size={15} />, label: "Heading 3",
+    apply: (t, s, e) => applyLinePrefix(t, s, e, "### "),
+  },
+];
+
+// Group 2: Inline formatting
+const INLINE_ACTIONS: FormatAction[] = [
+  {
+    icon: <Bold size={15} />, label: "Bold", hotkey: "b",
+    apply: (t, s, e) => applyWrap(t, s, e, "**", "**"),
+  },
+  {
+    icon: <Italic size={15} />, label: "Italic", hotkey: "i",
+    apply: (t, s, e) => applyWrap(t, s, e, "_", "_"),
+  },
+  {
+    icon: <Strikethrough size={15} />, label: "Strikethrough",
+    apply: (t, s, e) => applyWrap(t, s, e, "~~", "~~"),
+  },
+  {
+    icon: <Code size={15} />, label: "Inline Code", hotkey: "e",
+    apply: (t, s, e) => applyWrap(t, s, e, "`", "`"),
+  },
+  {
+    icon: <Highlighter size={15} />, label: "Highlight",
+    apply: (t, s, e) => applyWrap(t, s, e, "==", "=="),
+  },
+];
+
+// Group 3: Lists
+const LIST_ACTIONS: FormatAction[] = [
+  {
+    icon: <List size={15} />, label: "Bullet List",
+    apply: (t, s, e) => applyLinePrefix(t, s, e, "- "),
+  },
+  {
+    icon: <ListOrdered size={15} />, label: "Numbered List",
+    apply: (t, s, e) => applyLinePrefix(t, s, e, "1. "),
+  },
+  {
+    icon: <CheckSquare size={15} />, label: "Task List",
+    apply: (t, s, e) => applyLinePrefix(t, s, e, "- [ ] "),
+  },
+];
+
+// Group 4: Block elements
+const BLOCK_ACTIONS: FormatAction[] = [
+  {
+    icon: <Quote size={15} />, label: "Blockquote",
+    apply: (t, s, e) => applyLinePrefix(t, s, e, "> "),
+  },
+  {
+    icon: <FileCode size={15} />, label: "Code Block",
+    apply: (t, s, e) => {
+      const selected = t.slice(s, e);
+      const before = t.slice(0, s);
+      const after = t.slice(e);
+      if (selected) {
+        const newText = before + "```\n" + selected + "\n```" + after;
+        return { text: newText, selStart: s + 4, selEnd: s + 4 + selected.length };
+      }
+      const newText = before + "```\n\n```" + after;
+      return { text: newText, selStart: s + 4, selEnd: s + 4 };
+    },
+  },
+  {
+    icon: <Minus size={15} />, label: "Horizontal Rule",
+    apply: (t, s, e) => {
+      const before = t.slice(0, s);
+      const after = t.slice(e);
+      const newText = before + "\n---\n" + after;
+      return { text: newText, selStart: s + 5, selEnd: s + 5 };
+    },
+  },
+];
+
+// Group 5: Link
+const LINK_ACTIONS: FormatAction[] = [
+  {
+    icon: <Link size={15} />, label: "Add Link", hotkey: "k",
+    apply: (t, s, e) => {
+      const selected = t.slice(s, e);
+      const before = t.slice(0, s);
+      const after = t.slice(e);
+      if (selected) {
+        const newText = before + "[" + selected + "](url)" + after;
+        const urlStart = s + selected.length + 3;
+        return { text: newText, selStart: urlStart, selEnd: urlStart + 3 };
+      }
+      const newText = before + "[text](url)" + after;
+      return { text: newText, selStart: s + 1, selEnd: s + 5 };
+    },
+  },
+];
+
+// All actions flat for hotkey lookup
+const ALL_FORMAT_ACTIONS: FormatAction[] = [
+  ...HEADING_ACTIONS, ...INLINE_ACTIONS, ...LIST_ACTIONS, ...BLOCK_ACTIONS, ...LINK_ACTIONS,
+];
+
+function ToolbarDivider() {
+  return <div className="w-px h-5 bg-[var(--border)] mx-1" />;
+}
+
+function MarkdownToolbar({
+  textareaRef,
+  text,
+  onTextChange,
+}: {
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  text: string;
+  onTextChange: (text: string) => void;
+}) {
+  const applyAction = useCallback(
+    (action: FormatAction) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const { selectionStart, selectionEnd } = textarea;
+      const result = action.apply(text, selectionStart, selectionEnd);
+      onTextChange(result.text);
+
+      requestAnimationFrame(() => {
+        textarea.focus();
+        textarea.setSelectionRange(result.selStart, result.selEnd);
+      });
+    },
+    [textareaRef, text, onTextChange]
+  );
+
+  const renderGroup = (actions: FormatAction[]) =>
+    actions.map((action, i) => (
+      <button
+        key={action.label}
+        onClick={(e) => { e.preventDefault(); applyAction(action); }}
+        title={`${action.label}${action.hotkey ? ` (⌘${action.hotkey.toUpperCase()})` : ""}`}
+        className="toolbar-btn"
+      >
+        {action.icon}
+      </button>
+    ));
+
+  return (
+    <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-[var(--accent)] bg-[var(--surface)]">
+      {renderGroup(HEADING_ACTIONS)}
+      <ToolbarDivider />
+      {renderGroup(INLINE_ACTIONS)}
+      <ToolbarDivider />
+      {renderGroup(LIST_ACTIONS)}
+      <ToolbarDivider />
+      {renderGroup(BLOCK_ACTIONS)}
+      <ToolbarDivider />
+      {renderGroup(LINK_ACTIONS)}
     </div>
   );
 }
@@ -1115,6 +1357,11 @@ export default function DiffViewer({
                             </button>
                           </div>
                         </div>
+                        <MarkdownToolbar
+                          textareaRef={editTextareaRef}
+                          text={editingText}
+                          onTextChange={setEditingText}
+                        />
                         <textarea
                           ref={editTextareaRef}
                           value={editingText}
@@ -1123,9 +1370,51 @@ export default function DiffViewer({
                             if (e.key === "Escape") {
                               setEditingBlockIndex(null);
                               setEditingText("");
+                              return;
                             }
                             if (e.key === "Enter" && e.metaKey) {
                               finishEditingBlock();
+                              return;
+                            }
+                            // Auto-surround selection with matching characters
+                            const surroundPairs: Record<string, string> = {
+                              "'": "'", '"': '"', "*": "*", "_": "_",
+                              "(": ")", "[": "]", "{": "}", "`": "`",
+                            };
+                            if (surroundPairs[e.key]) {
+                              const textarea = e.currentTarget;
+                              if (textarea.selectionStart !== textarea.selectionEnd) {
+                                e.preventDefault();
+                                const result = applyWrap(
+                                  editingText,
+                                  textarea.selectionStart,
+                                  textarea.selectionEnd,
+                                  e.key,
+                                  surroundPairs[e.key]
+                                );
+                                setEditingText(result.text);
+                                requestAnimationFrame(() => {
+                                  textarea.setSelectionRange(result.selStart, result.selEnd);
+                                });
+                                return;
+                              }
+                            }
+                            // Hotkeys for formatting
+                            if (e.metaKey || e.ctrlKey) {
+                              const action = ALL_FORMAT_ACTIONS.find((a) => a.hotkey === e.key);
+                              if (action) {
+                                e.preventDefault();
+                                const textarea = e.currentTarget;
+                                const result = action.apply(
+                                  editingText,
+                                  textarea.selectionStart,
+                                  textarea.selectionEnd
+                                );
+                                setEditingText(result.text);
+                                requestAnimationFrame(() => {
+                                  textarea.setSelectionRange(result.selStart, result.selEnd);
+                                });
+                              }
                             }
                           }}
                           className="w-full p-3 text-sm font-mono bg-[var(--surface)] text-[var(--text-primary)] border-none outline-none resize-y min-h-[80px]"
