@@ -221,6 +221,51 @@ export async function fetchPullRequests(
   }));
 }
 
+/**
+ * Fetch markdown file counts for a batch of PRs via a single GraphQL query.
+ * Returns a map of PR number → count of .md/.mdx files changed.
+ */
+export async function fetchPRMarkdownCounts(
+  repoFullName: string,
+  prNumbers: number[]
+): Promise<Map<number, number>> {
+  const octokit = getOctokit();
+  if (!octokit || prNumbers.length === 0) return new Map();
+
+  const { owner, repo } = parseOwnerRepo(repoFullName);
+
+  // Build aliased query fragments for each PR
+  const fragments = prNumbers.map(
+    (num, i) => `pr${i}: pullRequest(number: ${num}) { number files(first: 100) { nodes { path } } }`
+  ).join("\n    ");
+
+  const query = `query {
+    repository(owner: "${owner}", name: "${repo}") {
+      ${fragments}
+    }
+  }`;
+
+  try {
+    const result: any = await (octokit as any).graphql(query);
+    const counts = new Map<number, number>();
+
+    for (let i = 0; i < prNumbers.length; i++) {
+      const prData = result.repository[`pr${i}`];
+      if (prData?.files?.nodes) {
+        const mdCount = prData.files.nodes.filter(
+          (f: any) => /\.(md|mdx)$/i.test(f.path)
+        ).length;
+        counts.set(prData.number, mdCount);
+      }
+    }
+
+    return counts;
+  } catch (err) {
+    console.error("Failed to fetch PR markdown counts:", err);
+    return new Map();
+  }
+}
+
 export async function fetchPRFiles(
   repoFullName: string,
   prNumber: number

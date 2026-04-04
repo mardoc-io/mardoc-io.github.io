@@ -233,6 +233,8 @@ export default function Sidebar() {
     createNewFile,
     addFileToPR,
     openLocalFile,
+    prStateFilter,
+    setPRStateFilter,
     setCurrentView,
     selectedFile,
     selectedPR,
@@ -539,6 +541,23 @@ export default function Sidebar() {
           </div>
         ) : (
           <div className="space-y-1">
+            {/* State filter */}
+            <div className="flex items-center gap-1 px-1 mb-2">
+              {(["open", "closed", "all"] as const).map((state) => (
+                <button
+                  key={state}
+                  onClick={() => setPRStateFilter(state)}
+                  className={`flex-1 text-[10px] py-1 rounded transition-colors capitalize ${
+                    prStateFilter === state
+                      ? "bg-[var(--accent-muted)] text-[var(--accent)] font-medium"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                  }`}
+                >
+                  {state}
+                </button>
+              ))}
+            </div>
+
             {/* Create review PR button */}
             <button
               onClick={() => setCurrentView("pr-review")}
@@ -571,12 +590,22 @@ export default function Sidebar() {
                     ) : (
                       <GitPullRequest size={14} className="text-green-500 shrink-0 mt-0.5" />
                     )}
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="text-sm text-[var(--text-primary)] truncate">
                         {pr.title}
                       </div>
-                      <div className="text-xs text-[var(--text-muted)] mt-0.5">
-                        #{pr.number} by {pr.author}
+                      <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mt-0.5">
+                        <span>#{pr.number} by {pr.author}</span>
+                        {pr.mdFileCount !== undefined && pr.mdFileCount > 0 && (
+                          <span className="text-[9px] px-1.5 py-0 rounded-full bg-[var(--accent-muted)] text-[var(--accent)] font-medium">
+                            {pr.mdFileCount} md
+                          </span>
+                        )}
+                        {pr.mdFileCount === 0 && (
+                          <span className="text-[9px] px-1.5 py-0 rounded-full bg-[var(--surface-secondary)] text-[var(--text-muted)]">
+                            no md
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
