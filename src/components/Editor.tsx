@@ -21,6 +21,7 @@ import TurndownService from "turndown";
 
 const lowlight = createLowlight(common);
 import { rewriteImageUrls, loadAuthenticatedImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent, createFileAsPR, commitFileToPRBranch } from "@/lib/github-api";
+import { classifyLink, resolvePath, findFileByPath } from "@/lib/link-handler";
 import { useApp } from "@/lib/app-context";
 import { preRenderMermaid } from "@/lib/mermaid";
 import { useWideFormat } from "@/lib/use-wide-format";
@@ -395,7 +396,7 @@ function CommentSidePanel({
 
 export default function Editor({ content, onContentChange, filePath, repoFullName, branch }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
-  const { isDemoMode, refreshRepo, prBranchForNewFile, prNumberForNewFile, openPR, pullRequests } = useApp();
+  const { isDemoMode, refreshRepo, prBranchForNewFile, prNumberForNewFile, openPR, pullRequests, repoFiles, openFile } = useApp();
   const { wide, toggle: toggleWide, contentClass } = useWideFormat();
   const [comments, setComments] = useState<EditorComment[]>([]);
   const [showComments, setShowComments] = useState(false);
@@ -707,6 +708,47 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     }
   }, [repoFullName, isDemoMode, editor, filePath, editPRTitle, refreshRepo]);
 
+  // Link click handler — intercept clicks on <a> tags in the editor
+  const handleLinkClick = useCallback((e: React.MouseEvent) => {
+    const target = (e.target as HTMLElement).closest("a");
+    if (!target) return;
+
+    const href = target.getAttribute("href");
+    if (!href) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const type = classifyLink(href);
+
+    if (type === "anchor") {
+      // Scroll to heading by ID
+      const id = href.slice(1);
+      const el = editorContainerRef.current?.querySelector(`[id="${id}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    } else if (type === "relative") {
+      // Strip anchor from href
+      const [pathPart] = href.split("#");
+      const resolvedPath = resolvePath(filePath, pathPart);
+      const file = findFileByPath(repoFiles, resolvedPath);
+      if (file) {
+        openFile(file);
+      } else {
+        // Try with .md extension if not found
+        const withMd = resolvedPath.endsWith(".md") ? resolvedPath : `${resolvedPath}.md`;
+        const fileWithMd = findFileByPath(repoFiles, withMd);
+        if (fileWithMd) {
+          openFile(fileWithMd);
+        }
+      }
+    } else {
+      // External — open in new tab
+      window.open(href, "_blank", "noopener,noreferrer");
+    }
+  }, [filePath, repoFiles, openFile]);
+
   if (!editor) return null;
 
   const activeCount = comments.filter((c) => !c.resolved).length;
@@ -909,7 +951,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         </div>
 
         {/* Editor area */}
-        <div className="flex-1 overflow-y-auto" ref={editorContainerRef as React.RefObject<HTMLDivElement>}>
+        <div className="flex-1 overflow-y-auto" ref={editorContainerRef as React.RefObject<HTMLDivElement>} onClick={handleLinkClick}>
           <div className={contentClass}>
             {/* File path breadcrumb */}
             <div className="text-xs text-[var(--text-muted)] mb-4 font-mono flex items-center gap-2">
