@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import ContextMenu from "./ContextMenu";
 import { mapSelectionToLines, rewriteImageUrls, loadAuthenticatedImages } from "@/lib/github-api";
+import { classifyLink } from "@/lib/link-handler";
 import { renderMermaidBlocks } from "@/lib/mermaid";
 import { highlightCodeBlocks } from "@/lib/highlight";
 import { useWideFormat } from "@/lib/use-wide-format";
@@ -1039,6 +1040,30 @@ export default function DiffViewer({
 
   const handleMarkClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
+
+    // Check for link clicks first
+    const anchor = target.closest("a");
+    if (anchor) {
+      const href = anchor.getAttribute("href");
+      if (href) {
+        e.preventDefault();
+        e.stopPropagation();
+        const type = classifyLink(href);
+        if (type === "anchor") {
+          const id = href.slice(1);
+          const el = contentRef.current?.querySelector(`[id="${id}"]`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        } else if (type === "external") {
+          window.open(href, "_blank", "noopener,noreferrer");
+        }
+        // Relative links don't apply in diff view — ignore
+        return;
+      }
+    }
+
+    // Check for comment highlight clicks
     const mark = target.closest("[data-comment-id]");
     if (mark) {
       const id = mark.getAttribute("data-comment-id");
