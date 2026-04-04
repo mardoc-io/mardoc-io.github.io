@@ -15,6 +15,7 @@
   --accent: #2383e2;
   --accent-hover: #1b6ec2;
   --accent-muted: #e8f0fe;
+  --inline-code: #d63384;
   --diff-add: #dafbe1;
   --diff-add-text: #1a7f37;
   --diff-remove: #ffebe9;
@@ -32,6 +33,7 @@
   --accent: #bd93f9;
   --accent-hover: #caa5fb;
   --accent-muted: #363949;
+  --inline-code: #ffb86c;
   --diff-add: #1e3a2a;
   --diff-add-text: #50fa7b;
   --diff-remove: #3d1a1e;
@@ -127,11 +129,19 @@ body {
   padding: 0.15em 0.3em;
   font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
   font-size: 0.9em;
+  color: var(--inline-code);
+}
+
+/* Remove Tailwind prose backtick pseudo-elements */
+.ProseMirror code::before,
+.ProseMirror code::after {
+  content: none !important;
 }
 
 .ProseMirror pre code {
   background: none;
   padding: 0;
+  color: inherit;
 }
 
 .ProseMirror img {
@@ -220,10 +230,16 @@ body {
   padding: 0.15em 0.3em;
   font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
   font-size: 0.9em;
+  color: var(--inline-code);
+}
+.diff-content code::before,
+.diff-content code::after {
+  content: none !important;
 }
 .diff-content pre code {
   background: none;
   padding: 0;
+  color: inherit;
 }
 
 /* Mermaid diagrams */
