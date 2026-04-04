@@ -56,6 +56,7 @@ import {
   ExternalLink,
   Loader2,
   FilePlus,
+  FileText,
   Save,
 } from "lucide-react";
 
@@ -405,8 +406,10 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   const [submittedPR, setSubmittedPR] = useState<{ url: string; number: number } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // New file state
+  // New file / local file state
   const isNewFile = filePath.startsWith("__new__/");
+  const isLocalFile = filePath.startsWith("__local__/");
+  const localFileName = isLocalFile ? filePath.replace("__local__/", "") : null;
   const [newFilePath, setNewFilePath] = useState("docs/");
   const [newFileTitle, setNewFileTitle] = useState("");
 
@@ -923,6 +926,14 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
                       — write content, then save to repo as a PR
                     </span>
                   )}
+                </>
+              ) : isLocalFile ? (
+                <>
+                  <FileText size={12} className="text-[var(--accent)]" />
+                  <span className="text-[var(--accent)] font-medium">{localFileName}</span>
+                  <span className="text-[10px] opacity-60">
+                    — local file
+                  </span>
                 </>
               ) : (
                 <>

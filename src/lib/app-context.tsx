@@ -55,6 +55,7 @@ interface AppState {
   openPR: (pr: PullRequest) => void;
   createNewFile: () => void;
   addFileToPR: (pr: PullRequest) => void;
+  openLocalFile: (name: string, content: string) => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -291,6 +292,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setFileContent("");
   }, []);
 
+  // Open a local file from the filesystem
+  const openLocalFile = useCallback((name: string, content: string) => {
+    const localFile: RepoFile = {
+      id: `local-${Date.now()}`,
+      name,
+      path: `__local__/${name}`,
+      type: "file",
+    };
+    setSelectedFile(localFile);
+    setSelectedPR(null);
+    setPRBranchForNewFile(null);
+    setPRNumberForNewFile(null);
+    setCurrentView("editor");
+    setFileContent(content);
+  }, []);
+
   // Open a PR and fetch its files + comments
   const openPR = useCallback(
     (pr: PullRequest) => {
@@ -445,6 +462,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         openPR,
         createNewFile,
         addFileToPR,
+        openLocalFile,
       }}
     >
       {children}
