@@ -22,20 +22,20 @@
 }
 
 .dark {
-  --surface: #191919;
-  --surface-secondary: #252525;
-  --surface-hover: #2f2f2f;
-  --border: #363636;
-  --text-primary: #e8e8e8;
-  --text-secondary: #a0a0a0;
-  --text-muted: #6a6a6a;
-  --accent: #529cca;
-  --accent-hover: #6db3de;
-  --accent-muted: #1c3a52;
-  --diff-add: #1a3a2a;
-  --diff-add-text: #56d364;
+  --surface: #282a36;
+  --surface-secondary: #21222c;
+  --surface-hover: #44475a;
+  --border: #44475a;
+  --text-primary: #f8f8f2;
+  --text-secondary: #bfc4d0;
+  --text-muted: #6272a4;
+  --accent: #bd93f9;
+  --accent-hover: #caa5fb;
+  --accent-muted: #363949;
+  --diff-add: #1e3a2a;
+  --diff-add-text: #50fa7b;
   --diff-remove: #3d1a1e;
-  --diff-remove-text: #f85149;
+  --diff-remove-text: #ff5555;
 }
 
 * {
@@ -385,22 +385,22 @@ body {
 /* Dark mode highlight.js overrides (base theme is github.css light) */
 .dark .hljs {
   background: var(--surface-secondary);
-  color: #c9d1d9;
+  color: #f8f8f2;
 }
 .dark .hljs-keyword,
-.dark .hljs-selector-tag { color: #ff7b72; }
+.dark .hljs-selector-tag { color: #ff79c6; }
 .dark .hljs-string,
-.dark .hljs-addition { color: #a5d6ff; }
+.dark .hljs-addition { color: #f1fa8c; }
 .dark .hljs-comment,
-.dark .hljs-quote { color: #8b949e; }
+.dark .hljs-quote { color: #6272a4; }
 .dark .hljs-number,
-.dark .hljs-literal { color: #79c0ff; }
+.dark .hljs-literal { color: #bd93f9; }
 .dark .hljs-title,
 .dark .hljs-section,
-.dark .hljs-built_in { color: #d2a8ff; }
+.dark .hljs-built_in { color: #50fa7b; }
 .dark .hljs-type,
-.dark .hljs-attr { color: #7ee787; }
+.dark .hljs-attr { color: #8be9fd; }
 .dark .hljs-name,
-.dark .hljs-selector-class { color: #7ee787; }
-.dark .hljs-deletion { color: #ffa198; }
-.dark .hljs-meta { color: #79c0ff; }
+.dark .hljs-selector-class { color: #8be9fd; }
+.dark .hljs-deletion { color: #ff5555; }
+.dark .hljs-meta { color: #ffb86c; }
