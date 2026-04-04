@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { RepoFile, PullRequest, PRFile, PRComment, ViewMode } from "@/types";
-import { initOctokit, fetchRepoTree, fetchPullRequests, fetchFileContent, fetchPRFiles, fetchPRComments, fetchDefaultBranch, fetchBranches } from "./github-api";
+import { initOctokit, fetchRepoTree, fetchPullRequests, fetchFileContent, fetchPRFiles, fetchPRComments, fetchDefaultBranch, fetchBranches, fetchPRMarkdownCounts } from "./github-api";
 import { repoFiles as mockFiles, pullRequests as mockPRs, findFile, flattenFiles } from "./mock-data";
 import { parseHash, buildFileHash, buildPRHash, buildRepoHash } from "./hash-router";
 
@@ -22,6 +22,8 @@ interface AppState {
   setCurrentRepo: (repo: string) => void;
   repoFiles: RepoFile[];
   pullRequests: PullRequest[];
+  prStateFilter: "open" | "closed" | "all";
+  setPRStateFilter: (state: "open" | "closed" | "all") => void;
 
   // Navigation
   currentView: ViewMode;
@@ -75,6 +77,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [availableBranches, setAvailableBranches] = useState<{ name: string; isDefault: boolean }[]>([]);
   const [repoFilesList, setRepoFiles] = useState<RepoFile[]>(mockFiles);
   const [prList, setPRList] = useState<PullRequest[]>(mockPRs);
+  const [prStateFilter, setPRStateFilterState] = useState<"open" | "closed" | "all">("open");
 
   // Navigation
   const [currentView, setCurrentView] = useState<ViewMode>("editor");
@@ -163,23 +166,50 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Load PRs and branches in parallel
+      await loadPRs(repo, prStateFilter);
+
       setLoadingPRs(true);
       try {
-        const [prs, branches] = await Promise.all([
-          fetchPullRequests(repo, "all"),
-          fetchBranches(repo).catch(() => [] as { name: string; isDefault: boolean }[]),
-        ]);
-        setPRList(prs);
+        const branches = await fetchBranches(repo).catch(() => [] as { name: string; isDefault: boolean }[]);
         setAvailableBranches(branches);
-      } catch (err: any) {
-        console.error("Failed to load PRs:", err);
-        setPRList([]);
+      } catch {
+        // branches are non-critical
       } finally {
         setLoadingPRs(false);
       }
     },
-    [githubToken]
+    [githubToken, prStateFilter]
   );
+
+  const loadPRs = useCallback(async (repo: string, state: "open" | "closed" | "all") => {
+    if (!githubToken) return;
+    setLoadingPRs(true);
+    try {
+      const prs = await fetchPullRequests(repo, state);
+      setPRList(prs);
+
+      // Enrich with markdown file counts (non-blocking)
+      if (prs.length > 0) {
+        fetchPRMarkdownCounts(repo, prs.map((p) => p.number)).then((counts) => {
+          setPRList((prev) =>
+            prev.map((p) => ({ ...p, mdFileCount: counts.get(p.number) ?? 0 }))
+          );
+        });
+      }
+    } catch (err: any) {
+      console.error("Failed to load PRs:", err);
+      setPRList([]);
+    } finally {
+      setLoadingPRs(false);
+    }
+  }, [githubToken]);
+
+  const setPRStateFilter = useCallback((state: "open" | "closed" | "all") => {
+    setPRStateFilterState(state);
+    if (currentRepo) {
+      loadPRs(currentRepo, state);
+    }
+  }, [currentRepo, loadPRs]);
 
   // Auto-restore: hash route wins over localStorage
   useEffect(() => {
@@ -439,6 +469,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCurrentRepo,
         repoFiles: repoFilesList,
         pullRequests: prList,
+        prStateFilter,
+        setPRStateFilter,
         currentView,
         setCurrentView,
         selectedFile,

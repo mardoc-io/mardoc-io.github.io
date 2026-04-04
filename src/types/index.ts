@@ -41,6 +41,7 @@ export interface PullRequest {
   files: PRFile[];
   comments: PRComment[];
   description: string;
+  mdFileCount?: number;
 }
 
 export interface PRFile {
