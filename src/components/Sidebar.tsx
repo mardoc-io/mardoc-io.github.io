@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   FileText,
   Folder,
@@ -15,6 +15,7 @@ import {
   FilePlus,
   FileMinus,
   FileEdit,
+  FolderInput,
   Search,
   X,
   PanelLeftClose,
@@ -231,6 +232,7 @@ export default function Sidebar() {
     openPR,
     createNewFile,
     addFileToPR,
+    openLocalFile,
     setCurrentView,
     selectedFile,
     selectedPR,
@@ -250,6 +252,21 @@ export default function Sidebar() {
   const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
   const [branchFilter, setBranchFilter] = useState("");
   const branchDropdownRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLocalFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      openLocalFile(file.name, reader.result as string);
+    };
+    reader.readAsText(file);
+
+    // Reset so the same file can be re-selected
+    e.target.value = "";
+  }, [openLocalFile]);
 
   // Close branch dropdown on outside click
   useEffect(() => {
@@ -482,13 +499,29 @@ export default function Sidebar() {
             </div>
           ) : (
             <div className="space-y-0.5">
-              <button
-                onClick={createNewFile}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs rounded-md text-[var(--accent)] hover:bg-[var(--surface-hover)] transition-colors mb-1"
-              >
-                <FilePlus size={14} />
-                New File
-              </button>
+              <div className="flex items-center gap-1 mb-1">
+                <button
+                  onClick={createNewFile}
+                  className="flex-1 flex items-center gap-2 px-3 py-1.5 text-xs rounded-md text-[var(--accent)] hover:bg-[var(--surface-hover)] transition-colors"
+                >
+                  <FilePlus size={14} />
+                  New File
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-hover)] transition-colors"
+                  title="Open a local .md file"
+                >
+                  <FolderInput size={14} />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".md,.mdx,.markdown"
+                  onChange={handleLocalFileSelect}
+                  className="hidden"
+                />
+              </div>
               {repoFiles.map((file) => (
                 <FileTreeItem
                   key={file.id}
