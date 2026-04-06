@@ -58,6 +58,7 @@ interface AppState {
   createNewFile: () => void;
   addFileToPR: (pr: PullRequest) => void;
   openLocalFile: (name: string, content: string) => void;
+  isEmbedded: boolean;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -65,7 +66,18 @@ const AppContext = createContext<AppState | null>(null);
 const TOKEN_KEY = "mardoc_github_token";
 const REPO_KEY = "mardoc_current_repo";
 
+// Module-level cache for VS Code init data — survives React Strict Mode remount
+let vsCodeInitData: Record<string, any> | null = null;
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  // Embed mode — detected from URL query param, deferred to avoid hydration mismatch
+  const [isEmbedded, setIsEmbedded] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("embed") === "true") {
+      setIsEmbedded(true);
+    }
+  }, []);
+
   // Auth state — server-safe defaults, hydrated in useEffect
   const [githubToken, setGithubTokenState] = useState<string | null>(null);
   const [isDemoMode, setIsDemoMode] = useState(true);
@@ -133,6 +145,62 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       initOctokit(savedToken);
     }
   }, []);
+
+  // Embed mode: listen for postMessage from VS Code extension
+  const pendingInitRef = useRef<{ owner: string; repo: string; branch: string; token: string } | null>(null);
+
+  const applyInitData = useCallback((data: Record<string, any>) => {
+    setIsEmbedded(true);
+
+    if (data.token) {
+      setGithubTokenState(data.token);
+      setIsDemoMode(false);
+      initOctokit(data.token);
+    }
+    if (data.owner && data.repo) {
+      pendingInitRef.current = data as any;
+    }
+
+    if (data.fileName && data.fileContent) {
+      const localFile: RepoFile = {
+        id: `local-${Date.now()}`,
+        name: data.fileName,
+        path: `__local__/${data.fileName}`,
+        type: "file" as const,
+      };
+      setSelectedFile(localFile);
+      setSelectedPR(null);
+      setCurrentView("editor");
+      setFileContent(data.fileContent);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || data.type !== "init") return;
+
+      // Cache at module level so Strict Mode remount can replay
+      vsCodeInitData = data;
+      applyInitData(data);
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    // On mount (or Strict Mode remount), replay cached init data if available
+    if (vsCodeInitData) {
+      applyInitData(vsCodeInitData);
+    }
+
+    // Signal to parent that we're ready to receive init
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: "ready" }, "*");
+    }
+
+    return () => window.removeEventListener("message", handleMessage);
+  }, [isEmbedded]);
+
+
 
   // Set current repo and load data
   const setCurrentRepo = useCallback(
@@ -210,6 +278,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       loadPRs(currentRepo, state);
     }
   }, [currentRepo, loadPRs]);
+
+  // Embed mode: process pending init repo after token and setCurrentRepo are ready
+  useEffect(() => {
+    if (!pendingInitRef.current || !githubToken) return;
+    const { owner, repo } = pendingInitRef.current;
+    pendingInitRef.current = null;
+    setCurrentRepo(`${owner}/${repo}`);
+  }, [githubToken, setCurrentRepo]);
 
   // Auto-restore: hash route wins over localStorage
   useEffect(() => {
@@ -337,6 +413,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentView("editor");
     setFileContent(content);
   }, []);
+
 
   // Open a PR and fetch its files + comments
   const openPR = useCallback(
@@ -495,6 +572,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createNewFile,
         addFileToPR,
         openLocalFile,
+        isEmbedded,
       }}
     >
       {children}

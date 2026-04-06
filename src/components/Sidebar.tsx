@@ -246,11 +246,17 @@ export default function Sidebar() {
     selectedBranch,
     availableBranches,
     setSelectedBranch,
+    isEmbedded,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<"files" | "prs">("files");
   const [prFileFilter, setPRFileFilter] = useState("");
   const [collapsed, setCollapsed] = useState(false);
+
+  // Switch to PRs tab once embed mode is detected (deferred via useEffect)
+  useEffect(() => {
+    if (isEmbedded) setActiveTab("prs");
+  }, [isEmbedded]);
   const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
   const [branchFilter, setBranchFilter] = useState("");
   const branchDropdownRef = useRef<HTMLDivElement>(null);
@@ -319,19 +325,21 @@ export default function Sidebar() {
     <aside className="w-64 shrink-0 h-full border-r border-[var(--border)] bg-[var(--surface-secondary)] flex flex-col">
       {/* Tabs */}
       <div className="flex border-b border-[var(--border)]">
-        <button
-          onClick={() => setActiveTab("files")}
-          className={`flex-1 px-3 py-2.5 text-sm font-medium transition-colors ${
-            activeTab === "files"
-              ? "text-[var(--text-primary)] border-b-2 border-[var(--accent)]"
-              : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-          }`}
-        >
-          <span className="flex items-center justify-center gap-1.5">
-            <FileText size={14} />
-            Files
-          </span>
-        </button>
+        {(!isEmbedded || isViewingPR) && (
+          <button
+            onClick={() => setActiveTab("files")}
+            className={`flex-1 px-3 py-2.5 text-sm font-medium transition-colors ${
+              activeTab === "files"
+                ? "text-[var(--text-primary)] border-b-2 border-[var(--accent)]"
+                : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            }`}
+          >
+            <span className="flex items-center justify-center gap-1.5">
+              <FileText size={14} />
+              {isEmbedded ? "Changed Files" : "Files"}
+            </span>
+          </button>
+        )}
         <button
           onClick={() => setActiveTab("prs")}
           className={`flex-1 px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -501,29 +509,31 @@ export default function Sidebar() {
             </div>
           ) : (
             <div className="space-y-0.5">
-              <div className="flex items-center gap-1 mb-1">
-                <button
-                  onClick={createNewFile}
-                  className="flex-1 flex items-center gap-2 px-3 py-1.5 text-xs rounded-md text-[var(--accent)] hover:bg-[var(--surface-hover)] transition-colors"
-                >
-                  <FilePlus size={14} />
-                  New File
-                </button>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-hover)] transition-colors"
-                  title="Open a local .md file"
-                >
-                  <FolderInput size={14} />
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".md,.mdx,.markdown"
-                  onChange={handleLocalFileSelect}
-                  className="hidden"
-                />
-              </div>
+              {!isEmbedded && (
+                <div className="flex items-center gap-1 mb-1">
+                  <button
+                    onClick={createNewFile}
+                    className="flex-1 flex items-center gap-2 px-3 py-1.5 text-xs rounded-md text-[var(--accent)] hover:bg-[var(--surface-hover)] transition-colors"
+                  >
+                    <FilePlus size={14} />
+                    New File
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-hover)] transition-colors"
+                    title="Open a local .md file"
+                  >
+                    <FolderInput size={14} />
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".md,.mdx,.markdown"
+                    onChange={handleLocalFileSelect}
+                    className="hidden"
+                  />
+                </div>
+              )}
               {repoFiles.map((file) => (
                 <FileTreeItem
                   key={file.id}

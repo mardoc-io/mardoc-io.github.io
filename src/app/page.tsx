@@ -33,6 +33,7 @@ export default function Home() {
     selectedBranch,
     repoFiles,
     pullRequests,
+    isEmbedded,
   } = useApp();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -55,7 +56,7 @@ export default function Home() {
             </span>
           ) : (
             <span className="text-xs text-[var(--text-muted)]">
-              {isDemoMode ? "Demo Mode" : "No repo selected"}
+              {isEmbedded ? "" : isDemoMode ? "Demo Mode" : "No repo selected"}
             </span>
           )}
         </div>
@@ -67,13 +68,15 @@ export default function Home() {
               <span className="max-w-48 truncate">{error}</span>
             </div>
           )}
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="toolbar-btn"
-            title="Settings"
-          >
-            <Settings size={16} />
-          </button>
+          {!isEmbedded && (
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="toolbar-btn"
+              title="Settings"
+            >
+              <Settings size={16} />
+            </button>
+          )}
           <ThemeToggle />
         </div>
       </header>
@@ -136,7 +139,9 @@ export default function Home() {
                   Welcome to mardoc.app
                 </h2>
                 <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-6">
-                  {isDemoMode
+                  {isEmbedded
+                    ? "Select a pull request from the sidebar to start reviewing, or right-click a markdown file to edit with MarDoc."
+                    : isDemoMode
                     ? "You're in demo mode with sample data. Open Settings to connect a GitHub repository."
                     : "Select a file from the sidebar to start editing, or open a pull request to review rendered markdown diffs."}
                 </p>
@@ -150,7 +155,7 @@ export default function Home() {
                     <span>{pullRequests.length} pull requests</span>
                   </div>
                 </div>
-                {isDemoMode && (
+                {isDemoMode && !isEmbedded && (
                   <button
                     onClick={() => setSettingsOpen(true)}
                     className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-white text-sm rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
