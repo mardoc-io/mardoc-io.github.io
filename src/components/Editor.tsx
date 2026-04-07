@@ -415,6 +415,11 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   const [editFilePath, setEditFilePath] = useState("");
   const [newFileTitle, setNewFileTitle] = useState("");
 
+  // Code view toggle
+  const [codeView, setCodeView] = useState(false);
+  const [codeContent, setCodeContent] = useState("");
+  const codeTextareaRef = useRef<HTMLTextAreaElement>(null);
+
   // Dirty tracking for existing files
   const [isDirty, setIsDirty] = useState(false);
   const [showEditPRModal, setShowEditPRModal] = useState(false);
@@ -489,11 +494,28 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     setSubmittedPR(null);
     setSubmitError(null);
     setIsDirty(false);
+    setCodeView(false);
+    setCodeContent("");
     setShowEditPRModal(false);
     setEditPRTitle("");
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath, editor]);
+
+  const toggleCodeView = useCallback(() => {
+    if (!editor) return;
+    if (!codeView) {
+      const turndown = createTurndownService();
+      const html = editor.getHTML();
+      const md = turndown.turndown(html);
+      setCodeContent(md);
+      setCodeView(true);
+    } else {
+      const html = showdownConverter.makeHtml(codeContent);
+      editor.commands.setContent(html);
+      setCodeView(false);
+    }
+  }, [editor, codeView, codeContent]);
 
   const addLink = useCallback(() => {
     if (!editor) return;
@@ -626,10 +648,15 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     setSubmitError(null);
 
     try {
-      // Convert TipTap HTML to markdown
-      const turndown = createTurndownService();
-      const html = editor.getHTML();
-      const markdown = turndown.turndown(html);
+      // Use code view content directly, or convert TipTap HTML to markdown
+      let markdown: string;
+      if (codeView) {
+        markdown = codeContent;
+      } else {
+        const turndown = createTurndownService();
+        const html = editor.getHTML();
+        markdown = turndown.turndown(html);
+      }
 
       const path = newFilePath.endsWith(".md") ? newFilePath : `${newFilePath}.md`;
 
@@ -672,7 +699,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     } finally {
       setSavingNewFile(false);
     }
-  }, [repoFullName, isDemoMode, editor, newFilePath, newFileTitle, prBranchForNewFile, prNumberForNewFile, pullRequests, openPR, refreshRepo]);
+  }, [repoFullName, isDemoMode, editor, newFilePath, newFileTitle, prBranchForNewFile, prNumberForNewFile, pullRequests, openPR, codeView, codeContent, refreshRepo]);
 
   const handleSubmitEditsAsPR = useCallback(async () => {
     if (!repoFullName || isDemoMode || !editor || !editPRTitle.trim()) return;
@@ -684,9 +711,14 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     setSubmitError(null);
 
     try {
-      const turndown = createTurndownService();
-      const html = editor.getHTML();
-      const markdown = turndown.turndown(html);
+      let markdown: string;
+      if (codeView) {
+        markdown = codeContent;
+      } else {
+        const turndown = createTurndownService();
+        const html = editor.getHTML();
+        markdown = turndown.turndown(html);
+      }
 
       const path = commitPath.endsWith(".md") ? commitPath : `${commitPath}.md`;
       const pr = await createFileAsPR(
@@ -705,7 +737,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     } finally {
       setSubmittingPR(false);
     }
-  }, [repoFullName, isDemoMode, editor, filePath, isLocalFile, editFilePath, editPRTitle, refreshRepo]);
+  }, [repoFullName, isDemoMode, editor, filePath, isLocalFile, editFilePath, editPRTitle, codeView, codeContent, refreshRepo]);
 
   // Link click handler — intercept clicks on <a> tags in the editor
   const handleLinkClick = useCallback((e: React.MouseEvent) => {
@@ -758,6 +790,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       <div className="flex-1 flex flex-col min-w-0">
         {/* Toolbar */}
         <div className="sticky top-0 z-10 bg-[var(--surface)] border-b border-[var(--border)] px-3 py-1.5 flex items-center gap-0.5 flex-wrap">
+          {!codeView && (<>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
             isActive={editor.isActive("heading", { level: 1 })}
@@ -869,6 +902,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
             title="Redo (⌘⇧Z)"
           />
 
+          </>)}
           {/* Wide format + comment toggle + submit PR — right side */}
           <div className="ml-auto flex items-center gap-1">
             {/* Save new file as PR */}
@@ -923,6 +957,13 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
             {submitError && (
               <span className="text-xs text-red-500 px-2">{submitError}</span>
             )}
+            <button
+              onClick={toggleCodeView}
+              className={`toolbar-btn ${codeView ? "active" : ""}`}
+              title={codeView ? "Rich view" : "Code view"}
+            >
+              <FileCode size={15} />
+            </button>
             <button
               onClick={toggleWide}
               className={`toolbar-btn ${wide ? "active" : ""}`}
@@ -992,7 +1033,17 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
               onComment={handleStartComment}
             />
 
-            <EditorContent editor={editor} />
+            {codeView ? (
+              <textarea
+                ref={codeTextareaRef}
+                value={codeContent}
+                onChange={(e) => { setCodeContent(e.target.value); setIsDirty(true); }}
+                className="w-full min-h-[60vh] p-4 font-mono text-sm leading-relaxed bg-[var(--surface-secondary)] text-[var(--text-primary)] border border-[var(--border)] rounded-lg resize-y focus:outline-none focus:border-[var(--accent)]"
+                spellCheck={false}
+              />
+            ) : (
+              <EditorContent editor={editor} />
+            )}
 
             {/* Pending comment input — inline below selection */}
             {pendingSelection && (
