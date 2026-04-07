@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import * as safeStorage from "./safe-storage";
 
 type Theme = "light" | "dark";
 
@@ -20,7 +21,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
-    const stored = localStorage.getItem("theme") as Theme | null;
+    const stored = safeStorage.getItem("theme") as Theme | null;
     if (stored) {
       setTheme(stored);
     } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
@@ -31,7 +32,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (mounted) {
       document.documentElement.classList.toggle("dark", theme === "dark");
-      localStorage.setItem("theme", theme);
+      safeStorage.setItem("theme", theme);
     }
   }, [theme, mounted]);
 

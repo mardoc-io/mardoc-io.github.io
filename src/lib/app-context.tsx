@@ -5,6 +5,7 @@ import { RepoFile, PullRequest, PRFile, PRComment, ViewMode } from "@/types";
 import { initOctokit, fetchRepoTree, fetchPullRequests, fetchFileContent, fetchPRFiles, fetchPRComments, fetchDefaultBranch, fetchBranches, fetchPRMarkdownCounts } from "./github-api";
 import { repoFiles as mockFiles, pullRequests as mockPRs, findFile, flattenFiles } from "./mock-data";
 import { parseHash, buildFileHash, buildPRHash, buildRepoHash } from "./hash-router";
+import * as safeStorage from "./safe-storage";
 
 interface AppState {
   // Auth
@@ -124,12 +125,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const setGithubToken = useCallback((token: string | null) => {
     setGithubTokenState(token);
     if (token) {
-      localStorage.setItem(TOKEN_KEY, token);
+      safeStorage.setItem(TOKEN_KEY, token);
       initOctokit(token);
       setIsDemoMode(false);
     } else {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(REPO_KEY);
+      safeStorage.removeItem(TOKEN_KEY);
+      safeStorage.removeItem(REPO_KEY);
       setIsDemoMode(true);
       setRepoFiles(mockFiles);
       setPRList(mockPRs);
@@ -138,7 +139,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Hydrate auth state from localStorage after mount (avoids SSR mismatch)
   useEffect(() => {
-    const savedToken = localStorage.getItem(TOKEN_KEY);
+    const savedToken = safeStorage.getItem(TOKEN_KEY);
     if (savedToken) {
       setGithubTokenState(savedToken);
       setIsDemoMode(false);
@@ -207,7 +208,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const setCurrentRepo = useCallback(
     async (repo: string) => {
       setCurrentRepoState(repo);
-      localStorage.setItem(REPO_KEY, repo);
+      safeStorage.setItem(REPO_KEY, repo);
       setError(null);
       setHash(buildRepoHash(repo));
 
@@ -298,7 +299,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const savedRepo = localStorage.getItem(REPO_KEY);
+    const savedRepo = safeStorage.getItem(REPO_KEY);
     if (savedRepo) {
       setCurrentRepo(savedRepo);
     }

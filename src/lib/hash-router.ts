@@ -33,8 +33,8 @@ export function parseHash(hash: string): HashRoute {
 
   // /{owner}/{repo}/blob/{branch}/{path...}
   if (parts[2] === "blob" && parts.length >= 5) {
-    const branch = parts[3];
-    const filePath = parts.slice(4).join("/");
+    const branch = decodeURIComponent(parts[3]);
+    const filePath = parts.slice(4).map(decodeURIComponent).join("/");
     return { type: "file", owner, repo, repoFullName, branch, filePath };
   }
 

@@ -36,6 +36,8 @@ import {
 import ContextMenu from "./ContextMenu";
 import { mapSelectionToLines, rewriteImageUrls, loadAuthenticatedImages } from "@/lib/github-api";
 import { classifyLink } from "@/lib/link-handler";
+import { useApp } from "@/lib/app-context";
+import { openExternal } from "@/lib/open-external";
 import { renderMermaidBlocks } from "@/lib/mermaid";
 import { highlightCodeBlocks } from "@/lib/highlight";
 import { useWideFormat } from "@/lib/use-wide-format";
@@ -720,6 +722,7 @@ export default function DiffViewer({
   const [viewMode, setViewMode] = useState<"rendered" | "split" | "suggest" | "preview">("rendered");
   const [showPanel, setShowPanel] = useState(true);
   const { wide, toggle: toggleWide } = useWideFormat();
+  const { isEmbedded } = useApp();
 
   // Single source of truth: comments prop from PRDetail (no local duplicate)
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
@@ -1056,7 +1059,7 @@ export default function DiffViewer({
             el.scrollIntoView({ behavior: "smooth", block: "start" });
           }
         } else if (type === "external") {
-          window.open(href, "_blank", "noopener,noreferrer");
+          openExternal(href, isEmbedded);
         }
         // Relative links don't apply in diff view — ignore
         return;

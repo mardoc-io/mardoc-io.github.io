@@ -23,6 +23,7 @@ const lowlight = createLowlight(common);
 import { rewriteImageUrls, loadAuthenticatedImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent, createFileAsPR, commitFileToPRBranch } from "@/lib/github-api";
 import { classifyLink, resolvePath, findFileByPath } from "@/lib/link-handler";
 import { useApp } from "@/lib/app-context";
+import { openExternal } from "@/lib/open-external";
 import { preRenderMermaid } from "@/lib/mermaid";
 import { useWideFormat } from "@/lib/use-wide-format";
 import {
@@ -600,7 +601,7 @@ function CommentSidePanel({
 
 export default function Editor({ content, onContentChange, filePath, repoFullName, branch }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
-  const { isDemoMode, refreshRepo, prBranchForNewFile, prNumberForNewFile, openPR, pullRequests, repoFiles, openFile } = useApp();
+  const { isDemoMode, isEmbedded, refreshRepo, prBranchForNewFile, prNumberForNewFile, openPR, pullRequests, repoFiles, openFile } = useApp();
   const { wide, toggle: toggleWide, contentClass } = useWideFormat();
   const [comments, setComments] = useState<EditorComment[]>([]);
   const [showComments, setShowComments] = useState(false);
@@ -1076,9 +1077,9 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         }
       }
     } else {
-      window.open(href, "_blank", "noopener,noreferrer");
+      openExternal(href, isEmbedded);
     }
-  }, [filePath, repoFiles, openFile]);
+  }, [filePath, repoFiles, openFile, isEmbedded]);
 
   if (!editor) return null;
 

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Settings, X, Github, LogIn, LogOut, RefreshCw, Lock, Globe, Search } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import { fetchUserRepos } from "@/lib/github-api";
+import * as safeStorage from "@/lib/safe-storage";
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -46,7 +47,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   useEffect(() => {
     if (isAuthenticated && isOpen) {
       // Show cached repos instantly
-      const cached = localStorage.getItem("mardoc_user_repos");
+      const cached = safeStorage.getItem("mardoc_user_repos");
       if (cached) {
         try {
           setUserRepos(JSON.parse(cached));
@@ -58,7 +59,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       fetchUserRepos()
         .then((repos) => {
           setUserRepos(repos);
-          localStorage.setItem("mardoc_user_repos", JSON.stringify(repos));
+          safeStorage.setItem("mardoc_user_repos", JSON.stringify(repos));
         })
         .catch(console.error)
         .finally(() => setLoadingRepos(false));
@@ -76,7 +77,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     setGithubToken(null);
     setTokenInput("");
     setUserRepos([]);
-    localStorage.removeItem("mardoc_user_repos");
+    safeStorage.removeItem("mardoc_user_repos");
     setActiveTab("connect");
   };
 
@@ -258,7 +259,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                         fetchUserRepos()
                           .then((repos) => {
                             setUserRepos(repos);
-                            localStorage.setItem("mardoc_user_repos", JSON.stringify(repos));
+                            safeStorage.setItem("mardoc_user_repos", JSON.stringify(repos));
                           })
                           .catch(console.error)
                           .finally(() => setLoadingRepos(false));

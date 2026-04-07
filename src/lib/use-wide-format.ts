@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import * as safeStorage from "./safe-storage";
 
 const STORAGE_KEY = "mardoc_wide_format";
 
@@ -9,12 +10,12 @@ export function useWideFormat() {
 
   // Hydrate from localStorage after mount
   useEffect(() => {
-    setWideState(localStorage.getItem(STORAGE_KEY) === "true");
+    setWideState(safeStorage.getItem(STORAGE_KEY) === "true");
   }, []);
 
   const setWide = useCallback((value: boolean) => {
     setWideState(value);
-    localStorage.setItem(STORAGE_KEY, String(value));
+    safeStorage.setItem(STORAGE_KEY, String(value));
   }, []);
 
   const toggle = useCallback(() => {
