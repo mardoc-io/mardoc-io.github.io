@@ -389,8 +389,10 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
 
           {/* Expanded description */}
           {pr.description && (
-            <div className="mt-2 text-sm text-[var(--text-secondary)] prose prose-sm dark:prose-invert max-w-none max-h-32 overflow-y-auto hidden [details[open]~&]:block">
-            </div>
+            <div
+              className="mt-2 text-sm text-[var(--text-secondary)] prose prose-sm dark:prose-invert max-w-none max-h-40 overflow-y-auto border-t border-[var(--border)] pt-2"
+              dangerouslySetInnerHTML={{ __html: descriptionConverter.makeHtml(pr.description) }}
+            />
           )}
         </div>
       </div>

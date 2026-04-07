@@ -965,6 +965,10 @@ export async function loadAuthenticatedImages(
       if ("content" in data && data.encoding === "base64") {
         const ext = path.split(".").pop()?.toLowerCase() || "png";
         const mime = mimeTypes[ext] || "application/octet-stream";
+        // Preserve original src for round-trip back to markdown
+        if (!img.getAttribute("data-original-src")) {
+          img.setAttribute("data-original-src", img.src);
+        }
         img.src = `data:${mime};base64,${data.content.replace(/\n/g, "")}`;
       }
     })

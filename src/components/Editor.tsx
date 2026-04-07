@@ -275,10 +275,19 @@ function LinkImageBubble({
   const container = containerRef.current;
   if (!container) return null;
 
+  // Dismiss if the target element was removed from the DOM (stale ref)
+  if (!document.contains(target.element)) {
+    // Can't call onDismiss during render — schedule it
+    requestAnimationFrame(onDismiss);
+    return null;
+  }
+
   const rect = target.element.getBoundingClientRect();
   const containerRect = container.getBoundingClientRect();
+  const bubbleWidth = 280;
   const top = rect.bottom - containerRect.top + 6;
-  const left = Math.max(0, rect.left - containerRect.left + rect.width / 2 - 140);
+  const rawLeft = rect.left - containerRect.left + rect.width / 2 - bubbleWidth / 2;
+  const left = Math.max(0, Math.min(rawLeft, containerRect.width - bubbleWidth));
 
   const startEdit = () => {
     setEditUrl(target.href);
@@ -734,13 +743,22 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       setCodeView(true);
       editor.setEditable(false);
     } else {
-      const rawHtml = showdownConverter.makeHtml(codeContent);
+      let rawHtml = showdownConverter.makeHtml(codeContent);
+      if (repoFullName && branch && filePath) {
+        rawHtml = rewriteImageUrls(rawHtml, repoFullName, branch, filePath);
+      }
       const html = await preRenderMermaid(rawHtml);
       editor.commands.setContent(html);
       setCodeView(false);
       editor.setEditable(true);
+      // Reload authenticated images after TipTap renders
+      setTimeout(() => {
+        if (editorContainerRef.current) {
+          loadAuthenticatedImages(editorContainerRef.current);
+        }
+      }, 50);
     }
-  }, [editor, codeView, codeContent]);
+  }, [editor, codeView, codeContent, repoFullName, branch, filePath]);
 
   // Inline add link/image popover (replaces window.prompt for VS Code compat)
   const [addPopover, setAddPopover] = useState<{ type: "link" | "image"; url: string; alt: string } | null>(null);

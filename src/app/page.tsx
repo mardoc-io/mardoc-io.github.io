@@ -100,9 +100,7 @@ export default function Home() {
                 filePath={selectedFile.path}
                 repoFullName={currentRepo || undefined}
                 branch={selectedBranch}
-                onContentChange={(html) => {
-                  console.log("Content changed");
-                }}
+                onContentChange={() => {}}
               />
             )
           ) : currentView === "pr-diff" && selectedPR ? (
@@ -124,9 +122,7 @@ export default function Home() {
             )
           ) : currentView === "pr-review" ? (
             <PRReview
-              onCreatePR={(title, description, filePath) => {
-                console.log("Creating review PR:", { title, description, filePath });
-              }}
+              onCreatePR={() => {}}
             />
           ) : (
             /* Welcome screen */
