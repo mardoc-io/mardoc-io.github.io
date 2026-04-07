@@ -59,6 +59,9 @@ import {
   FilePlus,
   FileText,
   Save,
+  Pencil,
+  Trash2,
+  Unlink,
 } from "lucide-react";
 
 interface EditorProps {
@@ -204,6 +207,207 @@ function FloatingCommentButton({
         <MessageSquarePlus size={12} />
         Comment
       </button>
+    </div>
+  );
+}
+
+// ─── Link / Image Edit Bubble ───────────────────────────────────────────
+
+interface BubbleTarget {
+  type: "link" | "image";
+  href: string;
+  alt?: string;
+  element: HTMLElement;
+}
+
+function LinkImageBubble({
+  containerRef,
+  editor,
+  target,
+  onDismiss,
+  onFollowLink,
+}: {
+  containerRef: React.RefObject<HTMLElement | null>;
+  editor: ReturnType<typeof useEditor>;
+  target: BubbleTarget | null;
+  onDismiss: () => void;
+  onFollowLink: (href: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editUrl, setEditUrl] = useState("");
+  const [editAlt, setEditAlt] = useState("");
+  const bubbleRef = useRef<HTMLDivElement>(null);
+
+  // Reset edit state when target changes
+  useEffect(() => {
+    setEditing(false);
+  }, [target]);
+
+  // Dismiss on Escape or click outside
+  useEffect(() => {
+    if (!target) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onDismiss();
+        setEditing(false);
+      }
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (bubbleRef.current && !bubbleRef.current.contains(e.target as Node)) {
+        onDismiss();
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    // Use setTimeout so the current click doesn't immediately dismiss
+    const timer = setTimeout(() => {
+      document.addEventListener("mousedown", handleClickOutside);
+    }, 0);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleClickOutside);
+      clearTimeout(timer);
+    };
+  }, [target, onDismiss]);
+
+  if (!target || !editor) return null;
+
+  const container = containerRef.current;
+  if (!container) return null;
+
+  const rect = target.element.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  const top = rect.bottom - containerRect.top + 6;
+  const left = Math.max(0, rect.left - containerRect.left + rect.width / 2 - 140);
+
+  const startEdit = () => {
+    setEditUrl(target.href);
+    setEditAlt(target.alt || "");
+    setEditing(true);
+  };
+
+  const applyEdit = () => {
+    if (target.type === "link") {
+      // Update the link href — select the link node, then set new href
+      const { from, to } = editor.state.selection;
+      editor.chain().focus()
+        .extendMarkRange("link")
+        .setLink({ href: editUrl })
+        .run();
+      // Restore selection position
+      editor.commands.setTextSelection({ from, to });
+    } else {
+      // Update image src and alt
+      editor.chain().focus()
+        .setImage({ src: editUrl, alt: editAlt })
+        .run();
+    }
+    onDismiss();
+    setEditing(false);
+  };
+
+  const remove = () => {
+    if (target.type === "link") {
+      editor.chain().focus().extendMarkRange("link").unsetLink().run();
+    } else {
+      // Delete the image node
+      editor.chain().focus().deleteSelection().run();
+    }
+    onDismiss();
+    setEditing(false);
+  };
+
+  return (
+    <div
+      ref={bubbleRef}
+      className="absolute z-50"
+      style={{ top, left, minWidth: 280 }}
+    >
+      <div
+        className="bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl p-2"
+        style={{ animation: "fadeInUp 0.1s ease-out" }}
+      >
+        {editing ? (
+          <div className="space-y-2 p-1">
+            <div>
+              <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-0.5 block">
+                {target.type === "link" ? "URL" : "Image URL"}
+              </label>
+              <input
+                autoFocus
+                type="text"
+                value={editUrl}
+                onChange={(e) => setEditUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") applyEdit();
+                  if (e.key === "Escape") { setEditing(false); }
+                }}
+                className="w-full text-xs px-2 py-1.5 rounded border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+            {target.type === "image" && (
+              <div>
+                <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-0.5 block">
+                  Alt text
+                </label>
+                <input
+                  type="text"
+                  value={editAlt}
+                  onChange={(e) => setEditAlt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") applyEdit();
+                    if (e.key === "Escape") { setEditing(false); }
+                  }}
+                  className="w-full text-xs px-2 py-1.5 rounded border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-1.5 pt-1">
+              <button
+                onClick={() => setEditing(false)}
+                className="text-[10px] px-2 py-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={applyEdit}
+                disabled={!editUrl.trim()}
+                className="text-[10px] px-2.5 py-1 bg-[var(--accent)] text-white rounded hover:bg-[var(--accent-hover)] disabled:opacity-40 transition-colors"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <span className="flex-1 text-xs text-[var(--text-secondary)] font-mono truncate px-1 max-w-[180px]" title={target.href}>
+              {target.type === "image" ? "🖼 " : ""}{target.href || "(no url)"}
+            </span>
+            <button
+              onClick={startEdit}
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-hover)] rounded transition-colors"
+              title="Edit"
+            >
+              <Pencil size={13} />
+            </button>
+            {target.type === "link" && (
+              <button
+                onClick={() => { onFollowLink(target.href); onDismiss(); }}
+                className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-hover)] rounded transition-colors"
+                title="Follow link"
+              >
+                <ExternalLink size={13} />
+              </button>
+            )}
+            <button
+              onClick={remove}
+              className="p-1.5 text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--surface-hover)] rounded transition-colors"
+              title={target.type === "link" ? "Remove link" : "Remove image"}
+            >
+              {target.type === "link" ? <Unlink size={13} /> : <Trash2 size={13} />}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -426,6 +630,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   const [editPRTitle, setEditPRTitle] = useState("");
   const [showNewFileModal, setShowNewFileModal] = useState(false);
   const [savingNewFile, setSavingNewFile] = useState(false);
+  const [bubbleTarget, setBubbleTarget] = useState<BubbleTarget | null>(null);
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -498,6 +703,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     setCodeContent("");
     setShowEditPRModal(false);
     setEditPRTitle("");
+    setBubbleTarget(null);
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath, editor]);
@@ -532,6 +738,54 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       editor.chain().focus().setImage({ src: url }).run();
     }
   }, [editor]);
+
+  // Markdown formatting for code view textarea
+  const wrapSelection = useCallback((prefix: string, suffix?: string) => {
+    const textarea = codeTextareaRef.current;
+    if (!textarea) return;
+    const s = suffix ?? prefix;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = codeContent.slice(start, end);
+    const replacement = `${prefix}${selected}${s}`;
+    const newContent = codeContent.slice(0, start) + replacement + codeContent.slice(end);
+    setCodeContent(newContent);
+    setIsDirty(true);
+    // Restore cursor position after React re-renders
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.selectionStart = start + prefix.length;
+      textarea.selectionEnd = end + prefix.length;
+    });
+  }, [codeContent]);
+
+  const handleCodeViewKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (!mod) return;
+
+    switch (e.key) {
+      case "b":
+        e.preventDefault();
+        wrapSelection("**");
+        break;
+      case "i":
+        e.preventDefault();
+        wrapSelection("_");
+        break;
+      case "e":
+        e.preventDefault();
+        wrapSelection("`");
+        break;
+      case "k": {
+        e.preventDefault();
+        const textarea = codeTextareaRef.current;
+        if (!textarea) return;
+        const selected = codeContent.slice(textarea.selectionStart, textarea.selectionEnd);
+        wrapSelection("[", `](${selected ? "" : "url"})`);
+        break;
+      }
+    }
+  }, [wrapSelection, codeContent]);
 
   const handleStartComment = useCallback((selectedText: string) => {
     setPendingSelection(selectedText);
@@ -739,35 +993,58 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     }
   }, [repoFullName, isDemoMode, editor, filePath, isLocalFile, editFilePath, editPRTitle, codeView, codeContent, refreshRepo]);
 
-  // Link click handler — intercept clicks on <a> tags in the editor
-  const handleLinkClick = useCallback((e: React.MouseEvent) => {
-    const target = (e.target as HTMLElement).closest("a");
-    if (!target) return;
+  // Click handler — intercept clicks on <a> and <img> tags in the editor
+  const handleEditorClick = useCallback((e: React.MouseEvent) => {
+    const el = e.target as HTMLElement;
 
-    const href = target.getAttribute("href");
+    // Check for image click — show edit bubble
+    const img = el.closest("img") as HTMLImageElement | null;
+    if (img) {
+      e.preventDefault();
+      e.stopPropagation();
+      setBubbleTarget({
+        type: "image",
+        href: img.getAttribute("src") || "",
+        alt: img.getAttribute("alt") || "",
+        element: img,
+      });
+      return;
+    }
+
+    // Check for link click
+    const anchor = el.closest("a") as HTMLAnchorElement | null;
+    if (!anchor) return;
+
+    const href = anchor.getAttribute("href");
     if (!href) return;
 
     e.preventDefault();
     e.stopPropagation();
 
+    // Show edit bubble for the link
+    setBubbleTarget({
+      type: "link",
+      href,
+      element: anchor,
+    });
+  }, []);
+
+  const followLink = useCallback((href: string) => {
     const type = classifyLink(href);
 
     if (type === "anchor") {
-      // Scroll to heading by ID
       const id = href.slice(1);
       const el = editorContainerRef.current?.querySelector(`[id="${id}"]`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     } else if (type === "relative") {
-      // Strip anchor from href
       const [pathPart] = href.split("#");
       const resolvedPath = resolvePath(filePath, pathPart);
       const file = findFileByPath(repoFiles, resolvedPath);
       if (file) {
         openFile(file);
       } else {
-        // Try with .md extension if not found
         const withMd = resolvedPath.endsWith(".md") ? resolvedPath : `${resolvedPath}.md`;
         const fileWithMd = findFileByPath(repoFiles, withMd);
         if (fileWithMd) {
@@ -775,7 +1052,6 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         }
       }
     } else {
-      // External — open in new tab
       window.open(href, "_blank", "noopener,noreferrer");
     }
   }, [filePath, repoFiles, openFile]);
@@ -903,6 +1179,15 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
           />
 
           </>)}
+          {codeView && (<>
+          <ToolbarButton onClick={() => wrapSelection("**")} icon={Bold} title="Bold (⌘B)" />
+          <ToolbarButton onClick={() => wrapSelection("_")} icon={Italic} title="Italic (⌘I)" />
+          <ToolbarButton onClick={() => wrapSelection("~~")} icon={Strikethrough} title="Strikethrough" />
+          <ToolbarButton onClick={() => wrapSelection("`")} icon={Code} title="Inline Code (⌘E)" />
+          <ToolbarDivider />
+          <ToolbarButton onClick={() => wrapSelection("[", "](url)")} icon={LinkIcon} title="Link (⌘K)" />
+          <ToolbarButton onClick={() => wrapSelection("![alt](", ")")} icon={ImageIcon} title="Image" />
+          </>)}
           {/* Wide format + comment toggle + submit PR — right side */}
           <div className="ml-auto flex items-center gap-1">
             {/* Save new file as PR */}
@@ -991,7 +1276,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         </div>
 
         {/* Editor area */}
-        <div className="flex-1 overflow-y-auto" ref={editorContainerRef as React.RefObject<HTMLDivElement>} onClick={handleLinkClick}>
+        <div className="flex-1 overflow-y-auto" ref={editorContainerRef as React.RefObject<HTMLDivElement>} onClick={handleEditorClick}>
           <div className={contentClass}>
             {/* File path breadcrumb */}
             <div className="text-xs text-[var(--text-muted)] mb-4 font-mono flex items-center gap-2">
@@ -1033,11 +1318,23 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
               onComment={handleStartComment}
             />
 
+            {/* Link / image edit bubble */}
+            {!codeView && (
+              <LinkImageBubble
+                containerRef={editorContainerRef}
+                editor={editor}
+                target={bubbleTarget}
+                onDismiss={() => setBubbleTarget(null)}
+                onFollowLink={followLink}
+              />
+            )}
+
             {codeView ? (
               <textarea
                 ref={codeTextareaRef}
                 value={codeContent}
                 onChange={(e) => { setCodeContent(e.target.value); setIsDirty(true); }}
+                onKeyDown={handleCodeViewKeyDown}
                 className="w-full min-h-[60vh] p-4 font-mono text-sm leading-relaxed bg-[var(--surface-secondary)] text-[var(--text-primary)] border border-[var(--border)] rounded-lg resize-y focus:outline-none focus:border-[var(--accent)]"
                 spellCheck={false}
               />
