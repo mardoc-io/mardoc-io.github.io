@@ -55,6 +55,7 @@ export async function preRenderMermaid(html: string): Promise<string> {
       const img = document.createElement("img");
       img.src = blobUrl;
       img.alt = "Mermaid diagram";
+      img.setAttribute("data-mermaid-source", source);
       pre.replaceWith(img);
     } catch (err) {
       console.warn("Mermaid render failed:", err);

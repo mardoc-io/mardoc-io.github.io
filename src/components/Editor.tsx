@@ -724,7 +724,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath, editor]);
 
-  const toggleCodeView = useCallback(() => {
+  const toggleCodeView = useCallback(async () => {
     if (!editor) return;
     if (!codeView) {
       const turndown = createTurndownService();
@@ -734,7 +734,8 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       setCodeView(true);
       editor.setEditable(false);
     } else {
-      const html = showdownConverter.makeHtml(codeContent);
+      const rawHtml = showdownConverter.makeHtml(codeContent);
+      const html = await preRenderMermaid(rawHtml);
       editor.commands.setContent(html);
       setCodeView(false);
       editor.setEditable(true);

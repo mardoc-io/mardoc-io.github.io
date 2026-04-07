@@ -35,6 +35,17 @@ export function createTurndownService(): TurndownService {
     "dd",
   ]);
 
+  // Mermaid diagrams — restore fenced code blocks from rendered <img> tags
+  turndown.addRule("mermaidDiagram", {
+    filter: (node) => {
+      return node.nodeName === "IMG" && node.hasAttribute("data-mermaid-source");
+    },
+    replacement: (_content, node) => {
+      const source = (node as HTMLElement).getAttribute("data-mermaid-source") || "";
+      return `\n\n\`\`\`mermaid\n${source}\n\`\`\`\n\n`;
+    },
+  });
+
   // Preserve div and span with attributes (class, style, id)
   turndown.addRule("divWithAttributes", {
     filter: (node) => {
