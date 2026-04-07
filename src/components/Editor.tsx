@@ -624,8 +624,10 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   const [codeContent, setCodeContent] = useState("");
   const codeTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Dirty tracking for existing files
+  // Dirty tracking for existing files — compare current markdown to original
   const [isDirty, setIsDirty] = useState(false);
+  const originalMarkdownRef = useRef<string | null>(null);
+  const dirtyCheckTimer = useRef<ReturnType<typeof setTimeout>>();
   const [showEditPRModal, setShowEditPRModal] = useState(false);
   const [editPRTitle, setEditPRTitle] = useState("");
   const [showNewFileModal, setShowNewFileModal] = useState(false);
@@ -662,7 +664,15 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     content: markdownToHtml(content, repoFullName, branch, filePath),
     onUpdate: ({ editor }) => {
       onContentChange?.(editor.getHTML());
-      if (!isNewFile) setIsDirty(true);
+      if (!isNewFile && originalMarkdownRef.current !== null) {
+        // Debounce the Turndown comparison to avoid running on every keystroke
+        if (dirtyCheckTimer.current) clearTimeout(dirtyCheckTimer.current);
+        dirtyCheckTimer.current = setTimeout(() => {
+          const turndown = createTurndownService();
+          const currentMd = turndown.turndown(editor.getHTML());
+          setIsDirty(currentMd !== originalMarkdownRef.current);
+        }, 300);
+      }
     },
     editorProps: {
       attributes: {
@@ -681,6 +691,9 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         preRenderMermaid(rawHtml).then((html) => {
           if (cancelled) return;
           editor.commands.setContent(html);
+          // Capture baseline markdown for dirty comparison
+          const turndown = createTurndownService();
+          originalMarkdownRef.current = turndown.turndown(editor.getHTML());
           // Fetch private repo images after TipTap renders
           setTimeout(() => {
             if (!cancelled && editorContainerRef.current) {
@@ -753,7 +766,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     const replacement = `${prefix}${selected}${s}`;
     const newContent = codeContent.slice(0, start) + replacement + codeContent.slice(end);
     setCodeContent(newContent);
-    setIsDirty(true);
+    setIsDirty(newContent !== originalMarkdownRef.current);
     // Restore cursor position after React re-renders
     requestAnimationFrame(() => {
       textarea.focus();
@@ -1336,7 +1349,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
               <textarea
                 ref={codeTextareaRef}
                 value={codeContent}
-                onChange={(e) => { setCodeContent(e.target.value); setIsDirty(true); }}
+                onChange={(e) => { setCodeContent(e.target.value); setIsDirty(e.target.value !== originalMarkdownRef.current); }}
                 onKeyDown={handleCodeViewKeyDown}
                 className="w-full min-h-[60vh] p-4 font-mono text-sm leading-relaxed bg-[var(--surface-secondary)] text-[var(--text-primary)] border border-[var(--border)] rounded-lg resize-y focus:outline-none focus:border-[var(--accent)]"
                 spellCheck={false}
