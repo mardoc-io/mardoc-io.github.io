@@ -35,6 +35,19 @@ export function createTurndownService(): TurndownService {
     "dd",
   ]);
 
+  // Images with original src — restore the original URL instead of data: or blob: URIs
+  turndown.addRule("imageWithOriginalSrc", {
+    filter: (node) => {
+      return node.nodeName === "IMG" && node.hasAttribute("data-original-src");
+    },
+    replacement: (_content, node) => {
+      const el = node as HTMLElement;
+      const src = el.getAttribute("data-original-src") || "";
+      const alt = el.getAttribute("alt") || "";
+      return `![${alt}](${src})`;
+    },
+  });
+
   // Mermaid diagrams — restore fenced code blocks from rendered <img> tags
   turndown.addRule("mermaidDiagram", {
     filter: (node) => {
