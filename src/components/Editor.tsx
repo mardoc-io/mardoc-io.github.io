@@ -701,6 +701,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     setIsDirty(false);
     setCodeView(false);
     setCodeContent("");
+    if (editor) editor.setEditable(true);
     setShowEditPRModal(false);
     setEditPRTitle("");
     setBubbleTarget(null);
@@ -716,10 +717,12 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       const md = turndown.turndown(html);
       setCodeContent(md);
       setCodeView(true);
+      editor.setEditable(false);
     } else {
       const html = showdownConverter.makeHtml(codeContent);
       editor.commands.setContent(html);
       setCodeView(false);
+      editor.setEditable(true);
     }
   }, [editor, codeView, codeContent]);
 
