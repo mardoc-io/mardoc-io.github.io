@@ -17,7 +17,7 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
 import Showdown from "showdown";
-import TurndownService from "turndown";
+import { createTurndownService } from "@/lib/turndown";
 
 const lowlight = createLowlight(common);
 import { rewriteImageUrls, loadAuthenticatedImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent, createFileAsPR, commitFileToPRBranch } from "@/lib/github-api";
@@ -627,10 +627,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
 
     try {
       // Convert TipTap HTML to markdown
-      const turndown = new TurndownService({
-        headingStyle: "atx",
-        codeBlockStyle: "fenced",
-      });
+      const turndown = createTurndownService();
       const html = editor.getHTML();
       const markdown = turndown.turndown(html);
 
@@ -687,10 +684,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     setSubmitError(null);
 
     try {
-      const turndown = new TurndownService({
-        headingStyle: "atx",
-        codeBlockStyle: "fenced",
-      });
+      const turndown = createTurndownService();
       const html = editor.getHTML();
       const markdown = turndown.turndown(html);
 

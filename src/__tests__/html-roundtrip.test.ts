@@ -13,9 +13,9 @@
  */
 import { describe, it, expect } from "vitest";
 import Showdown from "showdown";
-import TurndownService from "turndown";
+import { createTurndownService } from "@/lib/turndown";
 
-// Match Editor.tsx Showdown config (lines 84-95)
+// Match Editor.tsx Showdown config
 function createShowdown() {
   return new Showdown.Converter({
     tables: true,
@@ -31,17 +31,9 @@ function createShowdown() {
   });
 }
 
-// Match Editor.tsx Turndown config (lines 630-633)
-function createTurndown() {
-  return new TurndownService({
-    headingStyle: "atx",
-    codeBlockStyle: "fenced",
-  });
-}
-
 function roundTrip(markdown: string): string {
   const showdown = createShowdown();
-  const turndown = createTurndown();
+  const turndown = createTurndownService();
   const html = showdown.makeHtml(markdown);
   return turndown.turndown(html).trim();
 }
@@ -113,7 +105,7 @@ describe("standard markdown round-trip", () => {
     expect(result).toMatch(/\* \* \*|---/);
   });
 
-  it.fails("preserves strikethrough", () => {
+  it("preserves strikethrough", () => {
     // Turndown doesn't support GFM strikethrough without a plugin
     expect(roundTrip("~~deleted~~")).toBe("~~deleted~~");
   });
@@ -139,7 +131,7 @@ describe("standard markdown round-trip", () => {
 
 describe("HTML elements round-trip", () => {
   describe("details/summary", () => {
-    it.fails("preserves <details><summary> blocks", () => {
+    it("preserves <details><summary> blocks", () => {
       const md = "<details>\n<summary>Click me</summary>\n\nHidden content here.\n\n</details>";
       const result = roundTrip(md);
       expect(result).toContain("<details>");
@@ -151,7 +143,7 @@ describe("HTML elements round-trip", () => {
   });
 
   describe("div with attributes", () => {
-    it.fails("preserves <div> with class attribute", () => {
+    it("preserves <div> with class attribute", () => {
       const md = '<div class="warning">\n\nThis is a warning.\n\n</div>';
       const result = roundTrip(md);
       expect(result).toContain('<div class="warning">');
@@ -159,14 +151,14 @@ describe("HTML elements round-trip", () => {
       expect(result).toContain("</div>");
     });
 
-    it.fails("preserves <div> with style attribute", () => {
+    it("preserves <div> with style attribute", () => {
       const md = '<div style="color: red;">Red text</div>';
       const result = roundTrip(md);
       expect(result).toContain("style=");
       expect(result).toContain("Red text");
     });
 
-    it.fails("preserves <div> with id attribute", () => {
+    it("preserves <div> with id attribute", () => {
       const md = '<div id="section-1">Content</div>';
       const result = roundTrip(md);
       expect(result).toContain('id="section-1"');
@@ -174,7 +166,7 @@ describe("HTML elements round-trip", () => {
   });
 
   describe("span with attributes", () => {
-    it.fails("preserves <span> with style", () => {
+    it("preserves <span> with style", () => {
       const md = 'Text with <span style="color:blue;">blue</span> word.';
       const result = roundTrip(md);
       expect(result).toContain("<span");
@@ -183,21 +175,21 @@ describe("HTML elements round-trip", () => {
   });
 
   describe("media elements", () => {
-    it.fails("preserves <video> tags", () => {
+    it("preserves <video> tags", () => {
       const md = '<video src="demo.mp4" controls></video>';
       const result = roundTrip(md);
       expect(result).toContain("<video");
       expect(result).toContain("demo.mp4");
     });
 
-    it.fails("preserves <audio> tags", () => {
+    it("preserves <audio> tags", () => {
       const md = '<audio src="clip.mp3" controls></audio>';
       const result = roundTrip(md);
       expect(result).toContain("<audio");
       expect(result).toContain("clip.mp3");
     });
 
-    it.fails("preserves <iframe> tags", () => {
+    it("preserves <iframe> tags", () => {
       const md = '<iframe src="https://example.com" width="600" height="400"></iframe>';
       const result = roundTrip(md);
       expect(result).toContain("<iframe");
@@ -206,32 +198,32 @@ describe("HTML elements round-trip", () => {
   });
 
   describe("semantic inline elements", () => {
-    it.fails("preserves <sup> (superscript)", () => {
+    it("preserves <sup> (superscript)", () => {
       const md = "E = mc<sup>2</sup>";
       const result = roundTrip(md);
       expect(result).toContain("<sup>2</sup>");
     });
 
-    it.fails("preserves <sub> (subscript)", () => {
+    it("preserves <sub> (subscript)", () => {
       const md = "H<sub>2</sub>O";
       const result = roundTrip(md);
       expect(result).toContain("<sub>2</sub>");
     });
 
-    it.fails("preserves <kbd> (keyboard input)", () => {
+    it("preserves <kbd> (keyboard input)", () => {
       const md = "Press <kbd>Ctrl</kbd>+<kbd>C</kbd>";
       const result = roundTrip(md);
       expect(result).toContain("<kbd>");
     });
 
-    it.fails("preserves <abbr> (abbreviation)", () => {
+    it("preserves <abbr> (abbreviation)", () => {
       const md = '<abbr title="HyperText Markup Language">HTML</abbr>';
       const result = roundTrip(md);
       expect(result).toContain("<abbr");
       expect(result).toContain("title=");
     });
 
-    it.fails("preserves <mark> (highlight)", () => {
+    it("preserves <mark> (highlight)", () => {
       const md = "This is <mark>highlighted</mark> text.";
       const result = roundTrip(md);
       expect(result).toContain("<mark>");
@@ -266,7 +258,7 @@ describe("HTML elements round-trip", () => {
   });
 
   describe("nested HTML structures", () => {
-    it.fails("preserves nested div structure", () => {
+    it("preserves nested div structure", () => {
       const md = '<div class="outer">\n<div class="inner">\n\nNested content\n\n</div>\n</div>';
       const result = roundTrip(md);
       expect(result).toContain("outer");
@@ -277,7 +269,7 @@ describe("HTML elements round-trip", () => {
   });
 
   describe("GitHub-flavored HTML", () => {
-    it.fails("preserves <picture> with <source> for dark/light images", () => {
+    it("preserves <picture> with <source> for dark/light images", () => {
       const md = '<picture>\n<source media="(prefers-color-scheme: dark)" srcset="dark.png">\n<img src="light.png">\n</picture>';
       const result = roundTrip(md);
       expect(result).toContain("<picture>");
@@ -285,7 +277,7 @@ describe("HTML elements round-trip", () => {
       expect(result).toContain("dark.png");
     });
 
-    it.fails("preserves <dl> <dt> <dd> (definition lists)", () => {
+    it("preserves <dl> <dt> <dd> (definition lists)", () => {
       const md = "<dl>\n<dt>Term</dt>\n<dd>Definition</dd>\n</dl>";
       const result = roundTrip(md);
       expect(result).toContain("<dl>");
