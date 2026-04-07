@@ -162,10 +162,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (data.fileName && data.fileContent) {
+      const localPath = data.filePath || data.fileName;
       const localFile: RepoFile = {
         id: `local-${Date.now()}`,
         name: data.fileName,
-        path: `__local__/${data.fileName}`,
+        path: `__local__/${localPath}`,
         type: "file" as const,
       };
       setSelectedFile(localFile);

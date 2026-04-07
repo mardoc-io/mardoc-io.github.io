@@ -412,6 +412,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   const isLocalFile = filePath.startsWith("__local__/");
   const localFileName = isLocalFile ? filePath.replace("__local__/", "") : null;
   const [newFilePath, setNewFilePath] = useState("docs/");
+  const [editFilePath, setEditFilePath] = useState("");
   const [newFileTitle, setNewFileTitle] = useState("");
 
   // Dirty tracking for existing files
@@ -679,6 +680,9 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   const handleSubmitEditsAsPR = useCallback(async () => {
     if (!repoFullName || isDemoMode || !editor || !editPRTitle.trim()) return;
 
+    const commitPath = isLocalFile ? editFilePath.trim() : filePath;
+    if (!commitPath || commitPath.startsWith("__local__/")) return;
+
     setSubmittingPR(true);
     setSubmitError(null);
 
@@ -690,9 +694,10 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       const html = editor.getHTML();
       const markdown = turndown.turndown(html);
 
+      const path = commitPath.endsWith(".md") ? commitPath : `${commitPath}.md`;
       const pr = await createFileAsPR(
         repoFullName,
-        filePath,
+        path,
         markdown,
         editPRTitle,
       );
@@ -706,7 +711,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     } finally {
       setSubmittingPR(false);
     }
-  }, [repoFullName, isDemoMode, editor, filePath, editPRTitle, refreshRepo]);
+  }, [repoFullName, isDemoMode, editor, filePath, isLocalFile, editFilePath, editPRTitle, refreshRepo]);
 
   // Link click handler — intercept clicks on <a> tags in the editor
   const handleLinkClick = useCallback((e: React.MouseEvent) => {
@@ -886,7 +891,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
             {/* Submit edits as PR — when file is dirty */}
             {!isNewFile && isDirty && !submittedPR && (
               <button
-                onClick={() => { setEditPRTitle(`Update ${filePath}`); setShowEditPRModal(true); }}
+                onClick={() => { const repoPath = isLocalFile ? (localFileName || "") : filePath; setEditPRTitle(`${isLocalFile ? "Add" : "Update"} ${repoPath}`); setEditFilePath(repoPath); setShowEditPRModal(true); }}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition-colors"
                 title="Submit your edits as a pull request"
               >
@@ -1186,20 +1191,37 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
             </h3>
 
             <p className="text-xs text-[var(--text-secondary)] mb-3">
-              Your changes to <span className="font-mono text-[var(--text-primary)]">{filePath}</span> will be committed on a new branch and opened as a pull request.
+              {isLocalFile
+                ? "This local file will be committed on a new branch and opened as a pull request."
+                : <>Your changes to <span className="font-mono text-[var(--text-primary)]">{filePath}</span> will be committed on a new branch and opened as a pull request.</>}
             </p>
 
             <div className="space-y-3">
+              {isLocalFile && (
+                <div>
+                  <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1 block">
+                    File path in repo
+                  </label>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={editFilePath}
+                    onChange={(e) => setEditFilePath(e.target.value)}
+                    placeholder="docs/my-document.md"
+                    className="w-full text-sm px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] font-mono placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                  />
+                </div>
+              )}
               <div>
                 <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1 block">
                   PR title
                 </label>
                 <input
-                  autoFocus
+                  autoFocus={!isLocalFile}
                   type="text"
                   value={editPRTitle}
                   onChange={(e) => setEditPRTitle(e.target.value)}
-                  placeholder={`Update ${filePath}`}
+                  placeholder={isLocalFile ? `Add ${editFilePath}` : `Update ${filePath}`}
                   className="w-full text-sm px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && editPRTitle.trim()) {
@@ -1223,7 +1245,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
               </button>
               <button
                 onClick={handleSubmitEditsAsPR}
-                disabled={submittingPR || !editPRTitle.trim()}
+                disabled={submittingPR || !editPRTitle.trim() || (isLocalFile && !editFilePath.trim())}
                 className="flex items-center gap-1.5 text-xs px-4 py-1.5 bg-[var(--accent)] text-white rounded-md hover:bg-[var(--accent-hover)] disabled:opacity-40 transition-colors"
               >
                 {submittingPR ? (
