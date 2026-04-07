@@ -718,6 +718,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     setShowEditPRModal(false);
     setEditPRTitle("");
     setBubbleTarget(null);
+    setAddPopover(null);
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath, editor]);
@@ -739,21 +740,28 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     }
   }, [editor, codeView, codeContent]);
 
+  // Inline add link/image popover (replaces window.prompt for VS Code compat)
+  const [addPopover, setAddPopover] = useState<{ type: "link" | "image"; url: string; alt: string } | null>(null);
+
   const addLink = useCallback(() => {
     if (!editor) return;
-    const url = window.prompt("Enter URL:");
-    if (url) {
-      editor.chain().focus().setLink({ href: url }).run();
-    }
+    setAddPopover({ type: "link", url: "", alt: "" });
   }, [editor]);
 
   const addImage = useCallback(() => {
     if (!editor) return;
-    const url = window.prompt("Enter image URL:");
-    if (url) {
-      editor.chain().focus().setImage({ src: url }).run();
-    }
+    setAddPopover({ type: "image", url: "", alt: "" });
   }, [editor]);
+
+  const confirmAddPopover = useCallback(() => {
+    if (!editor || !addPopover || !addPopover.url.trim()) return;
+    if (addPopover.type === "link") {
+      editor.chain().focus().setLink({ href: addPopover.url }).run();
+    } else {
+      editor.chain().focus().setImage({ src: addPopover.url, alt: addPopover.alt || undefined }).run();
+    }
+    setAddPopover(null);
+  }, [editor, addPopover]);
 
   // Markdown formatting for code view textarea
   const wrapSelection = useCallback((prefix: string, suffix?: string) => {
@@ -1178,8 +1186,66 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
 
           <ToolbarDivider />
 
-          <ToolbarButton onClick={addLink} isActive={editor.isActive("link")} icon={LinkIcon} title="Add Link" />
-          <ToolbarButton onClick={addImage} icon={ImageIcon} title="Add Image" />
+          <div className="relative">
+            <ToolbarButton onClick={addLink} isActive={editor.isActive("link") || addPopover?.type === "link"} icon={LinkIcon} title="Add Link" />
+            <ToolbarButton onClick={addImage} isActive={addPopover?.type === "image"} icon={ImageIcon} title="Add Image" />
+            {addPopover && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl p-2 min-w-[260px]" style={{ animation: "fadeInUp 0.1s ease-out" }}>
+                <div className="space-y-2 p-1">
+                  <div>
+                    <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-0.5 block">
+                      {addPopover.type === "link" ? "URL" : "Image URL"}
+                    </label>
+                    <input
+                      autoFocus
+                      type="text"
+                      value={addPopover.url}
+                      onChange={(e) => setAddPopover({ ...addPopover, url: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") confirmAddPopover();
+                        if (e.key === "Escape") setAddPopover(null);
+                      }}
+                      placeholder={addPopover.type === "link" ? "https://..." : "https://...image.png"}
+                      className="w-full text-xs px-2 py-1.5 rounded border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+                  {addPopover.type === "image" && (
+                    <div>
+                      <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-0.5 block">
+                        Alt text
+                      </label>
+                      <input
+                        type="text"
+                        value={addPopover.alt}
+                        onChange={(e) => setAddPopover({ ...addPopover, alt: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") confirmAddPopover();
+                          if (e.key === "Escape") setAddPopover(null);
+                        }}
+                        placeholder="Description"
+                        className="w-full text-xs px-2 py-1.5 rounded border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-center justify-end gap-1.5 pt-1">
+                    <button
+                      onClick={() => setAddPopover(null)}
+                      className="text-[10px] px-2 py-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmAddPopover}
+                      disabled={!addPopover.url.trim()}
+                      className="text-[10px] px-2.5 py-1 bg-[var(--accent)] text-white rounded hover:bg-[var(--accent-hover)] disabled:opacity-40 transition-colors"
+                    >
+                      {addPopover.type === "link" ? "Add Link" : "Add Image"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           <ToolbarDivider />
 
