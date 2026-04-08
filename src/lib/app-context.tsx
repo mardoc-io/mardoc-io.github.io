@@ -164,6 +164,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (data.fileName && data.fileContent) {
+      // Real file provided — exit demo mode even without a token
+      setIsDemoMode(false);
       const localPath = data.filePath || data.fileName;
       const localFile: RepoFile = {
         id: `local-${Date.now()}`,
