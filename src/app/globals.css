@@ -246,7 +246,10 @@ body {
 .mermaid-diagram {
   display: flex;
   justify-content: center;
-  padding: 1rem 0;
+  padding: 1.5rem;
+  background: var(--bg-secondary, var(--surface));
+  border-radius: 8px;
+  margin: 1rem 0;
 }
 
 .mermaid-diagram svg {

@@ -1,19 +1,81 @@
 "use client";
 
+const LIGHT_THEME_VARS = {
+  primaryColor: "#E6F1FB",
+  primaryTextColor: "#0C447C",
+  primaryBorderColor: "#85B7EB",
+  secondaryColor: "#E1F5EE",
+  secondaryTextColor: "#085041",
+  secondaryBorderColor: "#5DCAA5",
+  tertiaryColor: "#FAEEDA",
+  tertiaryTextColor: "#633806",
+  tertiaryBorderColor: "#FAC775",
+  lineColor: "#5F5E5A",
+  textColor: "#2C2C2A",
+  fontSize: "14px",
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  noteTextColor: "#2C2C2A",
+  noteBkgColor: "#F1EFE8",
+  noteBorderColor: "#B4B2A9",
+};
+
+const DARK_THEME_VARS = {
+  primaryColor: "#363949",
+  primaryTextColor: "#bd93f9",
+  primaryBorderColor: "#6272a4",
+  secondaryColor: "#1e3a2a",
+  secondaryTextColor: "#50fa7b",
+  secondaryBorderColor: "#50fa7b",
+  tertiaryColor: "#3d1a1e",
+  tertiaryTextColor: "#ffb86c",
+  tertiaryBorderColor: "#ff79c6",
+  lineColor: "#6272a4",
+  textColor: "#f8f8f2",
+  fontSize: "14px",
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  noteTextColor: "#f8f8f2",
+  noteBkgColor: "#44475a",
+  noteBorderColor: "#6272a4",
+};
+
+function detectDarkMode(): boolean {
+  return typeof document !== "undefined" &&
+    document.documentElement.classList.contains("dark");
+}
+
+function getMermaidConfig(isDark: boolean) {
+  return {
+    startOnLoad: false,
+    theme: "base" as const,
+    securityLevel: "loose" as const,
+    themeVariables: isDark ? DARK_THEME_VARS : LIGHT_THEME_VARS,
+    flowchart: { curve: "basis" as const, padding: 16 },
+    sequence: { actorMargin: 60, messageMargin: 40 },
+  };
+}
+
 let mermaidReady: Promise<typeof import("mermaid")["default"]> | null = null;
+let lastDark: boolean | null = null;
 
 function getMermaid() {
   if (!mermaidReady) {
+    const isDark = detectDarkMode();
+    lastDark = isDark;
     mermaidReady = import("mermaid").then((m) => {
-      m.default.initialize({
-        startOnLoad: false,
-        theme: "default",
-        securityLevel: "loose",
-      });
+      m.default.initialize(getMermaidConfig(isDark));
       return m.default;
     });
   }
   return mermaidReady;
+}
+
+/** Re-initialize mermaid with the current theme. Call before rendering. */
+async function syncMermaidTheme(): Promise<void> {
+  const isDark = detectDarkMode();
+  if (isDark === lastDark) return;
+  lastDark = isDark;
+  const mermaid = await getMermaid();
+  mermaid.initialize(getMermaidConfig(isDark));
 }
 
 const MERMAID_KEYWORDS = /^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|gitgraph|journey|mindmap|timeline|quadrantChart|sankey|block|xychart|C4Context)\b/;
@@ -35,6 +97,7 @@ export async function preRenderMermaid(html: string): Promise<string> {
   );
   if (codeBlocks.length === 0) return html;
 
+  await syncMermaidTheme();
   const mermaid = await getMermaid();
 
   for (let i = 0; i < codeBlocks.length; i++) {
@@ -81,6 +144,7 @@ export async function renderMermaidBlocks(container: HTMLElement): Promise<void>
   });
   if (codeBlocks.length === 0) return;
 
+  await syncMermaidTheme();
   const mermaid = await getMermaid();
 
   for (let i = 0; i < codeBlocks.length; i++) {

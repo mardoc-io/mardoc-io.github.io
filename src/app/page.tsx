@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useApp } from "@/lib/app-context";
 import Sidebar from "@/components/Sidebar";
 import Editor from "@/components/Editor";
+import HtmlViewer from "@/components/HtmlViewer";
 import PRDetail from "@/components/PRDetail";
 import PRReview from "@/components/PRReview";
 import SettingsPanel from "@/components/SettingsPanel";
@@ -101,6 +102,22 @@ export default function Home() {
                 repoFullName={currentRepo || undefined}
                 branch={selectedBranch}
                 onContentChange={() => {}}
+              />
+            )
+          ) : currentView === "html-viewer" && selectedFile ? (
+            loadingContent ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                  <Loader2 size={18} className="animate-spin" />
+                  <span className="text-sm">Loading {selectedFile.name}...</span>
+                </div>
+              </div>
+            ) : (
+              <HtmlViewer
+                content={fileContent}
+                filePath={selectedFile.path}
+                repoFullName={currentRepo || undefined}
+                branch={selectedBranch}
               />
             )
           ) : currentView === "pr-diff" && selectedPR ? (

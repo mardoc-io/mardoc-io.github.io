@@ -479,7 +479,7 @@ export default function Sidebar() {
                 </div>
               ) : prFileTree.length === 0 ? (
                 <p className="text-xs text-[var(--text-muted)] text-center py-4">
-                  {prFileFilter ? "No files matching filter." : "No markdown files changed."}
+                  {prFileFilter ? "No files matching filter." : "No document files changed."}
                 </p>
               ) : (
                 <div className="space-y-0.5">
@@ -503,7 +503,7 @@ export default function Sidebar() {
             <div className="text-center py-8 px-3">
               <p className="text-sm text-[var(--text-muted)]">
                 {currentRepo
-                  ? "No markdown files found in this repository."
+                  ? "No document files found in this repository."
                   : "Open Settings to connect a repository."}
               </p>
             </div>
@@ -528,7 +528,7 @@ export default function Sidebar() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".md,.mdx,.markdown"
+                    accept=".md,.mdx,.markdown,.html,.htm"
                     onChange={handleLocalFileSelect}
                     className="hidden"
                   />

@@ -1,5 +1,80 @@
 import { RepoFile, PullRequest } from "@/types";
 
+const MOCK_HTML_DOC = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architecture Overview — MarDoc</title>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({ startOnLoad: true, theme: 'base', themeVariables: {
+  primaryColor: '#E6F1FB', primaryTextColor: '#0C447C', primaryBorderColor: '#85B7EB',
+  secondaryColor: '#E1F5EE', lineColor: '#5F5E5A', textColor: '#2C2C2A', fontSize: '14px'
+}});
+<\/script>
+<style>
+  :root { --bg: #FAFAF8; --surface: #FFFFFF; --border: #E2E0D8; --text: #1A1A18; --accent: #185FA5; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; font-size: 15px; }
+  .page { max-width: 800px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  h2 { font-size: 20px; font-weight: 600; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  p { margin-bottom: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; font-weight: 600; margin-bottom: 4px; }
+  .card .value { font-size: 16px; font-weight: 600; }
+  .diagram { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+  .diagram-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 12px; }
+  code { font-family: "SFMono-Regular", Consolas, monospace; font-size: 13px; background: #F1EFE8; padding: 2px 6px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>MarDoc Architecture Overview</h1>
+  <p>A browser-only PWA that transforms markdown review on GitHub into a rich document experience.</p>
+
+  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 24px 0;">
+    <div class="card"><div class="label">Runtime</div><div class="value">Browser-only</div></div>
+    <div class="card"><div class="label">Framework</div><div class="value">Next.js 14</div></div>
+    <div class="card"><div class="label">Editor</div><div class="value">TipTap 2.11</div></div>
+  </div>
+
+  <h2>System Flow</h2>
+  <div class="diagram">
+    <div class="diagram-title">Request lifecycle</div>
+    <pre class="mermaid">
+flowchart LR
+  A["Browser"] -->|"GitHub API"| B["Octokit"]
+  B --> C["Repo Files"]
+  B --> D["Pull Requests"]
+  C --> E["TipTap Editor"]
+  D --> F["DiffViewer"]
+  E -->|"Turndown"| G["Markdown Commit"]
+  F --> H["Inline Comments"]
+  style A fill:#E6F1FB,stroke:#85B7EB,color:#0C447C
+  style B fill:#FAEEDA,stroke:#FAC775,color:#633806
+  style E fill:#E1F5EE,stroke:#5DCAA5,color:#085041
+  style F fill:#E1F5EE,stroke:#5DCAA5,color:#085041
+    </pre>
+  </div>
+
+  <h2>Key Design Decisions</h2>
+  <p><strong>Zero backend.</strong> Everything runs in the browser. Static export to GitHub Pages via Next.js. The GitHub API (via <code>Octokit</code>) is the only external dependency.</p>
+  <p><strong>Markdown-first.</strong> The source of truth is always <code>.md</code> files in a repo. The editor renders markdown but round-trips back to markdown for commits.</p>
+  <p><strong>Progressive enhancement.</strong> The app works in demo mode with zero config. Adding a GitHub PAT unlocks real repos.</p>
+</div>
+</body>
+</html>`;
+
+const MOCK_HTML_DOC_V2 = MOCK_HTML_DOC.replace(
+  "<h2>Key Design Decisions</h2>",
+  `<h2>HTML Document Support</h2>
+  <p><strong>New in v0.4:</strong> MarDoc now renders HTML documents alongside markdown. AI-generated reports, architecture guides, and styled documents render beautifully in the viewer.</p>
+
+  <h2>Key Design Decisions</h2>`
+);
+
 export const repoFiles: RepoFile[] = [
   {
     id: "1",
@@ -187,6 +262,13 @@ Generate a new token following the steps above, then update it in mardoc.app Set
 
 *Need help? Open an issue at [github.com/mardoc-io/mardoc-io.github.io](https://github.com/mardoc-io/mardoc-io.github.io/issues).*
 `,
+      },
+      {
+        id: "9",
+        name: "architecture-overview.html",
+        path: "docs/architecture-overview.html",
+        type: "file",
+        content: MOCK_HTML_DOC,
       },
       {
         id: "8",
@@ -704,6 +786,26 @@ The editor supports GitHub webhooks for real-time synchronization. Configure you
 ### Known Issues
 - GitHub API integration is mocked (coming in v0.2.0)
 - Real-time collaboration not yet supported`,
+      },
+    ],
+    comments: [],
+  },
+  {
+    id: "pr-4",
+    number: 37,
+    title: "Add architecture overview as HTML document",
+    author: "joe.barnett",
+    status: "open",
+    createdAt: "2026-04-05T09:00:00Z",
+    baseBranch: "main",
+    headBranch: "docs/html-architecture",
+    description: "Adds a rich HTML architecture overview with mermaid diagrams, styled cards, and visual layout — demonstrating MarDoc's new HTML rendering support.",
+    files: [
+      {
+        path: "docs/architecture-overview.html",
+        status: "modified",
+        baseContent: MOCK_HTML_DOC,
+        headContent: MOCK_HTML_DOC_V2,
       },
     ],
     comments: [],

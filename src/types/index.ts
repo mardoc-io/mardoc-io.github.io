@@ -59,4 +59,4 @@ export interface PendingSuggestion {
   endLine: number;
 }
 
-export type ViewMode = "editor" | "pr-list" | "pr-diff" | "pr-review";
+export type ViewMode = "editor" | "pr-list" | "pr-diff" | "pr-review" | "html-viewer";

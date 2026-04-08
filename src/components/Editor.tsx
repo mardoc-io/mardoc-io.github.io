@@ -6,7 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
-import Image from "@tiptap/extension-image";
+import BaseImage from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Highlight from "@tiptap/extension-highlight";
 import Typography from "@tiptap/extension-typography";
@@ -20,6 +20,22 @@ import Showdown from "showdown";
 import { createTurndownService } from "@/lib/turndown";
 
 const lowlight = createLowlight(common);
+
+// Extend TipTap Image to preserve data attributes needed for round-trip fidelity
+const Image = BaseImage.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      "data-mermaid-source": { default: null, parseHTML: (el) => el.getAttribute("data-mermaid-source"), renderHTML: (attrs) => attrs["data-mermaid-source"] ? { "data-mermaid-source": attrs["data-mermaid-source"] } : {} },
+      "data-original-src": { default: null, parseHTML: (el) => el.getAttribute("data-original-src"), renderHTML: (attrs) => attrs["data-original-src"] ? { "data-original-src": attrs["data-original-src"] } : {} },
+      "data-gh-owner": { default: null, parseHTML: (el) => el.getAttribute("data-gh-owner"), renderHTML: (attrs) => attrs["data-gh-owner"] ? { "data-gh-owner": attrs["data-gh-owner"] } : {} },
+      "data-gh-repo": { default: null, parseHTML: (el) => el.getAttribute("data-gh-repo"), renderHTML: (attrs) => attrs["data-gh-repo"] ? { "data-gh-repo": attrs["data-gh-repo"] } : {} },
+      "data-gh-ref": { default: null, parseHTML: (el) => el.getAttribute("data-gh-ref"), renderHTML: (attrs) => attrs["data-gh-ref"] ? { "data-gh-ref": attrs["data-gh-ref"] } : {} },
+      "data-gh-path": { default: null, parseHTML: (el) => el.getAttribute("data-gh-path"), renderHTML: (attrs) => attrs["data-gh-path"] ? { "data-gh-path": attrs["data-gh-path"] } : {} },
+    };
+  },
+});
+
 import { rewriteImageUrls, loadAuthenticatedImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent, createFileAsPR, commitFileToPRBranch } from "@/lib/github-api";
 import { classifyLink, resolvePath, findFileByPath } from "@/lib/link-handler";
 import { useApp } from "@/lib/app-context";

@@ -6,6 +6,7 @@ import { initOctokit, fetchRepoTree, fetchPullRequests, fetchFileContent, fetchP
 import { repoFiles as mockFiles, pullRequests as mockPRs, findFile, flattenFiles } from "./mock-data";
 import { parseHash, buildFileHash, buildPRHash, buildRepoHash } from "./hash-router";
 import * as safeStorage from "./safe-storage";
+import { isHtmlFile } from "./file-types";
 
 interface AppState {
   // Auth
@@ -172,7 +173,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       setSelectedFile(localFile);
       setSelectedPR(null);
-      setCurrentView("editor");
+      setCurrentView(isHtmlFile(data.fileName) ? "html-viewer" : "editor");
       setFileContent(data.fileContent);
     }
   }, []);
@@ -333,7 +334,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     async (file: RepoFile) => {
       setSelectedFile(file);
       setSelectedPR(null);
-      setCurrentView("editor");
+      setCurrentView(isHtmlFile(file.name) ? "html-viewer" : "editor");
 
       // Update URL hash
       if (currentRepo) {
@@ -412,7 +413,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSelectedPR(null);
     setPRBranchForNewFile(null);
     setPRNumberForNewFile(null);
-    setCurrentView("editor");
+    setCurrentView(isHtmlFile(name) ? "html-viewer" : "editor");
     setFileContent(content);
   }, []);
 

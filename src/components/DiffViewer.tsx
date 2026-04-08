@@ -41,6 +41,7 @@ import { openExternal } from "@/lib/open-external";
 import { renderMermaidBlocks } from "@/lib/mermaid";
 import { highlightCodeBlocks } from "@/lib/highlight";
 import { useWideFormat } from "@/lib/use-wide-format";
+import { isHtmlFile } from "@/lib/file-types";
 
 interface DiffViewerProps {
   file: PRFile;
@@ -720,6 +721,9 @@ export default function DiffViewer({
   onAcceptSuggestion,
 }: DiffViewerProps) {
   const [viewMode, setViewMode] = useState<"rendered" | "split" | "suggest" | "preview">("rendered");
+  const [htmlViewMode, setHtmlViewMode] = useState<"rendered" | "source">("rendered");
+  const [htmlShowBase, setHtmlShowBase] = useState(false);
+  const fileIsHtml = isHtmlFile(file.path);
   const [showPanel, setShowPanel] = useState(true);
   const { wide, toggle: toggleWide } = useWideFormat();
   const { isEmbedded } = useApp();
@@ -737,13 +741,74 @@ export default function DiffViewer({
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const contentRef = useRef<HTMLDivElement>(null);
+  const htmlIframeRef = useRef<HTMLIFrameElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
-  // Post-render: fetch private repo images and render mermaid diagrams
+  // Post-render: fetch private repo images and render mermaid diagrams (markdown only)
   useEffect(() => {
-    if (!contentRef.current) return;
+    if (!contentRef.current || fileIsHtml) return;
     loadAuthenticatedImages(contentRef.current);
     renderMermaidBlocks(contentRef.current);
-  }, [file, viewMode]);
+  }, [file, viewMode, fileIsHtml]);
+
+  // Listen for iframe resize messages (HTML file rendering)
+  useEffect(() => {
+    if (!fileIsHtml) return;
+    const iframe = htmlIframeRef.current;
+    if (!iframe) return;
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "mardoc-iframe-resize" && typeof event.data.height === "number") {
+        iframe.style.height = `${event.data.height + 20}px`;
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [fileIsHtml, htmlViewMode, htmlShowBase]);
+
+  // Prepare HTML srcdoc with injected resize script
+  const htmlSrcdoc = useMemo(() => {
+    if (!fileIsHtml) return "";
+    const raw = htmlShowBase ? file.baseContent : file.headContent;
+    const resizeScript = `<script>(function(){function p(){window.parent.postMessage({type:'mardoc-iframe-resize',height:document.documentElement.scrollHeight},'*')}window.addEventListener('load',function(){setTimeout(p,100)});new MutationObserver(p).observe(document.body,{childList:true,subtree:true,attributes:true});setTimeout(p,500);setTimeout(p,2000)})()</script>`;
+    if (raw.includes("</body>")) return raw.replace("</body>", `${resizeScript}</body>`);
+    return raw + resizeScript;
+  }, [fileIsHtml, file.baseContent, file.headContent, htmlShowBase]);
+
+  // Simple source diff for HTML files
+  const htmlSourceDiff = useMemo(() => {
+    if (!fileIsHtml) return [];
+    const baseLines = file.baseContent.split("\n");
+    const headLines = file.headContent.split("\n");
+    const result: { type: "context" | "add" | "remove"; text: string }[] = [];
+
+    // Simple line-by-line diff (good enough for source view)
+    const baseSet = new Set(baseLines);
+    const headSet = new Set(headLines);
+
+    let bi = 0, hi = 0;
+    while (bi < baseLines.length || hi < headLines.length) {
+      if (bi < baseLines.length && hi < headLines.length && baseLines[bi] === headLines[hi]) {
+        result.push({ type: "context", text: headLines[hi] });
+        bi++; hi++;
+      } else if (hi < headLines.length && !baseSet.has(headLines[hi])) {
+        result.push({ type: "add", text: headLines[hi] });
+        hi++;
+      } else if (bi < baseLines.length && !headSet.has(baseLines[bi])) {
+        result.push({ type: "remove", text: baseLines[bi] });
+        bi++;
+      } else {
+        // Modified line — show as remove + add
+        if (bi < baseLines.length) {
+          result.push({ type: "remove", text: baseLines[bi] });
+          bi++;
+        }
+        if (hi < headLines.length) {
+          result.push({ type: "add", text: headLines[hi] });
+          hi++;
+        }
+      }
+    }
+    return result;
+  }, [fileIsHtml, file.baseContent, file.headContent]);
 
   // Map PR comments into panel format for display
   const allPanelComments: PanelComment[] = useMemo(() => {
@@ -1120,54 +1185,81 @@ export default function DiffViewer({
             {wide ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
 
-          <div className="flex items-center gap-1 bg-[var(--surface-secondary)] rounded-md p-0.5">
-            <button
-              onClick={() => setViewMode("rendered")}
-              className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                viewMode === "rendered"
-                  ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-              }`}
-            >
-              Inline Diff
-            </button>
-            <button
-              onClick={() => setViewMode("split")}
-              className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                viewMode === "split"
-                  ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-              }`}
-            >
-              Side by Side
-            </button>
-            <button
-              onClick={() => setViewMode("suggest")}
-              className={`text-xs px-2.5 py-1 rounded transition-colors flex items-center gap-1 ${
-                viewMode === "suggest"
-                  ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-              }`}
-            >
-              <Pencil size={10} />
-              Suggest
-              {pendingSuggestions.length > 0 && (
-                <span className="ml-0.5 px-1.5 py-0 text-[9px] rounded-full bg-[var(--accent)] text-white font-medium">
-                  {pendingSuggestions.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setViewMode("preview")}
-              className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                viewMode === "preview"
-                  ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-              }`}
-            >
-              Preview
-            </button>
-          </div>
+          {fileIsHtml ? (
+            <div className="flex items-center gap-1 bg-[var(--surface-secondary)] rounded-md p-0.5">
+              <button
+                onClick={() => setHtmlViewMode("rendered")}
+                className={`text-xs px-2.5 py-1 rounded transition-colors flex items-center gap-1 ${
+                  htmlViewMode === "rendered"
+                    ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                }`}
+              >
+                <Eye size={10} />
+                Rendered
+              </button>
+              <button
+                onClick={() => setHtmlViewMode("source")}
+                className={`text-xs px-2.5 py-1 rounded transition-colors flex items-center gap-1 ${
+                  htmlViewMode === "source"
+                    ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                }`}
+              >
+                <FileCode size={10} />
+                Source Diff
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 bg-[var(--surface-secondary)] rounded-md p-0.5">
+              <button
+                onClick={() => setViewMode("rendered")}
+                className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                  viewMode === "rendered"
+                    ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                }`}
+              >
+                Inline Diff
+              </button>
+              <button
+                onClick={() => setViewMode("split")}
+                className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                  viewMode === "split"
+                    ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                }`}
+              >
+                Side by Side
+              </button>
+              <button
+                onClick={() => setViewMode("suggest")}
+                className={`text-xs px-2.5 py-1 rounded transition-colors flex items-center gap-1 ${
+                  viewMode === "suggest"
+                    ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                }`}
+              >
+                <Pencil size={10} />
+                Suggest
+                {pendingSuggestions.length > 0 && (
+                  <span className="ml-0.5 px-1.5 py-0 text-[9px] rounded-full bg-[var(--accent)] text-white font-medium">
+                    {pendingSuggestions.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setViewMode("preview")}
+                className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                  viewMode === "preview"
+                    ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                }`}
+              >
+                Preview
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1224,7 +1316,75 @@ export default function DiffViewer({
       <div className="flex-1 flex overflow-hidden">
         {/* Main diff content */}
         <div className="flex-1 overflow-y-auto">
-          {viewMode === "rendered" ? (
+          {fileIsHtml ? (
+            /* HTML file rendering */
+            htmlViewMode === "rendered" ? (
+              <div className="h-full flex flex-col">
+                {/* Base/Head toggle for rendered HTML */}
+                {file.baseContent && file.headContent && (
+                  <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--border)] bg-[var(--bg-secondary,var(--surface))]">
+                    <span className="text-[10px] text-[var(--text-muted)]">Showing:</span>
+                    <button
+                      onClick={() => setHtmlShowBase(false)}
+                      className={`text-xs px-2 py-0.5 rounded transition-colors ${
+                        !htmlShowBase
+                          ? "bg-[var(--diff-add)] text-[var(--diff-add-text)] font-medium"
+                          : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      Head (new)
+                    </button>
+                    <button
+                      onClick={() => setHtmlShowBase(true)}
+                      className={`text-xs px-2 py-0.5 rounded transition-colors ${
+                        htmlShowBase
+                          ? "bg-[var(--diff-remove)] text-[var(--diff-remove-text)] font-medium"
+                          : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      Base (old)
+                    </button>
+                  </div>
+                )}
+                <div className="flex-1 overflow-auto">
+                  <iframe
+                    ref={htmlIframeRef}
+                    srcDoc={htmlSrcdoc}
+                    sandbox="allow-scripts"
+                    title={file.path}
+                    className="w-full border-0"
+                    style={{ minHeight: "100%", height: "100%" }}
+                  />
+                </div>
+              </div>
+            ) : (
+              /* Source diff for HTML files */
+              <div className={wide ? "mx-auto px-12 py-6" : "max-w-5xl mx-auto px-8 py-6"}>
+                <div className="text-[10px] text-[var(--text-muted)] mb-4">
+                  Raw HTML source diff — switch to Rendered to see the visual output
+                </div>
+                <pre className="text-xs font-mono leading-relaxed">
+                  {htmlSourceDiff.map((line, idx) => (
+                    <div
+                      key={idx}
+                      className={
+                        line.type === "add"
+                          ? "bg-[var(--diff-add)] text-[var(--diff-add-text)]"
+                          : line.type === "remove"
+                          ? "bg-[var(--diff-remove)] text-[var(--diff-remove-text)]"
+                          : ""
+                      }
+                    >
+                      <span className="inline-block w-4 text-[var(--text-muted)] select-none">
+                        {line.type === "add" ? "+" : line.type === "remove" ? "-" : " "}
+                      </span>
+                      {line.text}
+                    </div>
+                  ))}
+                </pre>
+              </div>
+            )
+          ) : viewMode === "rendered" ? (
             <div className="relative" ref={contentRef}>
               {/* Floating selection toolbar */}
               <FloatingToolbar

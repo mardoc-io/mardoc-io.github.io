@@ -2,6 +2,7 @@
 
 import { Octokit } from "@octokit/rest";
 import { RepoFile, PullRequest, PRFile, PRComment } from "@/types";
+import { isDocumentFile } from "@/lib/file-types";
 
 let octokitInstance: Octokit | null = null;
 
@@ -105,8 +106,8 @@ export async function fetchRepoTree(
       const parts = path.split("/");
       const name = parts[parts.length - 1];
 
-      // Only show markdown files and their parent directories
-      const isMarkdown = name.endsWith(".md") || name.endsWith(".mdx");
+      // Only show document files and their parent directories
+      const isMarkdown = isDocumentFile(name);
       const isDir = item.type === "tree";
 
       const file: RepoFile = {
@@ -253,7 +254,7 @@ export async function fetchPRMarkdownCounts(
       const prData = result.repository[`pr${i}`];
       if (prData?.files?.nodes) {
         const mdCount = prData.files.nodes.filter(
-          (f: any) => /\.(md|mdx)$/i.test(f.path)
+          (f: any) => isDocumentFile(f.path)
         ).length;
         counts.set(prData.number, mdCount);
       }
@@ -282,9 +283,9 @@ export async function fetchPRFiles(
     per_page: 100,
   });
 
-  // Filter to markdown files only
+  // Filter to document files only (markdown + HTML)
   const mdFiles = files.filter(
-    (f) => f.filename.endsWith(".md") || f.filename.endsWith(".mdx")
+    (f) => isDocumentFile(f.filename)
   );
 
   const prDetail = await octokit.pulls.get({
