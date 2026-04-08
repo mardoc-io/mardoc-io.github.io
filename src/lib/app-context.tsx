@@ -149,7 +149,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Embed mode: listen for postMessage from VS Code extension
-  const pendingInitRef = useRef<{ owner: string; repo: string; branch: string; token: string } | null>(null);
+  const pendingInitRef = useRef<{ owner: string; repo: string; branch: string; token: string; fileName?: string } | null>(null);
 
   const applyInitData = useCallback((data: Record<string, any>) => {
     setIsEmbedded(true);
@@ -282,12 +282,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentRepo, loadPRs]);
 
-  // Embed mode: process pending init repo after token and setCurrentRepo are ready
+  // Embed mode: process pending init repo after token and setCurrentRepo are ready.
+  // Preserve any file that was already opened by applyInitData.
   useEffect(() => {
     if (!pendingInitRef.current || !githubToken) return;
     const { owner, repo } = pendingInitRef.current;
+    const hadFile = !!pendingInitRef.current.fileName;
     pendingInitRef.current = null;
-    setCurrentRepo(`${owner}/${repo}`);
+
+    // Load repo context (file tree, PRs, branches) in background
+    setCurrentRepo(`${owner}/${repo}`).then(() => {
+      // setCurrentRepo may reset the view — restore if a file was opened
+      if (hadFile && vsCodeInitData?.fileName) {
+        const name = vsCodeInitData.fileName;
+        const localPath = vsCodeInitData.filePath || name;
+        setSelectedFile({
+          id: `local-${Date.now()}`,
+          name,
+          path: `__local__/${localPath}`,
+          type: "file",
+        });
+        setSelectedPR(null);
+        setCurrentView(isHtmlFile(name) ? "html-viewer" : "editor");
+        setFileContent(vsCodeInitData.fileContent || "");
+      }
+    });
   }, [githubToken, setCurrentRepo]);
 
   // Auto-restore: hash route wins over localStorage
