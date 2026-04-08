@@ -1350,7 +1350,7 @@ export default function DiffViewer({
                   <iframe
                     ref={htmlIframeRef}
                     srcDoc={htmlSrcdoc}
-                    sandbox="allow-scripts"
+                    sandbox="allow-scripts allow-same-origin"
                     title={file.path}
                     className="w-full border-0"
                     style={{ minHeight: "100%", height: "100%" }}

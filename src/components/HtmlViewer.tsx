@@ -178,7 +178,7 @@ export default function HtmlViewer({ content, filePath, repoFullName, branch }: 
           <iframe
             ref={iframeRef}
             srcDoc={srcdoc}
-            sandbox="allow-scripts"
+            sandbox="allow-scripts allow-same-origin"
             title={fileName}
             className="w-full border-0"
             style={{ minHeight: "100%", height: "100%" }}
