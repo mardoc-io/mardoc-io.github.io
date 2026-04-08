@@ -1053,6 +1053,29 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     }
   }, [repoFullName, isDemoMode, editor, filePath, isLocalFile, editFilePath, editPRTitle, codeView, codeContent, refreshRepo]);
 
+  // Save to disk via VS Code extension (embed mode only)
+  const [savingToDisk, setSavingToDisk] = useState(false);
+  const handleEmbeddedSave = useCallback(() => {
+    if (!editor || !isEmbedded) return;
+
+    let markdown: string;
+    if (codeView) {
+      markdown = codeContent;
+    } else {
+      const turndown = createTurndownService();
+      const html = editor.getHTML();
+      markdown = turndown.turndown(html);
+    }
+
+    // Resolve the file path — strip __local__/ prefix if present
+    const savePath = filePath.replace(/^__local__\//, "");
+
+    setSavingToDisk(true);
+    window.parent.postMessage({ type: "file:save", filePath: savePath, content: markdown }, "*");
+    setIsDirty(false);
+    setTimeout(() => setSavingToDisk(false), 500);
+  }, [editor, isEmbedded, codeView, codeContent, filePath]);
+
   // Click handler — intercept clicks on <a> and <img> tags in the editor
   const handleEditorClick = useCallback((e: React.MouseEvent) => {
     const el = e.target as HTMLElement;
@@ -1319,8 +1342,20 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
                 {isAddingToPR ? "Add to PR" : "Save to Repo"}
               </button>
             )}
-            {/* Submit edits as PR — when file is dirty */}
-            {!isNewFile && isDirty && !submittedPR && (
+            {/* Save to disk — embed mode */}
+            {isEmbedded && isDirty && (
+              <button
+                onClick={handleEmbeddedSave}
+                disabled={savingToDisk}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
+                title="Save file to disk"
+              >
+                <Save size={13} />
+                {savingToDisk ? "Saving..." : "Save"}
+              </button>
+            )}
+            {/* Submit edits as PR — when file is dirty (non-embedded) */}
+            {!isEmbedded && !isNewFile && isDirty && !submittedPR && (
               <button
                 onClick={() => { const repoPath = isLocalFile ? (localFileName || "") : filePath; setEditPRTitle(`${isLocalFile ? "Add" : "Update"} ${repoPath}`); setEditFilePath(repoPath); setShowEditPRModal(true); }}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition-colors"

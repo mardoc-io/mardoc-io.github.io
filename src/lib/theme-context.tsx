@@ -7,11 +7,13 @@ type Theme = "light" | "dark";
 
 interface ThemeContextType {
   theme: Theme;
+  setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextType>({
   theme: "light",
+  setTheme: () => {},
   toggleTheme: () => {},
 });
 
@@ -27,6 +29,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
       setTheme("dark");
     }
+  }, []);
+
+  // Listen for theme messages from VS Code extension
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data) return;
+      if (data.type === "theme:change" && (data.theme === "light" || data.theme === "dark")) {
+        setTheme(data.theme);
+      }
+      if (data.type === "init" && (data.theme === "light" || data.theme === "dark")) {
+        setTheme(data.theme);
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, []);
 
   useEffect(() => {
@@ -45,7 +63,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
