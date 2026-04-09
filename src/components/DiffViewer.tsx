@@ -743,12 +743,15 @@ export default function DiffViewer({
   const contentRef = useRef<HTMLDivElement>(null);
   const htmlIframeRef = useRef<HTMLIFrameElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
-  // Post-render: fetch private repo images and render mermaid diagrams (markdown only)
+  // Post-render: fetch private repo images and render mermaid diagrams (markdown only).
+  // Must re-run when comments change because renderBlockHtml injects highlight marks,
+  // which causes React to replace the dangerouslySetInnerHTML DOM — wiping any
+  // previously rendered mermaid SVGs.
   useEffect(() => {
     if (!contentRef.current || fileIsHtml) return;
     loadAuthenticatedImages(contentRef.current);
     renderMermaidBlocks(contentRef.current);
-  }, [file, viewMode, fileIsHtml]);
+  }, [file, viewMode, fileIsHtml, comments]);
 
   // Listen for iframe resize messages (HTML file rendering)
   useEffect(() => {
