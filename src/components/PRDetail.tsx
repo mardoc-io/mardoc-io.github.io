@@ -25,6 +25,7 @@ import {
   type ReviewEvent,
 } from "@/lib/github-api";
 import { mergeFreshComments } from "@/lib/comment-merge";
+import { buildSuggestionBody, parseSuggestionBody } from "@/lib/suggestion-body";
 import DiffViewer from "./DiffViewer";
 import Showdown from "showdown";
 
@@ -353,7 +354,11 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     if (!file) return;
 
     const newComments: PRComment[] = suggestions.map((suggestion, i) => {
-      const body = `\`\`\`suggestion\n${suggestion.editedMarkdown}\n\`\`\``;
+      // buildSuggestionBody picks an outer fence longer than any run of
+      // backticks inside — otherwise nested ```json / ```ts blocks close
+      // the outer suggestion fence early and GitHub rejects the comment as
+      // a broken suggestion. Covered in suggestion-body.test.ts.
+      const body = buildSuggestionBody(suggestion.editedMarkdown);
       return {
         id: `s-${Date.now()}-${i}-${suggestion.blockIndex}`,
         author: "you",
@@ -381,11 +386,10 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     const file = prFiles[selectedPRFileIdx];
     if (!file) return;
 
-    // Parse suggestion from comment body
-    const match = comment.body.match(/```suggestion\n([\s\S]*?)\n```/);
-    if (!match) return;
-
-    const replacementText = match[1];
+    // Parse suggestion from comment body — handles variable-length fences
+    // so nested ``` inside the suggestion survive round-trip parsing.
+    const replacementText = parseSuggestionBody(comment.body);
+    if (replacementText === null) return;
 
     // Get line range from the comment's selected text
     const selectedText = comment.selectedText || "";

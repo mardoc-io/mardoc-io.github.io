@@ -32,6 +32,7 @@ import {
   Highlighter,
   FileCode,
   Minus,
+  Trash2,
 } from "lucide-react";
 import ContextMenu from "./ContextMenu";
 import { mapSelectionToLines, rewriteImageUrls, loadAuthenticatedImages } from "@/lib/github-api";
@@ -42,6 +43,8 @@ import { renderMermaidBlocks } from "@/lib/mermaid";
 import { highlightCodeBlocks } from "@/lib/highlight";
 import { useWideFormat } from "@/lib/use-wide-format";
 import { isHtmlFile } from "@/lib/file-types";
+import { extractCommentSuggestions, mergeSuggestions } from "@/lib/suggestion-extract";
+import { parseSuggestionBody } from "@/lib/suggestion-body";
 
 interface DiffViewerProps {
   file: PRFile;
@@ -600,23 +603,36 @@ function CommentPanel({
                   )}
                 </div>
                 {(() => {
-                  const suggestionMatch = comment.body.match(/```suggestion\n([\s\S]*?)\n```/);
-                  if (suggestionMatch) {
+                  const suggestionContent = parseSuggestionBody(comment.body);
+                  if (suggestionContent !== null) {
+                    // Accept writes a real commit to the PR head branch via
+                    // the GitHub API. For a pending (not yet submitted)
+                    // suggestion, there's no posted comment to reference and
+                    // the line range can be stale — accepting would commit
+                    // blind. Hide the button until the review is submitted.
+                    const canAccept = !!onAccept && !comment.pending;
                     return (
                       <div className="mt-1">
                         <div className="text-[9px] text-[var(--accent)] font-medium mb-1">Suggested change:</div>
                         <div className="text-[11px] font-mono bg-[var(--accent-muted)] text-[var(--text-primary)] px-2 py-1.5 rounded border border-[var(--accent)] leading-relaxed whitespace-pre-wrap">
-                          {suggestionMatch[1]}
+                          {suggestionContent}
                         </div>
-                        {onAccept && (
+                        {canAccept ? (
                           <button
-                            onClick={(e) => { e.stopPropagation(); onAccept(comment.id); }}
+                            onClick={(e) => { e.stopPropagation(); onAccept!(comment.id); }}
                             className="flex items-center gap-1 text-[10px] mt-1.5 px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors font-medium"
                           >
                             <Check size={10} />
                             Accept suggestion
                           </button>
-                        )}
+                        ) : comment.pending ? (
+                          <p
+                            className="text-[9px] text-[var(--text-muted)] mt-1.5 italic"
+                            title="Finish your review to post this suggestion; then it can be accepted"
+                          >
+                            Submit the review first to enable Accept
+                          </p>
+                        ) : null}
                       </div>
                     );
                   }
@@ -900,32 +916,52 @@ export default function DiffViewer({
     setEditingText(headBlocks[blockIndex]);
   }, [headBlocks]);
 
+  // Suggest mode: queue a pending suggestion for the given block. Shared
+  // between "Done" (save the user's edits) and "Delete block" (replace
+  // the block with an empty suggestion — GitHub applies that as a delete).
+  const queueSuggestionForBlock = useCallback(
+    (blockIndex: number, editedMarkdown: string) => {
+      const original = headBlocks[blockIndex];
+      const range = headBlockRanges[blockIndex];
+      setPendingSuggestions((prev) => {
+        const filtered = prev.filter((s) => s.blockIndex !== blockIndex);
+        return [
+          ...filtered,
+          {
+            blockIndex,
+            originalMarkdown: original,
+            editedMarkdown,
+            startLine: range.startLine,
+            endLine: range.endLine,
+          },
+        ];
+      });
+    },
+    [headBlocks, headBlockRanges]
+  );
+
   // Suggest mode: save or discard edits on a block
   const finishEditingBlock = useCallback(() => {
     if (editingBlockIndex === null) return;
 
     const original = headBlocks[editingBlockIndex];
     if (editingText.trim() !== original.trim()) {
-      const range = headBlockRanges[editingBlockIndex];
-      setPendingSuggestions((prev) => {
-        // Replace existing suggestion for same block
-        const filtered = prev.filter((s) => s.blockIndex !== editingBlockIndex);
-        return [
-          ...filtered,
-          {
-            blockIndex: editingBlockIndex,
-            originalMarkdown: original,
-            editedMarkdown: editingText,
-            startLine: range.startLine,
-            endLine: range.endLine,
-          },
-        ];
-      });
+      queueSuggestionForBlock(editingBlockIndex, editingText);
     }
 
     setEditingBlockIndex(null);
     setEditingText("");
-  }, [editingBlockIndex, editingText, headBlocks, headBlockRanges]);
+  }, [editingBlockIndex, editingText, headBlocks, queueSuggestionForBlock]);
+
+  // Suggest mode: queue an empty-suggestion delete for the block currently
+  // being edited. GitHub applies an empty suggestion body as a delete of
+  // the referenced lines — no special API call required.
+  const deleteEditingBlock = useCallback(() => {
+    if (editingBlockIndex === null) return;
+    queueSuggestionForBlock(editingBlockIndex, "");
+    setEditingBlockIndex(null);
+    setEditingText("");
+  }, [editingBlockIndex, queueSuggestionForBlock]);
 
   // Suggest mode: discard a pending suggestion
   const discardSuggestion = useCallback((blockIndex: number) => {
@@ -939,44 +975,21 @@ export default function DiffViewer({
     setPendingSuggestions([]);
   }, [pendingSuggestions, onSubmitSuggestions]);
 
-  // Extract submitted suggestions from existing PR comments
+  // Extract already-submitted suggestions from PR comments, mapped back to
+  // blocks via line numbers (the mapping logic is pure and tested in
+  // suggestion-extract.test.ts). This replaces a previous broken version
+  // that mapped via `comment.selectedText`, which is only set on local
+  // optimistic copies — so submitted suggestions disappeared the moment the
+  // refetch replaced local state with fresh data from GitHub.
   const commentSuggestions = useMemo(() => {
-    const results: PendingSuggestion[] = [];
-    const suggestionRegex = /```suggestion\n([\s\S]*?)\n```/;
-
-    for (const comment of comments) {
-      const match = comment.body.match(suggestionRegex);
-      if (!match) continue;
-
-      const editedMarkdown = match[1];
-      const originalText = comment.selectedText || "";
-
-      // Find which block this maps to
-      const blockIdx = headBlocks.findIndex((block) => block.includes(originalText));
-      if (blockIdx === -1) continue;
-
-      const range = headBlockRanges[blockIdx];
-      results.push({
-        blockIndex: blockIdx,
-        originalMarkdown: headBlocks[blockIdx],
-        editedMarkdown,
-        startLine: range.startLine,
-        endLine: range.endLine,
-      });
-    }
-    return results;
+    return extractCommentSuggestions(comments, headBlocks, headBlockRanges);
   }, [comments, headBlocks, headBlockRanges]);
 
-  // All suggestions: pending local + already submitted as comments
-  const allSuggestions = useMemo(() => {
-    const merged = [...pendingSuggestions];
-    for (const cs of commentSuggestions) {
-      if (!merged.some((s) => s.blockIndex === cs.blockIndex)) {
-        merged.push(cs);
-      }
-    }
-    return merged;
-  }, [pendingSuggestions, commentSuggestions]);
+  // All suggestions: pending local + already submitted as comments.
+  const allSuggestions = useMemo(
+    () => mergeSuggestions(pendingSuggestions, commentSuggestions),
+    [pendingSuggestions, commentSuggestions]
+  );
 
   // Preview mode: apply suggestions to produce preview content
   const previewBlocks = useMemo(() => {
@@ -1545,7 +1558,15 @@ export default function DiffViewer({
                 </div>
 
                 {headBlocks.map((block, idx) => {
-                  const hasSuggestion = pendingSuggestions.some((s) => s.blockIndex === idx);
+                  // allSuggestions includes both in-progress local edits and
+                  // already-submitted suggestions fetched from GitHub, so the
+                  // highlight survives the refetch after submit.
+                  const suggestionForBlock = allSuggestions.find((s) => s.blockIndex === idx);
+                  const hasSuggestion = !!suggestionForBlock;
+                  // Only locally-pending suggestions can be discarded — ones
+                  // that are already on GitHub need to be deleted on the PR,
+                  // not removed from local state.
+                  const isLocalPending = pendingSuggestions.some((s) => s.blockIndex === idx);
                   const isEditing = editingBlockIndex === idx;
 
                   if (isEditing) {
@@ -1561,6 +1582,14 @@ export default function DiffViewer({
                               className="text-[10px] px-2 py-0.5 bg-[var(--accent)] text-white rounded hover:bg-[var(--accent-hover)] transition-colors"
                             >
                               Done
+                            </button>
+                            <button
+                              onClick={deleteEditingBlock}
+                              className="flex items-center gap-1 text-[10px] px-2 py-0.5 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                              title="Suggest deleting this block"
+                            >
+                              <Trash2 size={10} />
+                              Delete
                             </button>
                             <button
                               onClick={() => { setEditingBlockIndex(null); setEditingText(""); }}
@@ -1650,21 +1679,24 @@ export default function DiffViewer({
                       {hasSuggestion && (
                         <div className="flex items-center justify-between py-1">
                           <span className="text-[9px] text-[var(--accent)] font-medium flex items-center gap-1">
-                            <Pencil size={8} /> Suggested change
+                            <Pencil size={8} />
+                            {isLocalPending ? "Suggested change" : "Submitted suggestion"}
                           </span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); discardSuggestion(idx); }}
-                            className="text-[9px] text-[var(--text-muted)] hover:text-red-500 transition-colors"
-                          >
-                            Discard
-                          </button>
+                          {isLocalPending && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); discardSuggestion(idx); }}
+                              className="text-[9px] text-[var(--text-muted)] hover:text-red-500 transition-colors"
+                            >
+                              Discard
+                            </button>
+                          )}
                         </div>
                       )}
                       <div
                         className="rendered-block diff-content"
                         dangerouslySetInnerHTML={{
                           __html: hasSuggestion
-                            ? headBlockToHtml(pendingSuggestions.find((s) => s.blockIndex === idx)!.editedMarkdown)
+                            ? headBlockToHtml(suggestionForBlock!.editedMarkdown)
                             : headBlockToHtml(block),
                         }}
                       />
