@@ -4,6 +4,7 @@ import { Octokit } from "@octokit/rest";
 import { RepoFile, PullRequest, PRFile, PRComment } from "@/types";
 import { isDocumentFile } from "@/lib/file-types";
 import { utf8ToBase64, base64ToUtf8 } from "@/lib/base64-utf8";
+import { isLineResolutionError, runInlineFallback } from "@/lib/review-fallback";
 
 let octokitInstance: Octokit | null = null;
 
@@ -645,22 +646,15 @@ export async function submitReviewBatched(
   try {
     await submitReview(repoFullName, prNumber, event, body, comments);
     return { unresolvedCount: 0 };
-  } catch (err: any) {
-    const status = err?.status ?? err?.response?.status;
-    const message = String(err?.message || "").toLowerCase();
-    const looksLikeLineResolution =
-      status === 422 &&
-      (message.includes("could not be resolved") ||
-        message.includes("pull_request_review_thread.line"));
-    if (!looksLikeLineResolution) {
+  } catch (err) {
+    if (!isLineResolutionError(err)) {
       throw err;
     }
   }
 
-  let unresolvedCount = 0;
-  for (const c of comments) {
-    try {
-      await createInlineComment(
+  const { unresolvedCount } = await runInlineFallback(comments, {
+    postInlineComment: (c) =>
+      createInlineComment(
         repoFullName,
         prNumber,
         c.body,
@@ -668,21 +662,9 @@ export async function submitReviewBatched(
         c.line,
         c.startLine,
         c.side || "RIGHT"
-      );
-    } catch {
-      unresolvedCount++;
-      const range =
-        c.startLine && c.startLine !== c.line
-          ? ` (L${c.startLine}-L${c.line})`
-          : ` (L${c.line})`;
-      const contextBody = `**${c.path}**${range}\n\n${c.body}`;
-      try {
-        await createPRComment(repoFullName, prNumber, contextBody);
-      } catch {
-        // Give up silently on this one — at least the others posted.
-      }
-    }
-  }
+      ),
+    postIssueComment: (text) => createPRComment(repoFullName, prNumber, text),
+  });
 
   if (event !== "COMMENT") {
     // Record the approval / change-request state even though the comments
