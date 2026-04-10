@@ -61,6 +61,14 @@ interface AppState {
   addFileToPR: (pr: PullRequest) => void;
   openLocalFile: (name: string, content: string) => void;
   isEmbedded: boolean;
+
+  // Unsaved-changes nav guard. The Editor reports its dirty state via
+  // setEditorIsDirty; the navigation actions above check it before switching
+  // away. When a guarded navigation is attempted with unsaved changes, the
+  // pending action is parked in pendingNavigation and a modal renders inside
+  // AppProvider asking the user to confirm or cancel.
+  editorIsDirty: boolean;
+  setEditorIsDirty: (dirty: boolean) => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -112,6 +120,59 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const isAuthenticated = !!githubToken;
+
+  // ─── Unsaved-changes nav guard ───────────────────────────────────────────
+  // The Editor calls setEditorIsDirty(true) when there are unsaved edits.
+  // The nav-guard ref mirrors that for use inside stable callbacks (so
+  // wrapping openFile/openPR/etc doesn't depend on a render-time closure).
+  const [editorIsDirty, setEditorIsDirtyState] = useState(false);
+  const editorIsDirtyRef = useRef(false);
+  const setEditorIsDirty = useCallback((dirty: boolean) => {
+    editorIsDirtyRef.current = dirty;
+    setEditorIsDirtyState(dirty);
+  }, []);
+
+  // The currently-parked navigation when the user has unsaved edits. The
+  // confirmation modal reads this and either runs onConfirm (discard edits +
+  // perform the nav) or clears it (cancel).
+  const [pendingNavigation, setPendingNavigation] = useState<
+    | { description: string; onConfirm: () => void }
+    | null
+  >(null);
+
+  // Guard helper — wrap any navigation action that should respect dirty state.
+  const guardNavigation = useCallback(
+    (description: string, action: () => void) => {
+      if (!editorIsDirtyRef.current) {
+        action();
+        return;
+      }
+      setPendingNavigation({
+        description,
+        onConfirm: () => {
+          editorIsDirtyRef.current = false;
+          setEditorIsDirtyState(false);
+          setPendingNavigation(null);
+          action();
+        },
+      });
+    },
+    []
+  );
+
+  // Browser-level guard: native beforeunload prompt when the tab is about to
+  // close with unsaved edits. The exact wording is browser-controlled.
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (editorIsDirtyRef.current) {
+        e.preventDefault();
+        // Some browsers still require returnValue to be set.
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
 
   // Suppress hashchange handling when we're the ones updating the hash
   const suppressHashChange = useRef(false);
@@ -327,8 +388,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [githubToken, currentRepo, setCurrentRepo]);
 
-  // Switch branch and reload file tree
-  const setSelectedBranch = useCallback(
+  // Switch branch and reload file tree (raw — caller must apply nav guard)
+  const _setSelectedBranchInternal = useCallback(
     async (branch: string) => {
       setSelectedBranchState(branch);
       setSelectedFile(null);
@@ -350,8 +411,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [currentRepo, githubToken]
   );
 
-  // Open a file and load its content
-  const openFile = useCallback(
+  const setSelectedBranch = useCallback(
+    (branch: string) => {
+      guardNavigation(`switch branch to ${branch}`, () => {
+        void _setSelectedBranchInternal(branch);
+      });
+    },
+    [guardNavigation, _setSelectedBranchInternal]
+  );
+
+  // Open a file and load its content (raw — caller must apply nav guard)
+  const _openFileInternal = useCallback(
     async (file: RepoFile) => {
       setSelectedFile(file);
       setSelectedPR(null);
@@ -385,6 +455,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [isDemoMode, currentRepo, githubToken, selectedBranch]
+  );
+
+  const openFile = useCallback(
+    (file: RepoFile) => {
+      guardNavigation(`open ${file.name}`, () => {
+        void _openFileInternal(file);
+      });
+      // Maintain the Promise<void> contract for callers that await — the
+      // promise resolves immediately whether the nav was deferred or ran.
+      return Promise.resolve();
+    },
+    [guardNavigation, _openFileInternal]
   );
 
   // PR-scoped new file state
@@ -439,8 +521,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
 
-  // Open a PR and fetch its files + comments
-  const openPR = useCallback(
+  // Open a PR and fetch its files + comments (raw — caller must apply nav guard)
+  const _openPRInternal = useCallback(
     (pr: PullRequest) => {
       setSelectedPR(pr);
       setSelectedFile(null);
@@ -475,6 +557,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .finally(() => setLoadingPRFiles(false));
     },
     [currentRepo, isDemoMode]
+  );
+
+  const openPR = useCallback(
+    (pr: PullRequest) => {
+      guardNavigation(`open PR #${pr.number}`, () => _openPRInternal(pr));
+    },
+    [guardNavigation, _openPRInternal]
   );
 
   // Update hash when PR file selection changes
@@ -597,9 +686,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addFileToPR,
         openLocalFile,
         isEmbedded,
+        editorIsDirty,
+        setEditorIsDirty,
       }}
     >
       {children}
+      {pendingNavigation && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50"
+          onClick={() => setPendingNavigation(null)}
+        >
+          <div
+            className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-2">
+              Discard unsaved changes?
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)] mb-4">
+              You have unsaved edits. Continuing will discard them and{" "}
+              {pendingNavigation.description}.
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => setPendingNavigation(null)}
+                className="text-xs px-3 py-1.5 border border-[var(--border)] text-[var(--text-secondary)] rounded-md hover:bg-[var(--surface-hover)] transition-colors"
+              >
+                Keep editing
+              </button>
+              <button
+                onClick={pendingNavigation.onConfirm}
+                className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+              >
+                Discard changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppContext.Provider>
   );
 }
