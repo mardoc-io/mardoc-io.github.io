@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/lib/theme-context";
-import { AuthProvider } from "@/lib/auth-provider";
 import { AppProvider } from "@/lib/app-context";
 import "./globals.css";
 
@@ -17,11 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <AuthProvider>
-          <ThemeProvider>
-            <AppProvider>{children}</AppProvider>
-          </ThemeProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AppProvider>{children}</AppProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
