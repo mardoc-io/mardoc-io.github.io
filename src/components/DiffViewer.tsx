@@ -60,6 +60,7 @@ interface DiffViewerProps {
   onReplyComment?: (commentId: string, body: string) => void;
   onSubmitSuggestions?: (suggestions: PendingSuggestion[]) => void;
   onAcceptSuggestion?: (commentId: string) => void;
+  onDiscardPendingComment?: (commentId: string) => void;
 }
 
 interface DiffBlock {
@@ -82,6 +83,7 @@ interface PanelComment {
   endLine?: number;
   replies: { author: string; avatarColor: string; body: string; createdAt: string }[];
   source: "local" | "github";
+  pending?: boolean;
 }
 
 // ─── Markdown Parsing Helpers ──────────────────────────────────────────────
@@ -491,6 +493,7 @@ function CommentPanel({
   onReply,
   onResolve,
   onAccept,
+  onDiscardPending,
   onClose,
 }: {
   comments: PanelComment[];
@@ -499,6 +502,7 @@ function CommentPanel({
   onReply: (id: string, body: string) => void;
   onResolve: (id: string) => void;
   onAccept?: (id: string) => void;
+  onDiscardPending?: (id: string) => void;
   onClose: () => void;
 }) {
   const [replyText, setReplyText] = useState<Record<string, string>>({});
@@ -573,10 +577,26 @@ function CommentPanel({
                       minute: "2-digit",
                     })}
                   </span>
-                  {comment.source === "github" && (
+                  {comment.pending ? (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">
+                      Pending
+                    </span>
+                  ) : comment.source === "github" ? (
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-muted)]">
                       GitHub
                     </span>
+                  ) : null}
+                  {comment.pending && onDiscardPending && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDiscardPending(comment.id);
+                      }}
+                      className="ml-auto text-[9px] text-[var(--text-muted)] hover:text-red-600 transition-colors"
+                      title="Discard this pending comment"
+                    >
+                      Discard
+                    </button>
                   )}
                 </div>
                 {(() => {
@@ -719,6 +739,7 @@ export default function DiffViewer({
   onReplyComment,
   onSubmitSuggestions,
   onAcceptSuggestion,
+  onDiscardPendingComment,
 }: DiffViewerProps) {
   const [viewMode, setViewMode] = useState<"rendered" | "split" | "suggest" | "preview">("rendered");
   const [htmlViewMode, setHtmlViewMode] = useState<"rendered" | "source">("rendered");
@@ -830,7 +851,8 @@ export default function DiffViewer({
         body: r.body,
         createdAt: r.createdAt,
       })),
-      source: "github" as const,
+      source: c.pending ? ("local" as const) : ("github" as const),
+      pending: c.pending,
     }));
   }, [comments]);
 
@@ -1777,6 +1799,7 @@ export default function DiffViewer({
             onReply={handleReply}
             onResolve={handleResolve}
             onAccept={onAcceptSuggestion}
+            onDiscardPending={onDiscardPendingComment}
             onClose={() => {
               setShowPanel(false);
               setActiveCommentId(null);

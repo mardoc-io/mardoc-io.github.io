@@ -27,6 +27,14 @@ export interface PRComment {
   selectedText?: string; // the text that was selected when the comment was created
   resolved: boolean;
   replies: PRCommentReply[];
+  // Queued locally as part of a pending review — not yet posted to GitHub.
+  // Cleared when the review is submitted or the comment is discarded.
+  pending?: boolean;
+  // Line range captured at queue time so the batched review knows where to
+  // post. Only used when pending is true.
+  pendingPath?: string;
+  pendingStartLine?: number;
+  pendingEndLine?: number;
 }
 
 export interface PullRequest {

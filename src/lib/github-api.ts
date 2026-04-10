@@ -558,6 +558,71 @@ export async function createInlineComment(
 }
 
 /**
+ * A pending inline comment queued for submission as part of a batched review.
+ * Maps 1:1 to the shape GitHub's pulls.createReview accepts in its `comments[]`.
+ */
+export interface PendingInlineComment {
+  path: string;
+  body: string;
+  line: number;
+  startLine?: number;
+  side?: "LEFT" | "RIGHT";
+}
+
+export type ReviewEvent = "APPROVE" | "REQUEST_CHANGES" | "COMMENT";
+
+/**
+ * Submit a PR review. If `comments` is provided, they are batched into the
+ * review as inline comments (a single notification to the author instead of N).
+ * Pass `event` = APPROVE / REQUEST_CHANGES / COMMENT.
+ *
+ * Note: REQUEST_CHANGES requires a non-empty body per GitHub API rules.
+ */
+export async function submitReview(
+  repoFullName: string,
+  prNumber: number,
+  event: ReviewEvent,
+  body?: string,
+  comments?: PendingInlineComment[]
+): Promise<void> {
+  const octokit = getOctokit();
+  if (!octokit) throw new Error("Not authenticated");
+
+  const { owner, repo } = parseOwnerRepo(repoFullName);
+
+  const { data: prData } = await octokit.pulls.get({
+    owner,
+    repo,
+    pull_number: prNumber,
+  });
+  const commitId = prData.head.sha;
+
+  const reviewComments = (comments || []).map((c) => {
+    const entry: Record<string, any> = {
+      path: c.path,
+      body: c.body,
+      line: c.line,
+      side: c.side || "RIGHT",
+    };
+    if (c.startLine && c.startLine !== c.line) {
+      entry.start_line = c.startLine;
+      entry.start_side = c.side || "RIGHT";
+    }
+    return entry;
+  });
+
+  await octokit.pulls.createReview({
+    owner,
+    repo,
+    pull_number: prNumber,
+    commit_id: commitId,
+    event,
+    body: body || undefined,
+    comments: reviewComments.length > 0 ? (reviewComments as any) : undefined,
+  });
+}
+
+/**
  * Apply a suggestion by committing the replacement text to the PR branch.
  * Fetches the file at the head branch, replaces the specified lines, and commits.
  */
