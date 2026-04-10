@@ -82,5 +82,61 @@ export function createTurndownService(): TurndownService {
     },
   });
 
+  // GFM tables. Turndown has no built-in table handling — left alone, a
+  // <table> falls through to the default element walker which extracts
+  // cell text and emits each cell as a separate paragraph. The saved file
+  // ends up as "foo\n\nbar\n\nzar\n\n..." instead of a real markdown table.
+  //
+  // This rule serializes the whole <table> subtree into a GFM-style
+  // | Header | ... |
+  // | ---    | ... |
+  // | cell   | ... |
+  // block. The children (thead/tbody/tr/td) still get walked by turndown,
+  // but we ignore their contribution (the `_content` arg) since we're
+  // rebuilding from the DOM directly.
+  turndown.addRule("gfmTable", {
+    filter: "table",
+    replacement: (_content, node) => {
+      const el = node as HTMLTableElement;
+      const rows = Array.from(el.querySelectorAll("tr"));
+      if (rows.length === 0) return "";
+
+      // Column count from the first row — use it as the canonical width and
+      // pad short rows to keep the markdown table rectangular.
+      const colCount = Math.max(
+        ...rows.map((r) => (r as HTMLTableRowElement).cells.length)
+      );
+      if (colCount === 0) return "";
+
+      const cellText = (c: HTMLTableCellElement): string => {
+        // Flatten the cell text and escape any pipes so they don't break
+        // the markdown table cell boundary. Collapse newlines to spaces —
+        // GFM tables can't contain raw newlines inside cells.
+        return (c.textContent || "")
+          .replace(/\s+/g, " ")
+          .trim()
+          .replace(/\|/g, "\\|");
+      };
+
+      const formatRow = (row: HTMLTableRowElement): string => {
+        const cells: string[] = [];
+        for (let i = 0; i < colCount; i++) {
+          const c = row.cells[i];
+          cells.push(c ? cellText(c) : "");
+        }
+        return "| " + cells.join(" | ") + " |";
+      };
+
+      const lines: string[] = [];
+      lines.push(formatRow(rows[0]));
+      lines.push("| " + Array(colCount).fill("---").join(" | ") + " |");
+      for (let i = 1; i < rows.length; i++) {
+        lines.push(formatRow(rows[i]));
+      }
+
+      return "\n\n" + lines.join("\n") + "\n\n";
+    },
+  });
+
   return turndown;
 }

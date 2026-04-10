@@ -110,13 +110,64 @@ describe("standard markdown round-trip", () => {
     expect(roundTrip("~~deleted~~")).toBe("~~deleted~~");
   });
 
-  it("preserves tables", () => {
-    const md = "| A | B |\n|---|---|\n| 1 | 2 |";
+  it("preserves table STRUCTURE, not just cell text", () => {
+    // Previous version of this test only asserted that cell text survived,
+    // which let a real bug through: Turndown with no table rule flattened
+    // <table> into separate paragraphs. Cells survived as text but the
+    // structure was gone — the saved file was six lines of "A\n\nB\n\n1..."
+    // instead of a markdown table. This version asserts the actual table
+    // syntax round-trips.
+    const md = "| A | B |\n| --- | --- |\n| 1 | 2 |";
     const result = roundTrip(md);
-    expect(result).toContain("A");
-    expect(result).toContain("B");
-    expect(result).toContain("1");
-    expect(result).toContain("2");
+    expect(result).toContain("| A | B |");
+    expect(result).toContain("| --- | --- |");
+    expect(result).toContain("| 1 | 2 |");
+  });
+
+  it("preserves a table with three columns and multiple rows", () => {
+    const md = [
+      "| Table | Name | Extra |",
+      "| --- | --- | --- |",
+      "| foo | bar | baz |",
+      "| qux | quux | corge |",
+    ].join("\n");
+    const result = roundTrip(md);
+    expect(result).toContain("| Table | Name | Extra |");
+    expect(result).toContain("| --- | --- | --- |");
+    expect(result).toContain("| foo | bar | baz |");
+    expect(result).toContain("| qux | quux | corge |");
+  });
+
+  it("escapes pipe characters inside cells", () => {
+    // A cell containing `a | b` would break the table if not escaped.
+    const html = "<table><thead><tr><th>x</th></tr></thead><tbody><tr><td>a | b</td></tr></tbody></table>";
+    const turndown = createTurndownService();
+    const result = turndown.turndown(html);
+    // The escaped pipe should be present in some form: \|
+    expect(result).toContain("\\|");
+  });
+
+  it("REGRESSION: table directly from TipTap Table extension HTML", () => {
+    // TipTap's Table extension emits this shape. Previously this flattened
+    // to "Table\n\nName\n\nfoo\n\nbar\n\nbar\n\nzar" — the exact bug the
+    // user reported (each cell became its own Added diff block).
+    const tiptapHtml =
+      '<table class="markdoc-table"><tbody>' +
+      "<tr><th><p>Table</p></th><th><p>Name</p></th></tr>" +
+      "<tr><td><p>foo</p></td><td><p>bar</p></td></tr>" +
+      "<tr><td><p>bar</p></td><td><p>zar</p></td></tr>" +
+      "</tbody></table>";
+    const turndown = createTurndownService();
+    const result = turndown.turndown(tiptapHtml).trim();
+    expect(result).toContain("| Table | Name |");
+    expect(result).toContain("| --- | --- |");
+    expect(result).toContain("| foo | bar |");
+    expect(result).toContain("| bar | zar |");
+  });
+
+  it("empty table returns empty string", () => {
+    const turndown = createTurndownService();
+    expect(turndown.turndown("<table></table>").trim()).toBe("");
   });
 
   it("preserves task lists", () => {
