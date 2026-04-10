@@ -87,6 +87,29 @@ body {
 .ProseMirror h2 { font-size: 1.5em; font-weight: 600; margin: 0.8em 0 0.4em; }
 .ProseMirror h3 { font-size: 1.25em; font-weight: 600; margin: 0.6em 0 0.3em; }
 
+/* Diff content is rendered markdown — delegate typography to the Tailwind
+ * typography plugin so every element (headings, paragraphs, links, bold,
+ * blockquotes, hr, etc.) inherits the correct styling in one place rather
+ * than requiring per-element overrides. Tailwind's preflight strips the
+ * defaults off headings/lists/etc, and the typography plugin is the only
+ * systematic way to restore them for dynamically-rendered markdown.
+ *
+ * Custom overrides below this block (tables, code blocks, diff-added /
+ * diff-removed backgrounds) take precedence over prose defaults. */
+.diff-content {
+  @apply prose prose-sm dark:prose-invert max-w-none;
+}
+
+/* Neutralize prose defaults that conflict with our per-block diff styling —
+ * prose adds vertical margin and borders to pre/blockquote that fight with
+ * the block-level diff containers. */
+.diff-content > *:first-child {
+  margin-top: 0;
+}
+.diff-content > *:last-child {
+  margin-bottom: 0;
+}
+
 .ProseMirror ul {
   list-style-type: disc;
   padding-left: 1.5em;
