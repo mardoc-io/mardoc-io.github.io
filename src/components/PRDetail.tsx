@@ -67,26 +67,53 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     }
   }, [prComments, comments.length]);
 
-  // Poll for new comments every 30s when authenticated. Merge rather than
-  // replace — pending locally-queued comments (not yet submitted) must survive
-  // the poll or the reviewer loses their in-progress review.
+  // Merge fresh comments from GitHub with local state, preserving any pending
+  // (locally-queued, not-yet-submitted) comments. Dedupes by id so an
+  // optimistic local entry and its fresh GitHub counterpart never render as
+  // two separate cards in the sidebar — fresh always wins for the same id.
+  const mergeFresh = useCallback((prev: PRComment[], fresh: PRComment[]): PRComment[] => {
+    const byId = new Map<string, PRComment>();
+    for (const c of fresh) byId.set(c.id, c);
+    for (const c of prev) {
+      if (c.pending && !byId.has(c.id)) {
+        byId.set(c.id, c);
+      }
+    }
+    return Array.from(byId.values());
+  }, []);
+
+  // Refetch comments from GitHub and merge into local state. Used by the 30s
+  // poll and the post-write propagation retries.
+  const refreshFromGitHub = useCallback(async () => {
+    if (isDemoMode || !currentRepo || !pr.number) return;
+    try {
+      const fresh = await fetchPRComments(currentRepo, pr.number);
+      setComments((prev) => mergeFresh(prev, fresh));
+    } catch {
+      // Silently skip — the next poll or retry will catch up.
+    }
+  }, [isDemoMode, currentRepo, pr.number, mergeFresh]);
+
+  // GitHub's read APIs lag its write APIs by 1–5 seconds in practice. After
+  // any write (review submit, reply, add-general-comment), schedule a handful
+  // of refetches at increasing delays to ride out propagation without waiting
+  // 30s for the background poll.
+  const scheduleRefreshHedge = useCallback(() => {
+    for (const delay of [1500, 4000, 8000]) {
+      setTimeout(() => {
+        void refreshFromGitHub();
+      }, delay);
+    }
+  }, [refreshFromGitHub]);
+
+  // Poll for new comments every 30s when authenticated.
   useEffect(() => {
     if (isDemoMode || !currentRepo || !pr.number) return;
-
-    const poll = setInterval(async () => {
-      try {
-        const fresh = await fetchPRComments(currentRepo, pr.number);
-        setComments((prev) => {
-          const pending = prev.filter((c) => c.pending);
-          return [...fresh, ...pending];
-        });
-      } catch {
-        // Silently skip — next poll will retry
-      }
+    const poll = setInterval(() => {
+      void refreshFromGitHub();
     }, 30_000);
-
     return () => clearInterval(poll);
-  }, [isDemoMode, currentRepo, pr.number]);
+  }, [isDemoMode, currentRepo, pr.number, refreshFromGitHub]);
 
   const selectedFile = prFiles[selectedPRFileIdx];
 
@@ -134,15 +161,17 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
       try {
         const fullBody = `**${file.path}**\n\n${body}`;
         await createPRComment(currentRepo || "", pr.number, fullBody);
-        // Drop the pending marker — this one is already posted.
-        setComments((prev) =>
-          prev.map((c) => (c.id === newComment.id ? { ...c, pending: false } : c))
-        );
+        // Drop the local optimistic copy — the hedged refetch below will
+        // bring the real one back from GitHub. Leaving the optimistic copy
+        // around (as pending: false) would create a transient duplicate in
+        // the sidebar until the next merge swapped it out.
+        setComments((prev) => prev.filter((c) => c.id !== newComment.id));
+        scheduleRefreshHedge();
       } catch (err) {
         console.error("Failed to post general PR comment:", err);
       }
     }
-  }, [currentRepo, isDemoMode, pr.number, prFiles, selectedPRFileIdx]);
+  }, [currentRepo, isDemoMode, pr.number, prFiles, selectedPRFileIdx, scheduleRefreshHedge]);
 
   // Collect pending line-scoped comments into the shape submitReview expects.
   const collectPendingInlineComments = useCallback((): PendingInlineComment[] => {
@@ -227,18 +256,11 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
         );
       }
 
-      // Trigger an immediate refresh so the posted comments show up without
-      // waiting for the 30s poll. Preserve any pending comments that the user
-      // added mid-refresh — matches the poll merge strategy.
-      try {
-        const fresh = await fetchPRComments(currentRepo, pr.number);
-        setComments((prev) => {
-          const pending = prev.filter((c) => c.pending);
-          return [...fresh, ...pending];
-        });
-      } catch {
-        // Next poll will catch up.
-      }
+      // Refetch once now for the happy path, then hedge with additional
+      // refetches at increasing delays so the new comments reliably appear
+      // even when GitHub's read API lags the write API.
+      await refreshFromGitHub();
+      scheduleRefreshHedge();
     } catch (err) {
       console.error("Failed to submit review:", err);
       setReviewError(
@@ -254,6 +276,8 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     pr.number,
     reviewBody,
     reviewEvent,
+    refreshFromGitHub,
+    scheduleRefreshHedge,
   ]);
 
   const handleDiscardPending = useCallback((commentId: string) => {
@@ -280,41 +304,60 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
 
   const handleReplyComment = useCallback(async (commentId: string, body: string) => {
     const comment = comments.find((c) => c.id === commentId);
+    if (!comment) return;
 
-    // Optimistic local update
-    const localReply = {
-      id: `r-${Date.now()}`,
-      author: "you",
-      avatarColor: "#2a9d8f",
-      body,
-      createdAt: new Date().toISOString(),
-    };
-    setComments((prev) =>
-      prev.map((c) =>
-        c.id === commentId
-          ? { ...c, replies: [...c.replies, localReply] }
-          : c
-      )
-    );
+    // `rc-*` ids are review comments (support proper threaded replies).
+    // `ic-*` ids are top-level issue comments — GitHub's issue comment API
+    // doesn't support nested replies, so we post a new top-level issue
+    // comment with context instead and skip the nested optimistic UI.
+    const isReviewComment = comment.id.startsWith("rc-");
 
-    // Post to GitHub if authenticated and comment has a GitHub ID
-    if (!isDemoMode && currentRepo && pr.number && comment?.githubId) {
-      try {
+    // Demo mode and review comments get an optimistic nested reply so the
+    // user sees their message immediately. Issue-comment replies can't nest
+    // on GitHub, so we skip the optimistic update there — the hedge refetch
+    // will bring the new top-level comment back in the sidebar.
+    if (isDemoMode || isReviewComment) {
+      const localReply = {
+        id: `r-${Date.now()}`,
+        author: "you",
+        avatarColor: "#2a9d8f",
+        body,
+        createdAt: new Date().toISOString(),
+      };
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId
+            ? { ...c, replies: [...c.replies, localReply] }
+            : c
+        )
+      );
+    }
+
+    if (isDemoMode || !currentRepo || !pr.number) return;
+
+    try {
+      if (isReviewComment && comment.githubId) {
         await replyToReviewComment(currentRepo, pr.number, comment.githubId, body);
-      } catch (err) {
-        console.error("Failed to post reply to GitHub:", err);
-        // Fall back to a general PR comment with context
-        try {
-          const fallbackBody = comment.selectedText
-            ? `> _Re: "${comment.selectedText}"_\n\n${body}`
-            : body;
-          await createPRComment(currentRepo, pr.number, fallbackBody);
-        } catch (fallbackErr) {
-          console.error("Fallback reply also failed:", fallbackErr);
-        }
+      } else {
+        // Issue comment or unknown parent — post a new top-level issue comment
+        // carrying a quote of the original so the connection is obvious.
+        const contextBody = comment.selectedText
+          ? `> _Re: "${comment.selectedText}"_\n\n${body}`
+          : `> _Re:_ ${comment.body.split("\n")[0].slice(0, 80)}\n\n${body}`;
+        await createPRComment(currentRepo, pr.number, contextBody);
+      }
+      scheduleRefreshHedge();
+    } catch (err) {
+      console.error("Failed to post reply to GitHub:", err);
+      // Final fallback — post any payload we can so the feedback isn't lost.
+      try {
+        await createPRComment(currentRepo, pr.number, body);
+        scheduleRefreshHedge();
+      } catch (fallbackErr) {
+        console.error("Fallback reply also failed:", fallbackErr);
       }
     }
-  }, [comments, isDemoMode, currentRepo, pr.number]);
+  }, [comments, isDemoMode, currentRepo, pr.number, scheduleRefreshHedge]);
 
   // Suggestions queue into the same pending-review bundle as regular comments
   // so hitting "Finish review" posts one notification instead of N.
