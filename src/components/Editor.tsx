@@ -67,6 +67,7 @@ import {
   Image as ImageIcon,
   Highlighter,
   FileCode,
+  Braces,
   MessageSquarePlus,
   MessageSquare,
   Send,
@@ -1061,14 +1062,16 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         }
         refreshRepo();
       } else {
-        // Create a new PR
-        if (!newFileTitle.trim()) return;
+        // Create a new PR. Fall back to "Add <path>" when the user leaves the
+        // title blank — the modal already shows this as a placeholder, so
+        // using it as the real title matches the visible intent.
+        const title = newFileTitle.trim() || `Add ${path}`;
 
         const pr = await createFileAsPR(
           repoFullName,
           path,
           markdown,
-          newFileTitle,
+          title,
         );
 
         setSubmittedPR(pr);
@@ -1466,10 +1469,15 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
             )}
             <button
               onClick={toggleCodeView}
-              className={`toolbar-btn ${codeView ? "active" : ""}`}
-              title={codeView ? "Rich view" : "Code view"}
+              className={`flex items-center gap-1 px-2 py-1 text-[11px] rounded-md transition-colors ${
+                codeView
+                  ? "bg-[var(--accent-muted)] text-[var(--accent)] font-medium"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
+              }`}
+              title={codeView ? "Switch back to rich editor" : "Edit raw markdown"}
             >
-              <FileCode size={15} />
+              <Braces size={13} />
+              {codeView ? "Rich" : "Code"}
             </button>
             <button
               onClick={toggleWide}
@@ -1783,7 +1791,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
               </button>
               <button
                 onClick={handleSaveNewFile}
-                disabled={savingNewFile || !newFilePath.trim() || (!isAddingToPR && !newFileTitle.trim()) || isDemoMode}
+                disabled={savingNewFile || !newFilePath.trim() || isDemoMode}
                 className="flex items-center gap-1.5 text-xs px-4 py-1.5 bg-[var(--accent)] text-white rounded-md hover:bg-[var(--accent-hover)] disabled:opacity-40 transition-colors"
               >
                 {savingNewFile ? (
