@@ -37,7 +37,12 @@ const Image = BaseImage.extend({
 });
 
 import { rewriteImageUrls, loadAuthenticatedImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent, createFileAsPR, commitFileToPRBranch } from "@/lib/github-api";
-import { saveDraft, loadDraft, clearDraft, formatRelativeSavedAt } from "@/lib/draft-store";
+import {
+  clearDraft,
+  formatRelativeSavedAt,
+  reconcileDraft,
+  resolveDraftOnLoad,
+} from "@/lib/draft-store";
 import { classifyLink, resolvePath, findFileByPath } from "@/lib/link-handler";
 import { useApp } from "@/lib/app-context";
 import { openExternal } from "@/lib/open-external";
@@ -677,6 +682,26 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       setEditorIsDirty(false);
     };
   }, [isDirty, setEditorIsDirty]);
+
+  // The TipTap onUpdate handler captures closures ONCE at useEditor time — it
+  // doesn't re-bind when props (filePath, repoFullName, branch, isNewFile)
+  // change. Without this ref, autosave would keep writing drafts to the key
+  // of the first file opened even after the user switches files. Updating
+  // this ref on every render keeps onUpdate looking at current props.
+  const draftScopeRef = useRef({
+    repoFullName,
+    branch,
+    filePath,
+    isNewFile,
+    isLocalFile,
+  });
+  draftScopeRef.current = {
+    repoFullName,
+    branch,
+    filePath,
+    isNewFile,
+    isLocalFile,
+  };
   const [showEditPRModal, setShowEditPRModal] = useState(false);
   const [editPRTitle, setEditPRTitle] = useState("");
   const [showNewFileModal, setShowNewFileModal] = useState(false);
@@ -713,23 +738,19 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     content: markdownToHtml(content, repoFullName, branch, filePath),
     onUpdate: ({ editor }) => {
       onContentChange?.(editor.getHTML());
-      if (!isNewFile && originalMarkdownRef.current !== null) {
-        // Debounce the Turndown comparison to avoid running on every keystroke.
-        // Autosave piggybacks on the same debounce — one Turndown pass per tick.
-        if (dirtyCheckTimer.current) clearTimeout(dirtyCheckTimer.current);
-        dirtyCheckTimer.current = setTimeout(() => {
-          const turndown = createTurndownService();
-          const currentMd = turndown.turndown(editor.getHTML());
-          const dirty = currentMd !== originalMarkdownRef.current;
-          setIsDirty(dirty);
-          if (dirty) {
-            saveDraft(repoFullName, branch, filePath, currentMd);
-          } else {
-            // Edits undone back to upstream — the draft is no longer useful.
-            clearDraft(repoFullName, branch, filePath);
-          }
-        }, 300);
-      }
+      // Debounce the Turndown comparison to avoid running on every keystroke.
+      // reconcileDraft encapsulates the autosave decision — tested in
+      // draft-store.test.ts. Scope comes from a ref because onUpdate captures
+      // closures ONCE at useEditor creation time and would otherwise go stale
+      // on file switches.
+      if (dirtyCheckTimer.current) clearTimeout(dirtyCheckTimer.current);
+      dirtyCheckTimer.current = setTimeout(() => {
+        const scope = draftScopeRef.current;
+        const turndown = createTurndownService();
+        const currentMd = turndown.turndown(editor.getHTML());
+        const { dirty } = reconcileDraft(scope, originalMarkdownRef.current, currentMd);
+        setIsDirty(dirty);
+      }, 300);
     },
     editorProps: {
       attributes: {
@@ -754,17 +775,15 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
           originalMarkdownRef.current = turndown.turndown(editor.getHTML());
 
           // Check for a locally-saved draft that differs from upstream — if
-          // found, offer to restore it. Skip for new files (they store their
-          // own unsaved content) and local-only files.
-          if (!isNewFile && !isLocalFile) {
-            const draft = loadDraft(repoFullName, branch, filePath);
-            if (draft && draft.markdown !== originalMarkdownRef.current) {
-              setDraftPrompt({ markdown: draft.markdown, savedAt: draft.savedAt });
-            } else if (draft) {
-              // Draft matches upstream — nothing to restore, clear the stale
-              // copy so we don't re-prompt forever.
-              clearDraft(repoFullName, branch, filePath);
-            }
+          // found, offer to restore it. resolveDraftOnLoad handles the
+          // new-file / local-file skip and the "draft matches upstream"
+          // cleanup in one place. Tested in draft-store.test.ts.
+          const draft = resolveDraftOnLoad(
+            { repoFullName, branch, filePath, isNewFile, isLocalFile },
+            originalMarkdownRef.current
+          );
+          if (draft) {
+            setDraftPrompt({ markdown: draft.markdown, savedAt: draft.savedAt });
           }
 
           // Fetch private repo images after TipTap renders
@@ -1586,12 +1605,12 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
                 onChange={(e) => {
                   const next = e.target.value;
                   setCodeContent(next);
-                  const dirty = next !== originalMarkdownRef.current;
+                  const { dirty } = reconcileDraft(
+                    draftScopeRef.current,
+                    originalMarkdownRef.current,
+                    next
+                  );
                   setIsDirty(dirty);
-                  if (!isNewFile && !isLocalFile) {
-                    if (dirty) saveDraft(repoFullName, branch, filePath, next);
-                    else clearDraft(repoFullName, branch, filePath);
-                  }
                 }}
                 onKeyDown={handleCodeViewKeyDown}
                 className="w-full min-h-[60vh] p-4 font-mono text-sm leading-relaxed bg-[var(--surface-secondary)] text-[var(--text-primary)] border border-[var(--border)] rounded-lg resize-y focus:outline-none focus:border-[var(--accent)]"
