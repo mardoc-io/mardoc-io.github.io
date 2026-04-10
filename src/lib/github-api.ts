@@ -25,6 +25,32 @@ function parseOwnerRepo(repo: string): { owner: string; repo: string } {
   return { owner, repo: repoName };
 }
 
+// ─── UTF-8 safe base64 helpers ────────────────────────────────────────────
+//
+// The browser btoa/atob built-ins only speak Latin-1, so passing any string
+// with characters above U+00FF (emoji, em-dashes, CJK, accented letters, …)
+// throws "The string to be encoded contains characters outside of the Latin1
+// range." Every file body we send to or receive from the GitHub content API
+// needs to round-trip through UTF-8 bytes first.
+
+function utf8ToBase64(s: string): string {
+  const bytes = new TextEncoder().encode(s);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToUtf8(b64: string): string {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
 // ─── Repository Metadata ──────────────────────────────────────────────────
 
 export async function fetchDefaultBranch(repoFullName: string): Promise<string> {
@@ -172,13 +198,7 @@ export async function fetchFileContent(
     });
 
     if ("content" in data && data.encoding === "base64") {
-      // Properly decode base64 → UTF-8 (atob only handles Latin-1, mangling multi-byte chars)
-      const binaryStr = atob(data.content);
-      const bytes = new Uint8Array(binaryStr.length);
-      for (let i = 0; i < binaryStr.length; i++) {
-        bytes[i] = binaryStr.charCodeAt(i);
-      }
-      return new TextDecoder("utf-8").decode(bytes);
+      return base64ToUtf8(data.content);
     }
 
     throw new Error("Unexpected response format");
@@ -623,6 +643,82 @@ export async function submitReview(
 }
 
 /**
+ * Submit a review with graceful fallback for out-of-hunk comments.
+ *
+ * GitHub's pulls.createReview requires every inline comment's `line` to sit
+ * inside a diff hunk on that file. A single unresolvable line rejects the
+ * whole review ("Unprocessable Entity: Line could not be resolved").
+ *
+ * We try the batched path first. On a 422 that looks like a line-resolution
+ * error, fall back to posting each comment individually:
+ *   1. createInlineComment for each — succeeds for in-hunk lines.
+ *   2. On per-comment failure, post it as a general PR issue comment with the
+ *      file + line context baked into the body so the feedback isn't lost.
+ *   3. Finally submit the review event (APPROVE / REQUEST_CHANGES) with no
+ *      comments. For COMMENT the individual comments are the review.
+ *
+ * Returns the count of comments that had to fall back to general PR comments,
+ * so the caller can surface a warning.
+ */
+export async function submitReviewBatched(
+  repoFullName: string,
+  prNumber: number,
+  event: ReviewEvent,
+  body: string | undefined,
+  comments: PendingInlineComment[]
+): Promise<{ unresolvedCount: number }> {
+  try {
+    await submitReview(repoFullName, prNumber, event, body, comments);
+    return { unresolvedCount: 0 };
+  } catch (err: any) {
+    const status = err?.status ?? err?.response?.status;
+    const message = String(err?.message || "").toLowerCase();
+    const looksLikeLineResolution =
+      status === 422 &&
+      (message.includes("could not be resolved") ||
+        message.includes("pull_request_review_thread.line"));
+    if (!looksLikeLineResolution) {
+      throw err;
+    }
+  }
+
+  let unresolvedCount = 0;
+  for (const c of comments) {
+    try {
+      await createInlineComment(
+        repoFullName,
+        prNumber,
+        c.body,
+        c.path,
+        c.line,
+        c.startLine,
+        c.side || "RIGHT"
+      );
+    } catch {
+      unresolvedCount++;
+      const range =
+        c.startLine && c.startLine !== c.line
+          ? ` (L${c.startLine}-L${c.line})`
+          : ` (L${c.line})`;
+      const contextBody = `**${c.path}**${range}\n\n${c.body}`;
+      try {
+        await createPRComment(repoFullName, prNumber, contextBody);
+      } catch {
+        // Give up silently on this one — at least the others posted.
+      }
+    }
+  }
+
+  if (event !== "COMMENT") {
+    // Record the approval / change-request state even though the comments
+    // were posted outside the review envelope.
+    await submitReview(repoFullName, prNumber, event, body, []);
+  }
+
+  return { unresolvedCount };
+}
+
+/**
  * Apply a suggestion by committing the replacement text to the PR branch.
  * Fetches the file at the head branch, replaces the specified lines, and commits.
  */
@@ -651,13 +747,7 @@ export async function applySuggestion(
     throw new Error("Unexpected response format");
   }
 
-  // Decode file content
-  const binaryStr = atob(data.content);
-  const bytes = new Uint8Array(binaryStr.length);
-  for (let i = 0; i < binaryStr.length; i++) {
-    bytes[i] = binaryStr.charCodeAt(i);
-  }
-  const currentContent = new TextDecoder("utf-8").decode(bytes);
+  const currentContent = base64ToUtf8(data.content);
 
   // Replace the specified lines with the suggestion text
   const lines = currentContent.split("\n");
@@ -665,20 +755,12 @@ export async function applySuggestion(
   const after = lines.slice(endLine);
   const newContent = [...before, replacementText, ...after].join("\n");
 
-  // Encode and commit
-  const contentBytes = new TextEncoder().encode(newContent);
-  let binaryString = "";
-  for (let i = 0; i < contentBytes.length; i++) {
-    binaryString += String.fromCharCode(contentBytes[i]);
-  }
-  const encoded = btoa(binaryString);
-
   await octokit.repos.createOrUpdateFileContents({
     owner,
     repo,
     path: filePath,
     message: "Apply suggestion from review",
-    content: encoded,
+    content: utf8ToBase64(newContent),
     sha: data.sha,
     branch: headBranch,
   });
@@ -820,7 +902,7 @@ export async function createReviewPR(
     repo,
     path: filePath,
     message: `review: ${title}`,
-    content: btoa(updatedContent),
+    content: utf8ToBase64(updatedContent),
     branch: branchName,
     sha: ((
       await octokit.repos.getContent({ owner, repo, path: filePath, ref: defaultBranch })
@@ -876,21 +958,13 @@ export async function createFileAsPR(
     sha: ref.object.sha,
   });
 
-  // Encode content for the GitHub API
-  const contentBytes = new TextEncoder().encode(content);
-  let binaryString = "";
-  for (let i = 0; i < contentBytes.length; i++) {
-    binaryString += String.fromCharCode(contentBytes[i]);
-  }
-  const encoded = btoa(binaryString);
-
   // Commit the new file
   await octokit.repos.createOrUpdateFileContents({
     owner,
     repo,
     path: filePath,
     message: `docs: add ${filePath}`,
-    content: encoded,
+    content: utf8ToBase64(content),
     branch: branchName,
   });
 
@@ -922,19 +996,12 @@ export async function commitFileToPRBranch(
 
   const { owner, repo } = parseOwnerRepo(repoFullName);
 
-  const contentBytes = new TextEncoder().encode(content);
-  let binaryString = "";
-  for (let i = 0; i < contentBytes.length; i++) {
-    binaryString += String.fromCharCode(contentBytes[i]);
-  }
-  const encoded = btoa(binaryString);
-
   await octokit.repos.createOrUpdateFileContents({
     owner,
     repo,
     path: filePath,
     message,
-    content: encoded,
+    content: utf8ToBase64(content),
     branch,
   });
 }
