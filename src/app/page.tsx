@@ -138,9 +138,7 @@ export default function Home() {
               />
             )
           ) : currentView === "pr-review" ? (
-            <PRReview
-              onCreatePR={() => {}}
-            />
+            <PRReview />
           ) : (
             /* Welcome screen */
             <div className="h-full flex items-center justify-center">

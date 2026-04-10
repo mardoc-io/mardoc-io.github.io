@@ -1,57 +1,78 @@
 "use client";
 
-import React, { useState } from "react";
-import { GitPullRequest, Send } from "lucide-react";
-import { repoFiles, flattenFiles } from "@/lib/mock-data";
+import React, { useMemo, useState } from "react";
+import { GitPullRequest, Send, Loader2, AlertCircle } from "lucide-react";
+import { flattenFiles } from "@/lib/mock-data";
+import { useApp } from "@/lib/app-context";
+import { createReviewPR } from "@/lib/github-api";
+import { isMarkdownFile } from "@/lib/file-types";
 
-interface PRReviewProps {
-  onCreatePR: (title: string, description: string, filePath: string) => void;
-}
+export default function PRReview() {
+  const { currentRepo, isDemoMode, repoFiles, refreshRepo, openPR, pullRequests } = useApp();
 
-export default function PRReview({ onCreatePR }: PRReviewProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const allFiles = flattenFiles(repoFiles);
+  // Flatten the live repo tree to a flat list of markdown files. In demo mode
+  // this falls back to the mock file list so the screen still works without a
+  // token.
+  const allFiles = useMemo(() => {
+    return flattenFiles(repoFiles).filter((f) => isMarkdownFile(f.name));
+  }, [repoFiles]);
 
-  const handleSubmit = () => {
-    if (title.trim() && selectedFile) {
-      onCreatePR(title, description, selectedFile);
-      setSubmitted(true);
+  const canSubmit = title.trim().length > 0 && selectedFile.length > 0 && !submitting;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setError(null);
+
+    if (isDemoMode || !currentRepo) {
+      setError(
+        isDemoMode
+          ? "Connect a GitHub token in Settings to create a review PR."
+          : "No repository selected."
+      );
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const pr = await createReviewPR(currentRepo, title, description, selectedFile);
+      // Refresh the PR list so the new one appears in the sidebar, then
+      // navigate to it. We look it up by number after refresh so PRDetail gets
+      // a fully-populated PullRequest object (files, comments, etc. load lazily).
+      await refreshRepo();
+      // refreshRepo reloads pullRequests; find the one we just made. If it's
+      // not in the refreshed list yet (eventual consistency), fall back to a
+      // stub so the user still lands on something useful.
+      const fresh = pullRequests.find((p) => p.number === pr.number);
+      if (fresh) {
+        openPR(fresh);
+      } else {
+        // Minimal stub — openPR will fetch files + comments from GitHub.
+        openPR({
+          id: `pr-${pr.number}`,
+          number: pr.number,
+          title: `[Review] ${title}`,
+          author: "you",
+          status: "open",
+          createdAt: new Date().toISOString(),
+          baseBranch: "main",
+          headBranch: `review/${pr.number}`,
+          files: [],
+          comments: [],
+          description: description || `Review discussion for \`${selectedFile}\``,
+        });
+      }
+    } catch (err: any) {
+      setError(err?.message || "Failed to create review PR");
+    } finally {
+      setSubmitting(false);
     }
   };
-
-  if (submitted) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
-            <GitPullRequest size={28} className="text-green-600 dark:text-green-400" />
-          </div>
-          <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-2">
-            Review PR Created!
-          </h2>
-          <p className="text-sm text-[var(--text-secondary)] mb-1">
-            <strong>#{Math.floor(Math.random() * 50 + 44)}</strong> — {title}
-          </p>
-          <p className="text-xs text-[var(--text-muted)]">
-            A PR has been created for review discussion on{" "}
-            <span className="font-mono">{selectedFile}</span>, even though no
-            file changes were made. Reviewers can now comment on the rendered
-            document.
-          </p>
-          <button
-            onClick={() => setSubmitted(false)}
-            className="mt-4 text-sm text-[var(--accent)] hover:underline"
-          >
-            Create another review
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="h-full overflow-y-auto">
@@ -79,9 +100,14 @@ export default function PRReview({ onCreatePR }: PRReviewProps) {
             <select
               value={selectedFile}
               onChange={(e) => setSelectedFile(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-colors"
+              disabled={submitting}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-colors disabled:opacity-50"
             >
-              <option value="">Select a file...</option>
+              <option value="">
+                {allFiles.length === 0
+                  ? "No markdown files found in this repo"
+                  : "Select a file..."}
+              </option>
               {allFiles.map((f) => (
                 <option key={f.id} value={f.path}>
                   {f.path}
@@ -100,7 +126,8 @@ export default function PRReview({ onCreatePR }: PRReviewProps) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Review: API reference accuracy check"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors"
+              disabled={submitting}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors disabled:opacity-50"
             />
           </div>
 
@@ -114,7 +141,8 @@ export default function PRReview({ onCreatePR }: PRReviewProps) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What should reviewers focus on?"
               rows={4}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors resize-none"
+              disabled={submitting}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors resize-none disabled:opacity-50"
             />
           </div>
 
@@ -128,14 +156,31 @@ export default function PRReview({ onCreatePR }: PRReviewProps) {
             </p>
           </div>
 
+          {/* Error */}
+          {error && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <AlertCircle size={14} className="text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-red-700 dark:text-red-400">{error}</p>
+            </div>
+          )}
+
           {/* Submit */}
           <button
             onClick={handleSubmit}
-            disabled={!title.trim() || !selectedFile}
+            disabled={!canSubmit}
             className="flex items-center gap-2 px-5 py-2.5 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Send size={14} />
-            Create Review PR
+            {submitting ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Send size={14} />
+                Create Review PR
+              </>
+            )}
           </button>
         </div>
       </div>
