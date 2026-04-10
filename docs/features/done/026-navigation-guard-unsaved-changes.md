@@ -6,10 +6,10 @@ Users can lose edits by clicking a different file or PR with no warning. There's
 
 ## Acceptance Criteria
 
-- [ ] Visual indicator (dot, badge, or color change) on the file breadcrumb when the document is dirty
-- [ ] Confirmation prompt before navigating away from a dirty document (file click, PR click, branch change)
-- [ ] Browser `beforeunload` event warns when closing the tab with unsaved changes
-- [ ] In VS Code embed mode, use inline confirmation (not `window.confirm`)
+- [x] Visual indicator (dot, badge, or color change) on the file breadcrumb when the document is dirty
+- [x] Confirmation prompt before navigating away from a dirty document (file click, PR click, branch change)
+- [x] Browser `beforeunload` event warns when closing the tab with unsaved changes
+- [x] In VS Code embed mode, use inline confirmation (not `window.confirm`)
 
 ## Dependencies
 
