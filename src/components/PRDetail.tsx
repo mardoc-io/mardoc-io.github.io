@@ -20,7 +20,7 @@ import {
   resolveReviewThread,
   applySuggestion,
   mapSelectionToLines,
-  submitReview,
+  submitReviewBatched,
   type PendingInlineComment,
   type ReviewEvent,
 } from "@/lib/github-api";
@@ -67,14 +67,19 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     }
   }, [prComments, comments.length]);
 
-  // Poll for new comments every 30s when authenticated
+  // Poll for new comments every 30s when authenticated. Merge rather than
+  // replace — pending locally-queued comments (not yet submitted) must survive
+  // the poll or the reviewer loses their in-progress review.
   useEffect(() => {
     if (isDemoMode || !currentRepo || !pr.number) return;
 
     const poll = setInterval(async () => {
       try {
         const fresh = await fetchPRComments(currentRepo, pr.number);
-        setComments(fresh);
+        setComments((prev) => {
+          const pending = prev.filter((c) => c.pending);
+          return [...fresh, ...pending];
+        });
       } catch {
         // Silently skip — next poll will retry
       }
@@ -194,7 +199,7 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     setSubmittingReview(true);
     try {
       const inlineComments = collectPendingInlineComments();
-      await submitReview(
+      const { unresolvedCount } = await submitReviewBatched(
         currentRepo,
         pr.number,
         reviewEvent,
@@ -212,11 +217,25 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
 
       setReviewModalOpen(false);
 
+      // Surface a soft warning (not an error) so the reviewer knows some
+      // comments ended up as general PR comments instead of inline review
+      // threads. This is the graceful-fallback signal from submitReviewBatched.
+      if (unresolvedCount > 0) {
+        const word = unresolvedCount === 1 ? "comment" : "comments";
+        console.warn(
+          `${unresolvedCount} ${word} could not be tied to specific lines in the PR diff and were posted as general PR comments.`
+        );
+      }
+
       // Trigger an immediate refresh so the posted comments show up without
-      // waiting for the 30s poll.
+      // waiting for the 30s poll. Preserve any pending comments that the user
+      // added mid-refresh — matches the poll merge strategy.
       try {
         const fresh = await fetchPRComments(currentRepo, pr.number);
-        setComments(fresh);
+        setComments((prev) => {
+          const pending = prev.filter((c) => c.pending);
+          return [...fresh, ...pending];
+        });
       } catch {
         // Next poll will catch up.
       }
