@@ -37,6 +37,7 @@ const Image = BaseImage.extend({
 });
 
 import { rewriteImageUrls, loadAuthenticatedImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent, createFileAsPR, commitFileToPRBranch } from "@/lib/github-api";
+import { saveDraft, loadDraft, clearDraft, formatRelativeSavedAt } from "@/lib/draft-store";
 import { classifyLink, resolvePath, findFileByPath } from "@/lib/link-handler";
 import { useApp } from "@/lib/app-context";
 import { openExternal } from "@/lib/open-external";
@@ -626,7 +627,7 @@ function CommentSidePanel({
 
 export default function Editor({ content, onContentChange, filePath, repoFullName, branch }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
-  const { isDemoMode, isEmbedded, refreshRepo, prBranchForNewFile, prNumberForNewFile, openPR, pullRequests, repoFiles, openFile } = useApp();
+  const { isDemoMode, isEmbedded, refreshRepo, prBranchForNewFile, prNumberForNewFile, openPR, pullRequests, repoFiles, openFile, setEditorIsDirty } = useApp();
   const { wide, toggle: toggleWide, contentClass } = useWideFormat();
   const [comments, setComments] = useState<EditorComment[]>([]);
   const [showComments, setShowComments] = useState(false);
@@ -654,6 +655,28 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   const [isDirty, setIsDirty] = useState(false);
   const originalMarkdownRef = useRef<string | null>(null);
   const dirtyCheckTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Draft autosave — a locally-saved copy of unsaved edits so a browser refresh
+  // doesn't lose work. The restore prompt is shown only when a draft exists
+  // that differs from the upstream content on file open.
+  const [draftPrompt, setDraftPrompt] = useState<
+    { markdown: string; savedAt: number } | null
+  >(null);
+  // Remember the raw upstream markdown for this file so "discard draft" can
+  // restore the editor without re-fetching.
+  const upstreamMarkdownRef = useRef<string>("");
+
+  // Mirror dirty state into AppContext so the global nav guard can intercept
+  // file/PR/branch switches when there's unsaved work.
+  useEffect(() => {
+    setEditorIsDirty(isDirty);
+    return () => {
+      // When the editor unmounts (view switch), clear the global flag — the
+      // unmount itself happens after the user has already discarded edits or
+      // committed them.
+      setEditorIsDirty(false);
+    };
+  }, [isDirty, setEditorIsDirty]);
   const [showEditPRModal, setShowEditPRModal] = useState(false);
   const [editPRTitle, setEditPRTitle] = useState("");
   const [showNewFileModal, setShowNewFileModal] = useState(false);
@@ -691,12 +714,20 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     onUpdate: ({ editor }) => {
       onContentChange?.(editor.getHTML());
       if (!isNewFile && originalMarkdownRef.current !== null) {
-        // Debounce the Turndown comparison to avoid running on every keystroke
+        // Debounce the Turndown comparison to avoid running on every keystroke.
+        // Autosave piggybacks on the same debounce — one Turndown pass per tick.
         if (dirtyCheckTimer.current) clearTimeout(dirtyCheckTimer.current);
         dirtyCheckTimer.current = setTimeout(() => {
           const turndown = createTurndownService();
           const currentMd = turndown.turndown(editor.getHTML());
-          setIsDirty(currentMd !== originalMarkdownRef.current);
+          const dirty = currentMd !== originalMarkdownRef.current;
+          setIsDirty(dirty);
+          if (dirty) {
+            saveDraft(repoFullName, branch, filePath, currentMd);
+          } else {
+            // Edits undone back to upstream — the draft is no longer useful.
+            clearDraft(repoFullName, branch, filePath);
+          }
         }, 300);
       }
     },
@@ -713,6 +744,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
 
     if (editor) {
       if (content) {
+        upstreamMarkdownRef.current = content;
         const rawHtml = markdownToHtml(content, repoFullName, branch, filePath);
         preRenderMermaid(rawHtml).then((html) => {
           if (cancelled) return;
@@ -720,6 +752,21 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
           // Capture baseline markdown for dirty comparison
           const turndown = createTurndownService();
           originalMarkdownRef.current = turndown.turndown(editor.getHTML());
+
+          // Check for a locally-saved draft that differs from upstream — if
+          // found, offer to restore it. Skip for new files (they store their
+          // own unsaved content) and local-only files.
+          if (!isNewFile && !isLocalFile) {
+            const draft = loadDraft(repoFullName, branch, filePath);
+            if (draft && draft.markdown !== originalMarkdownRef.current) {
+              setDraftPrompt({ markdown: draft.markdown, savedAt: draft.savedAt });
+            } else if (draft) {
+              // Draft matches upstream — nothing to restore, clear the stale
+              // copy so we don't re-prompt forever.
+              clearDraft(repoFullName, branch, filePath);
+            }
+          }
+
           // Fetch private repo images after TipTap renders
           setTimeout(() => {
             if (!cancelled && editorContainerRef.current) {
@@ -738,6 +785,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     setSubmittedPR(null);
     setSubmitError(null);
     setIsDirty(false);
+    setDraftPrompt(null);
     setCodeView(false);
     setCodeContent("");
     if (editor) editor.setEditable(true);
@@ -1045,13 +1093,14 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       setSubmittedPR(pr);
       setShowEditPRModal(false);
       setIsDirty(false);
+      clearDraft(repoFullName, branch, filePath);
       refreshRepo();
     } catch (err: any) {
       setSubmitError(err.message || "Failed to create PR");
     } finally {
       setSubmittingPR(false);
     }
-  }, [repoFullName, isDemoMode, editor, filePath, isLocalFile, editFilePath, editPRTitle, codeView, codeContent, refreshRepo]);
+  }, [repoFullName, branch, isDemoMode, editor, filePath, isLocalFile, editFilePath, editPRTitle, codeView, codeContent, refreshRepo]);
 
   // Save to disk via VS Code extension (embed mode only)
   const [savingToDisk, setSavingToDisk] = useState(false);
@@ -1073,8 +1122,9 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     setSavingToDisk(true);
     window.parent.postMessage({ type: "file:save", filePath: savePath, content: markdown }, "*");
     setIsDirty(false);
+    clearDraft(repoFullName, branch, filePath);
     setTimeout(() => setSavingToDisk(false), 500);
-  }, [editor, isEmbedded, codeView, codeContent, filePath]);
+  }, [editor, isEmbedded, codeView, codeContent, filePath, repoFullName, branch]);
 
   // Click handler — intercept clicks on <a> and <img> tags in the editor
   const handleEditorClick = useCallback((e: React.MouseEvent) => {
@@ -1458,6 +1508,13 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
               ) : (
                 <>
                   {filePath}
+                  {isDirty && (
+                    <span
+                      className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500"
+                      title="Unsaved changes"
+                      aria-label="Unsaved changes"
+                    />
+                  )}
                   <span className="text-[10px] text-[var(--text-muted)] opacity-60">
                     — select text to comment
                   </span>
@@ -1482,11 +1539,60 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
               />
             )}
 
+            {/* Draft restore banner — shows when a locally-saved draft is
+                newer than upstream content for this file. */}
+            {draftPrompt && !isNewFile && !isLocalFile && (
+              <div className="mb-4 p-3 border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 rounded-md flex items-center justify-between gap-3">
+                <div className="text-xs text-[var(--text-primary)]">
+                  <strong>Unsaved draft found</strong>{" "}
+                  <span className="text-[var(--text-secondary)]">
+                    saved {formatRelativeSavedAt(draftPrompt.savedAt)}.
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      const md = draftPrompt.markdown;
+                      const rawHtml = markdownToHtml(md, repoFullName, branch, filePath);
+                      const html = await preRenderMermaid(rawHtml);
+                      editor.commands.setContent(html);
+                      // Re-derive isDirty against original
+                      const turndown = createTurndownService();
+                      const currentMd = turndown.turndown(editor.getHTML());
+                      setIsDirty(currentMd !== originalMarkdownRef.current);
+                      setDraftPrompt(null);
+                    }}
+                    className="text-xs px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors"
+                  >
+                    Restore
+                  </button>
+                  <button
+                    onClick={() => {
+                      clearDraft(repoFullName, branch, filePath);
+                      setDraftPrompt(null);
+                    }}
+                    className="text-xs px-3 py-1 border border-[var(--border)] text-[var(--text-secondary)] rounded hover:bg-[var(--surface-hover)] transition-colors"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            )}
+
             {codeView ? (
               <textarea
                 ref={codeTextareaRef}
                 value={codeContent}
-                onChange={(e) => { setCodeContent(e.target.value); setIsDirty(e.target.value !== originalMarkdownRef.current); }}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setCodeContent(next);
+                  const dirty = next !== originalMarkdownRef.current;
+                  setIsDirty(dirty);
+                  if (!isNewFile && !isLocalFile) {
+                    if (dirty) saveDraft(repoFullName, branch, filePath, next);
+                    else clearDraft(repoFullName, branch, filePath);
+                  }
+                }}
                 onKeyDown={handleCodeViewKeyDown}
                 className="w-full min-h-[60vh] p-4 font-mono text-sm leading-relaxed bg-[var(--surface-secondary)] text-[var(--text-primary)] border border-[var(--border)] rounded-lg resize-y focus:outline-none focus:border-[var(--accent)]"
                 spellCheck={false}
