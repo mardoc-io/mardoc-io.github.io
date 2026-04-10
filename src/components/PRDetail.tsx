@@ -24,6 +24,7 @@ import {
   type PendingInlineComment,
   type ReviewEvent,
 } from "@/lib/github-api";
+import { mergeFreshComments } from "@/lib/comment-merge";
 import DiffViewer from "./DiffViewer";
 import Showdown from "showdown";
 
@@ -67,32 +68,18 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
     }
   }, [prComments, comments.length]);
 
-  // Merge fresh comments from GitHub with local state, preserving any pending
-  // (locally-queued, not-yet-submitted) comments. Dedupes by id so an
-  // optimistic local entry and its fresh GitHub counterpart never render as
-  // two separate cards in the sidebar — fresh always wins for the same id.
-  const mergeFresh = useCallback((prev: PRComment[], fresh: PRComment[]): PRComment[] => {
-    const byId = new Map<string, PRComment>();
-    for (const c of fresh) byId.set(c.id, c);
-    for (const c of prev) {
-      if (c.pending && !byId.has(c.id)) {
-        byId.set(c.id, c);
-      }
-    }
-    return Array.from(byId.values());
-  }, []);
-
   // Refetch comments from GitHub and merge into local state. Used by the 30s
-  // poll and the post-write propagation retries.
+  // poll and the post-write propagation retries. The merge helper is extracted
+  // to @/lib/comment-merge and covered by comment-merge.test.ts.
   const refreshFromGitHub = useCallback(async () => {
     if (isDemoMode || !currentRepo || !pr.number) return;
     try {
       const fresh = await fetchPRComments(currentRepo, pr.number);
-      setComments((prev) => mergeFresh(prev, fresh));
+      setComments((prev) => mergeFreshComments(prev, fresh));
     } catch {
       // Silently skip — the next poll or retry will catch up.
     }
-  }, [isDemoMode, currentRepo, pr.number, mergeFresh]);
+  }, [isDemoMode, currentRepo, pr.number]);
 
   // GitHub's read APIs lag its write APIs by 1–5 seconds in practice. After
   // any write (review submit, reply, add-general-comment), schedule a handful
