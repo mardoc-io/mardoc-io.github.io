@@ -543,3 +543,56 @@ body {
 .dark .markdown-alert-warning { border-left-color: #f1fa8c; }
 .dark .markdown-alert-caution > .markdown-alert-title { color: #ff5555; }
 .dark .markdown-alert-caution { border-left-color: #ff5555; }
+
+/* ─── Footnotes ──────────────────────────────────────────────────────────
+ * Pre-processed by @/lib/footnotes into inline <sup class="footnote-ref">
+ * links and a trailing <section class="footnotes"> block. CSS gives the
+ * section visual separation and styles the tiny back-link arrows.
+ */
+.footnote-ref {
+  font-size: 0.75em;
+  vertical-align: super;
+  line-height: 0;
+}
+.footnote-ref a {
+  text-decoration: none;
+  color: var(--accent);
+  padding: 0 0.1em;
+}
+.footnote-ref a:hover {
+  text-decoration: underline;
+}
+
+.footnotes {
+  margin-top: 2em;
+  padding-top: 1em;
+  border-top: 1px solid var(--border);
+  font-size: 0.9em;
+  color: var(--text-secondary);
+}
+.footnotes ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+.footnotes li {
+  margin: 0.4em 0;
+  padding-left: 0.25em;
+}
+.footnotes li:target {
+  /* When the user clicks a [^N] reference, the browser jumps to the
+   * <li id="fn-N">. Highlight it briefly so the target is obvious. */
+  background-color: var(--accent-muted);
+  border-radius: 4px;
+  padding: 0.25em 0.5em;
+  transition: background-color 0.3s ease;
+}
+.footnote-back {
+  text-decoration: none;
+  color: var(--text-muted);
+  margin-left: 0.4em;
+  font-size: 0.85em;
+}
+.footnote-back:hover {
+  color: var(--accent);
+}
