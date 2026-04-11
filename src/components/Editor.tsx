@@ -72,11 +72,14 @@ import {
 import { analyzeMarkdown, type MarkdownStats } from "@/lib/word-count";
 import { parseImageDimension, formatImageDimension, unwrapCenteredImages, type ImageDimension } from "@/lib/image-resize";
 import { computeDragResize } from "@/lib/image-drag-resize";
+import { MardocSearchExtension } from "@/lib/tiptap-search-extension";
 import { transformGitHubAlerts } from "@/lib/github-alerts";
 import { transformFootnotes } from "@/lib/footnotes";
 import FindReplaceBar from "./FindReplaceBar";
+import RichFindReplaceBar from "./RichFindReplaceBar";
 import type { Match as FindMatch } from "@/lib/find-replace";
 import Outline from "./Outline";
+import { MARDOC_OPEN_FIND_EVENT } from "@/lib/tiptap-search-extension";
 import {
   validateImageFile,
   generateImagePath,
@@ -1175,6 +1178,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       TableRow,
       TableCell,
       TableHeader,
+      MardocSearchExtension,
     ],
     content: markdownToHtml(content, repoFullName, branch, filePath),
     onUpdate: ({ editor }) => {
@@ -1412,11 +1416,21 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     textarea.scrollTop = Math.max(0, lineNumber * lineHeight - textarea.clientHeight / 2);
   }, [codeContent]);
 
-  // Leaving code view closes the find bar. Opening the bar requires being
-  // in code view, and the bar only operates on codeContent.
+  // Toggling between rich and code view closes the bar so the UI
+  // doesn't end up in a stale state across modes. The user can reopen
+  // it in the new view with Cmd+F.
   useEffect(() => {
-    if (!codeView) setFindBarOpen(false);
+    setFindBarOpen(false);
   }, [codeView]);
+
+  // Rich view opens the find bar via a custom event fired by the
+  // MardocSearchExtension's Mod-F keyboard shortcut. TipTap catches
+  // the key inside the editor; the event bridges to React state.
+  useEffect(() => {
+    const handler = () => setFindBarOpen(true);
+    window.addEventListener(MARDOC_OPEN_FIND_EVENT, handler);
+    return () => window.removeEventListener(MARDOC_OPEN_FIND_EVENT, handler);
+  }, []);
 
   const handleStartComment = useCallback((selectedText: string) => {
     setPendingSelection(selectedText);
@@ -2208,6 +2222,16 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
                   codeTextareaRef.current?.focus();
                 }}
                 onMatchFocused={handleMatchFocused}
+              />
+            )}
+
+            {!codeView && findBarOpen && editor && (
+              <RichFindReplaceBar
+                editor={editor}
+                onClose={() => {
+                  setFindBarOpen(false);
+                  editor.commands.focus();
+                }}
               />
             )}
 

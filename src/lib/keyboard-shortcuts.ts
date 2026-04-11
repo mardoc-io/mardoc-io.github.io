@@ -30,7 +30,7 @@ export const ALL_SHORTCUTS: Shortcut[] = [
   { keys: ["⌘", "I"], description: "Italic", category: "Editor" },
   { keys: ["⌘", "E"], description: "Inline code", category: "Editor" },
   { keys: ["⌘", "K"], description: "Insert link", category: "Editor" },
-  { keys: ["⌘", "F"], description: "Find and replace (code view)", category: "Editor" },
+  { keys: ["⌘", "F"], description: "Find and replace", category: "Editor" },
   { keys: ["⌘", "Z"], description: "Undo", category: "Editor" },
   { keys: ["⌘", "⇧", "Z"], description: "Redo", category: "Editor" },
   { keys: ["⌘", "↵"], description: "Finish editing block (suggest mode)", category: "Editor" },
