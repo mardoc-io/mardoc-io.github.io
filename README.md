@@ -1,6 +1,6 @@
 # MarDoc
 
-**A PWA overlay that makes working with markdown in your GitHub repos easier.**
+**A browser-only overlay that makes working with markdown in your GitHub repos easier.**
 
 MarDoc renders your GitHub PR diffs as rich, formatted documents — not raw text with `+` and `-` lines. Select any passage, leave a comment, and have it posted back to GitHub as an inline review comment tied to the exact line range.
 
