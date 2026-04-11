@@ -63,4 +63,12 @@ Next.js 14, TipTap, Showdown, Octokit, and Tailwind CSS. Hosted on GitHub Pages.
 
 ## License
 
-MIT
+[Elastic License 2.0](./LICENSE) (ELv2).
+
+Source is available. You can read it, run it locally, self-host it
+for your own internal use, fork it, and contribute back. You
+**cannot** provide MarDoc to third parties as a hosted or managed
+service — that's a commercial right reserved for the maintainers.
+
+See [elastic.co/licensing/elastic-license](https://www.elastic.co/licensing/elastic-license)
+for the canonical text and FAQ.
