@@ -32,6 +32,19 @@ const Image = BaseImage.extend({
       "data-gh-repo": { default: null, parseHTML: (el) => el.getAttribute("data-gh-repo"), renderHTML: (attrs) => attrs["data-gh-repo"] ? { "data-gh-repo": attrs["data-gh-repo"] } : {} },
       "data-gh-ref": { default: null, parseHTML: (el) => el.getAttribute("data-gh-ref"), renderHTML: (attrs) => attrs["data-gh-ref"] ? { "data-gh-ref": attrs["data-gh-ref"] } : {} },
       "data-gh-path": { default: null, parseHTML: (el) => el.getAttribute("data-gh-path"), renderHTML: (attrs) => attrs["data-gh-path"] ? { "data-gh-path": attrs["data-gh-path"] } : {} },
+      // Width / height attributes for image resize. Stored as strings
+      // (e.g. "300" or "50%") so they round-trip through HTML
+      // attribute parsing without losing the % unit.
+      width: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("width"),
+        renderHTML: (attrs) => (attrs.width ? { width: attrs.width } : {}),
+      },
+      height: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("height"),
+        renderHTML: (attrs) => (attrs.height ? { height: attrs.height } : {}),
+      },
     };
   },
 });
@@ -44,6 +57,7 @@ import {
   resolveDraftOnLoad,
 } from "@/lib/draft-store";
 import { analyzeMarkdown, type MarkdownStats } from "@/lib/word-count";
+import { parseImageDimension, formatImageDimension, type ImageDimension } from "@/lib/image-resize";
 import { transformGitHubAlerts } from "@/lib/github-alerts";
 import { transformFootnotes } from "@/lib/footnotes";
 import FindReplaceBar from "./FindReplaceBar";
@@ -84,6 +98,8 @@ import {
   Undo,
   Redo,
   Link as LinkIcon,
+  Link2,
+  Link2Off,
   Image as ImageIcon,
   Highlighter,
   FileCode,
@@ -263,6 +279,11 @@ interface BubbleTarget {
   href: string;
   alt?: string;
   element: HTMLElement;
+  // For images: the current width/height attribute values (raw strings
+  // like "300" or "50%"), passed through so the editing popover shows
+  // what's already set instead of starting blank.
+  width?: string;
+  height?: string;
 }
 
 function LinkImageBubble({
@@ -281,6 +302,13 @@ function LinkImageBubble({
   const [editing, setEditing] = useState(false);
   const [editUrl, setEditUrl] = useState("");
   const [editAlt, setEditAlt] = useState("");
+  const [editWidth, setEditWidth] = useState("");
+  const [editHeight, setEditHeight] = useState("");
+  const [lockAspect, setLockAspect] = useState(true);
+  // Natural image aspect ratio (intrinsic width / height) captured from
+  // the rendered <img>. Used to auto-fill the other dimension when the
+  // aspect lock is on.
+  const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
 
   // Reset edit state when target changes
@@ -336,7 +364,51 @@ function LinkImageBubble({
   const startEdit = () => {
     setEditUrl(target.href);
     setEditAlt(target.alt || "");
+    setEditWidth(target.width || "");
+    setEditHeight(target.height || "");
+
+    // Capture the natural aspect ratio of the rendered <img> so the
+    // aspect lock can drive one input from the other. Fall back to the
+    // displayed dimensions if naturalWidth/Height aren't available yet.
+    if (target.type === "image" && target.element instanceof HTMLImageElement) {
+      const img = target.element;
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      if (w > 0 && h > 0) {
+        setNaturalRatio(w / h);
+      } else {
+        setNaturalRatio(null);
+      }
+    }
+
     setEditing(true);
+  };
+
+  // When the aspect lock is on and the user types in one field, auto-
+  // fill the other based on the natural ratio. Only applies when both
+  // sides are pure pixel values — percentage mixes don't have a
+  // meaningful aspect relationship.
+  const handleWidthChange = (raw: string) => {
+    setEditWidth(raw);
+    if (!lockAspect || !naturalRatio) return;
+    const parsed = parseImageDimension(raw);
+    if (parsed && parsed.unit === "px") {
+      const h = Math.round(parsed.value / naturalRatio);
+      setEditHeight(String(h));
+    } else if (parsed && parsed.unit === "%") {
+      setEditHeight(`${parsed.value}%`);
+    }
+  };
+  const handleHeightChange = (raw: string) => {
+    setEditHeight(raw);
+    if (!lockAspect || !naturalRatio) return;
+    const parsed = parseImageDimension(raw);
+    if (parsed && parsed.unit === "px") {
+      const w = Math.round(parsed.value * naturalRatio);
+      setEditWidth(String(w));
+    } else if (parsed && parsed.unit === "%") {
+      setEditWidth(`${parsed.value}%`);
+    }
   };
 
   const applyEdit = () => {
@@ -350,9 +422,30 @@ function LinkImageBubble({
       // Restore selection position
       editor.commands.setTextSelection({ from, to });
     } else {
-      // Update image src and alt
-      editor.chain().focus()
-        .setImage({ src: editUrl, alt: editAlt })
+      // Update image src + alt + dimensions. parseImageDimension
+      // normalizes each value; invalid input falls back to null which
+      // means "remove the attribute" so the image reverts to natural
+      // size.
+      const widthParsed = parseImageDimension(editWidth);
+      const heightParsed = parseImageDimension(editHeight);
+      const attrs: Record<string, string | null> = {
+        src: editUrl,
+        alt: editAlt,
+        width: widthParsed ? formatImageDimension(widthParsed) : null,
+        height: heightParsed ? formatImageDimension(heightParsed) : null,
+      };
+      editor.chain().focus().setImage(attrs as any).run();
+
+      // setImage in TipTap's Image extension ignores non-standard
+      // attributes on some versions. Force the width/height via
+      // updateAttributes on the current node as a safety net.
+      editor
+        .chain()
+        .focus()
+        .updateAttributes("image", {
+          width: attrs.width,
+          height: attrs.height,
+        })
         .run();
     }
     onDismiss();
@@ -399,21 +492,73 @@ function LinkImageBubble({
               />
             </div>
             {target.type === "image" && (
-              <div>
-                <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-0.5 block">
-                  Alt text
-                </label>
-                <input
-                  type="text"
-                  value={editAlt}
-                  onChange={(e) => setEditAlt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") applyEdit();
-                    if (e.key === "Escape") { setEditing(false); }
-                  }}
-                  className="w-full text-xs px-2 py-1.5 rounded border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-0.5 block">
+                    Alt text
+                  </label>
+                  <input
+                    type="text"
+                    value={editAlt}
+                    onChange={(e) => setEditAlt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") applyEdit();
+                      if (e.key === "Escape") { setEditing(false); }
+                    }}
+                    className="w-full text-xs px-2 py-1.5 rounded border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                  />
+                </div>
+                {/* Width / height inputs with an aspect-lock toggle
+                    between them. Blank means "natural size" — the
+                    attribute gets removed on apply. */}
+                <div>
+                  <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-0.5 block">
+                    Size
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={editWidth}
+                      onChange={(e) => handleWidthChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") applyEdit();
+                        if (e.key === "Escape") { setEditing(false); }
+                      }}
+                      placeholder="Width"
+                      className="w-20 text-xs px-2 py-1.5 rounded border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent)]"
+                      title="Width in pixels (e.g. 300) or percent (e.g. 50%)"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setLockAspect((v) => !v)}
+                      className={`p-1 rounded transition-colors ${
+                        lockAspect
+                          ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                          : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
+                      }`}
+                      title={lockAspect ? "Aspect ratio locked" : "Aspect ratio unlocked"}
+                      aria-pressed={lockAspect}
+                    >
+                      {lockAspect ? <Link2 size={12} /> : <Link2Off size={12} />}
+                    </button>
+                    <input
+                      type="text"
+                      value={editHeight}
+                      onChange={(e) => handleHeightChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") applyEdit();
+                        if (e.key === "Escape") { setEditing(false); }
+                      }}
+                      placeholder="Height"
+                      className="w-20 text-xs px-2 py-1.5 rounded border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent)]"
+                      title="Height in pixels (e.g. 200) or percent (e.g. 50%)"
+                    />
+                    <span className="text-[9px] text-[var(--text-muted)] ml-1">
+                      px or %
+                    </span>
+                  </div>
+                </div>
+              </>
             )}
             <div className="flex items-center justify-end gap-1.5 pt-1">
               <button
@@ -1423,6 +1568,8 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         href: img.getAttribute("src") || "",
         alt: img.getAttribute("alt") || "",
         element: img,
+        width: img.getAttribute("width") || "",
+        height: img.getAttribute("height") || "",
       });
       return;
     }

@@ -1,4 +1,5 @@
 import TurndownService from "turndown";
+import { buildSizedImageHTML, parseImageDimension } from "@/lib/image-resize";
 
 /**
  * Creates a configured TurndownService that preserves HTML elements
@@ -44,7 +45,35 @@ export function createTurndownService(): TurndownService {
       const el = node as HTMLElement;
       const src = el.getAttribute("data-original-src") || "";
       const alt = el.getAttribute("alt") || "";
+      const width = parseImageDimension(el.getAttribute("width") || "");
+      const height = parseImageDimension(el.getAttribute("height") || "");
+      // If either dimension is set, switch to inline <img> HTML so the
+      // size survives the round-trip — standard markdown has no size
+      // syntax, but GitHub renders inline <img> tags.
+      if (width || height) {
+        return buildSizedImageHTML({ src, alt, width, height });
+      }
       return `![${alt}](${src})`;
+    },
+  });
+
+  // Images without a data-original-src — mostly user-pasted or
+  // drag-dropped images that go straight to the rich editor. Still
+  // need to check for width/height so the resize survives save.
+  turndown.addRule("imageWithDimensions", {
+    filter: (node) => {
+      if (node.nodeName !== "IMG") return false;
+      if (node.hasAttribute("data-original-src")) return false; // handled above
+      if (node.hasAttribute("data-mermaid-source")) return false; // handled below
+      return node.hasAttribute("width") || node.hasAttribute("height");
+    },
+    replacement: (_content, node) => {
+      const el = node as HTMLElement;
+      const src = el.getAttribute("src") || "";
+      const alt = el.getAttribute("alt") || "";
+      const width = parseImageDimension(el.getAttribute("width") || "");
+      const height = parseImageDimension(el.getAttribute("height") || "");
+      return buildSizedImageHTML({ src, alt, width, height });
     },
   });
 
