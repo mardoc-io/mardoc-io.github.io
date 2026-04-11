@@ -3,783 +3,395 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OpenTelemetry Architecture &amp; Integration Guide — FinOps Knowledge Article</title>
+<title>The Field Guide to Document Review in the AI Era</title>
 <script type="module">
-import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-mermaid.initialize({
-  startOnLoad: true,
-  theme: 'base',
-  themeVariables: {
-    primaryColor: '#E6F1FB',
-    primaryTextColor: '#0C447C',
-    primaryBorderColor: '#85B7EB',
-    secondaryColor: '#E1F5EE',
-    secondaryTextColor: '#085041',
-    secondaryBorderColor: '#5DCAA5',
-    tertiaryColor: '#FAEEDA',
-    tertiaryTextColor: '#633806',
-    tertiaryBorderColor: '#FAC775',
-    lineColor: '#5F5E5A',
-    textColor: '#2C2C2A',
-    fontSize: '14px',
-    fontFamily: '"Inter", "Segoe UI", system-ui, sans-serif',
-    noteTextColor: '#2C2C2A',
-    noteBkgColor: '#F1EFE8',
-    noteBorderColor: '#B4B2A9',
-    edgeLabelBackground: '#ffffff',
-  },
-  flowchart: { curve: 'basis', padding: 16 },
-  sequence: { actorMargin: 60, messageMargin: 40 }
-});
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#eff6ff',
+      primaryTextColor: '#1e3a8a',
+      primaryBorderColor: '#60a5fa',
+      secondaryColor: '#ecfdf5',
+      secondaryTextColor: '#065f46',
+      secondaryBorderColor: '#34d399',
+      tertiaryColor: '#fef3c7',
+      tertiaryTextColor: '#92400e',
+      tertiaryBorderColor: '#fbbf24',
+      lineColor: '#6b7280',
+      fontSize: '13px',
+      fontFamily: '"Inter", -apple-system, "Segoe UI", system-ui, sans-serif'
+    }
+  });
 </script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
   :root {
-    --bg: #FAFAF8;
-    --surface: #FFFFFF;
-    --border: #E2E0D8;
-    --text: #1A1A18;
-    --text-secondary: #5F5E5A;
-    --accent: #185FA5;
-    --accent-light: #E6F1FB;
-    --teal: #0F6E56;
-    --teal-light: #E1F5EE;
-    --coral: #993C1D;
-    --coral-light: #FAECE7;
-    --amber: #854F0B;
-    --amber-light: #FAEEDA;
-    --purple: #534AB7;
-    --purple-light: #EEEDFE;
-    --red: #A32D2D;
-    --red-light: #FCEBEB;
+    --ink: #1a1a1a;
+    --paper: #fafaf7;
+    --accent: #2563eb;
+    --accent-soft: #eff6ff;
+    --accent-dark: #1e3a8a;
+    --muted: #6b7280;
+    --rule: #e5e7eb;
+    --card-bg: #ffffff;
+    --warn: #f59e0b;
+    --warn-soft: #fffbeb;
+    --ok: #10b981;
+    --ok-soft: #ecfdf5;
   }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    font-family: 'Inter', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.7;
-    font-size: 15px;
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    line-height: 1.65;
   }
-
-  .page-wrapper {
-    max-width: 900px;
+  main {
+    max-width: 760px;
     margin: 0 auto;
-    padding: 40px 24px 80px;
+    padding: 48px 32px 96px;
   }
-
-  /* Header */
-  .doc-header {
-    border-bottom: 2px solid var(--text);
-    padding-bottom: 24px;
+  header {
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 28px;
     margin-bottom: 40px;
   }
-  .doc-header .meta {
-    font-size: 12px;
+  header .kicker {
     text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--text-secondary);
-    margin-bottom: 12px;
-    font-weight: 600;
-  }
-  .doc-header h1 {
-    font-size: 32px;
-    font-weight: 700;
-    line-height: 1.2;
-    margin-bottom: 8px;
-  }
-  .doc-header .subtitle {
-    font-size: 17px;
-    color: var(--text-secondary);
-    font-weight: 400;
-  }
-
-  /* Audience badges */
-  .audience {
-    display: flex;
-    gap: 8px;
-    margin-top: 16px;
-    flex-wrap: wrap;
-  }
-  .badge {
+    letter-spacing: 0.14em;
     font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    padding: 4px 10px;
-    border-radius: 4px;
-  }
-  .badge.lt { background: var(--purple-light); color: var(--purple); }
-  .badge.eng { background: var(--teal-light); color: var(--teal); }
-
-  /* Section headers */
-  h2 {
-    font-size: 22px;
-    font-weight: 700;
-    margin: 48px 0 8px;
-    padding-top: 24px;
-    border-top: 1px solid var(--border);
-  }
-  h2:first-of-type { border-top: none; padding-top: 0; }
-  h3 {
-    font-size: 17px;
-    font-weight: 600;
-    margin: 32px 0 8px;
-    color: var(--text);
-  }
-  h4 {
-    font-size: 15px;
-    font-weight: 600;
-    margin: 20px 0 6px;
-  }
-
-  p { margin-bottom: 14px; }
-
-  /* Diagram containers */
-  .diagram-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 28px 20px;
-    margin: 24px 0;
-    overflow-x: auto;
-  }
-  .diagram-card .diagram-title {
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-secondary);
-    margin-bottom: 16px;
-  }
-  .mermaid {
-    display: flex;
-    justify-content: center;
-  }
-
-  /* Callout boxes */
-  .callout {
-    border-left: 3px solid;
-    padding: 16px 20px;
-    margin: 20px 0;
-    border-radius: 0 6px 6px 0;
-    font-size: 14px;
-  }
-  .callout.key { border-color: var(--accent); background: var(--accent-light); }
-  .callout.key strong { color: var(--accent); }
-  .callout.answer { border-color: var(--teal); background: var(--teal-light); }
-  .callout.answer strong { color: var(--teal); }
-  .callout.warning { border-color: var(--coral); background: var(--coral-light); }
-  .callout.warning strong { color: var(--coral); }
-  .callout.finops { border-color: var(--purple); background: var(--purple-light); }
-  .callout.finops strong { color: var(--purple); }
-
-  /* Numbered questions */
-  .question-block {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 20px 24px;
-    margin: 20px 0;
-  }
-  .question-block .q {
-    font-weight: 600;
     color: var(--accent);
-    margin-bottom: 8px;
-    font-size: 15px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    margin-bottom: 10px;
+    font-weight: 600;
   }
-  .question-block .a {
-    color: var(--text);
+  h1 {
+    font-size: 38px;
+    line-height: 1.15;
+    margin: 0 0 14px;
+    letter-spacing: -0.01em;
   }
-
-  /* Table */
+  header .byline {
+    color: var(--muted);
+    font-size: 14px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+  }
+  h2 {
+    font-size: 26px;
+    margin-top: 44px;
+    margin-bottom: 14px;
+    letter-spacing: -0.005em;
+  }
+  h3 {
+    font-size: 19px;
+    margin-top: 30px;
+    margin-bottom: 10px;
+  }
+  p { margin: 0 0 16px; }
+  blockquote {
+    border-left: 4px solid var(--accent);
+    background: var(--accent-soft);
+    margin: 28px 0;
+    padding: 18px 22px;
+    font-style: italic;
+    color: var(--accent-dark);
+    border-radius: 0 6px 6px 0;
+  }
+  ul, ol { padding-left: 24px; }
+  li { margin-bottom: 6px; }
   table {
     width: 100%;
     border-collapse: collapse;
-    margin: 20px 0;
+    margin: 28px 0;
+    font-family: -apple-system, "Segoe UI", sans-serif;
     font-size: 14px;
+    background: var(--card-bg);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  th, td {
+    text-align: left;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--rule);
   }
   th {
-    text-align: left;
+    background: #f8fafc;
     font-weight: 600;
-    padding: 10px 14px;
-    border-bottom: 2px solid var(--text);
+    color: #374151;
+    letter-spacing: 0.02em;
     font-size: 12px;
     text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-secondary);
-  }
-  td {
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: top;
   }
   tr:last-child td { border-bottom: none; }
-
   code {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: "JetBrains Mono", Menlo, Consolas, monospace;
     font-size: 13px;
-    background: #F1EFE8;
-    padding: 2px 6px;
+    background: #f3f4f6;
+    padding: 1px 6px;
     border-radius: 3px;
+    color: #be185d;
   }
-
-  /* TOC */
-  .toc {
-    background: var(--surface);
-    border: 1px solid var(--border);
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 18px 22px;
     border-radius: 8px;
-    padding: 20px 24px;
-    margin-bottom: 36px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+    box-shadow: 0 2px 6px rgba(15,23,42,0.1);
   }
-  .toc-title {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    color: var(--text-secondary);
-    margin-bottom: 12px;
+  pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
   }
-  .toc ol { padding-left: 20px; }
-  .toc li { margin-bottom: 6px; font-size: 14px; }
-  .toc a { color: var(--accent); text-decoration: none; }
-  .toc a:hover { text-decoration: underline; }
-
-  /* Summary strip */
-  .summary-strip {
+  .callout {
+    background: var(--card-bg);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--accent);
+    padding: 18px 22px;
+    margin: 28px 0;
+    border-radius: 6px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .callout strong { color: var(--accent); }
+  .callout.warn {
+    border-left-color: var(--warn);
+    background: var(--warn-soft);
+  }
+  .callout.warn strong { color: #b45309; }
+  .callout.ok {
+    border-left-color: var(--ok);
+    background: var(--ok-soft);
+  }
+  .callout.ok strong { color: #047857; }
+  .cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 16px;
-    margin: 24px 0;
+    margin: 28px 0;
   }
-  .summary-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--rule);
     border-radius: 8px;
-    padding: 16px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
-  .summary-card .label {
+  .card .label {
+    font-family: -apple-system, "Segoe UI", sans-serif;
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-secondary);
+    letter-spacing: 0.1em;
+    color: var(--accent);
     font-weight: 600;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
   }
-  .summary-card .value {
-    font-size: 18px;
-    font-weight: 700;
+  .card h4 {
+    margin: 0 0 8px;
+    font-size: 16px;
   }
-
-  .footer {
-    margin-top: 48px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border);
-    font-size: 12px;
-    color: var(--text-secondary);
+  .card p {
+    margin: 0;
+    font-size: 13px;
+    color: #4b5563;
+    line-height: 1.55;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+  }
+  .mermaid {
+    background: var(--card-bg);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 24px;
+    margin: 28px 0;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  footer {
+    margin-top: 72px;
+    padding-top: 28px;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 13px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (max-width: 640px) {
+    .cards { grid-template-columns: 1fr; }
+    main { padding: 32px 20px 64px; }
+    h1 { font-size: 30px; }
   }
 </style>
 </head>
 <body>
-<div class="page-wrapper">
+<main>
 
-<!-- HEADER -->
-<header class="doc-header">
-  <div class="meta">Knowledge Article &middot; Architecture &middot; Observability</div>
-  <h1>OpenTelemetry: Architecture, Trace Context &amp; Integration Patterns</h1>
-  <p class="subtitle">How OTel works, what the Collector does, how cloud providers implement it, and how we (as a FinOps integrator) can consume trace data.</p>
-  <div class="audience">
-    <span class="badge lt">Leadership</span>
-    <span class="badge eng">Engineering</span>
-  </div>
+<header>
+  <div class="kicker">Sample Document</div>
+  <h1>The Field Guide to Document Review in the AI Era</h1>
+  <div class="byline">A demo document for MarDoc — highlight any passage and leave a comment.</div>
 </header>
 
-<!-- TOC -->
-<nav class="toc">
-  <div class="toc-title">Contents</div>
-  <ol>
-    <li><a href="#tldr">Executive summary</a></li>
-    <li><a href="#what-is-otel">What is OpenTelemetry?</a></li>
-    <li><a href="#trace-context">W3C Trace Context &amp; how correlation works</a></li>
-    <li><a href="#spans-events">Spans, events, and custom attributes</a></li>
-    <li><a href="#collector">The OTel Collector: what it does</a></li>
-    <li><a href="#cloud">Cloud-provider OTel collectors (AWS, GCP, Azure)</a></li>
-    <li><a href="#questions">Answering our five questions</a></li>
-    <li><a href="#finops">FinOps integration patterns: how we plug in</a></li>
-    <li><a href="#decision">Decision matrix</a></li>
-  </ol>
-</nav>
+<p>This is a sample HTML document shipped with MarDoc. Use it to try the review flow the same way you would on any <code>.html</code> file in a real repository: select a sentence, leave a comment, reply, resolve. Every interaction is routed through the same GitHub review API that markdown files use — the only thing that changes is the rendering layer.</p>
 
-<!-- EXECUTIVE SUMMARY -->
-<section id="tldr">
-<h2>1. Executive summary</h2>
+<blockquote>
+  If the reviewer can't read the document, they can't review the document. HTML and markdown are how AI writes; they should be how humans review.
+</blockquote>
 
-<div class="summary-strip">
-  <div class="summary-card">
-    <div class="label">What OTel is</div>
-    <div class="value" style="font-size:14px; font-weight:500; line-height:1.5">A vendor-neutral standard for collecting traces, metrics, and logs from applications.</div>
+<h2>Why document review is the bottleneck</h2>
+
+<p>Most organizations have quietly accumulated three review workflows, each of which makes a different set of people unhappy. Engineers review code in pull requests. Writers review prose in Google Docs or Notion. Everyone else reviews whatever the last meeting's action item ended up in — a spreadsheet, a Slack thread, a draft email nobody ever sends.</p>
+
+<p>When AI-generated content enters the picture, the bottleneck becomes obvious. A language model can produce a four-thousand-word technical brief in ninety seconds. A human can review it in forty-five minutes. The constraint is no longer production; it is attention. And attention, unlike compute, does not scale by adding another GPU.</p>
+
+<h3>The three review styles</h3>
+
+<p>Every review task falls into one of three shapes. Understanding which shape you're dealing with tells you which tool to use.</p>
+
+<div class="cards">
+  <div class="card">
+    <div class="label">Style 1</div>
+    <h4>Correctness</h4>
+    <p>Does this assert something true? Technical docs, legal language, anything with an audit trail.</p>
   </div>
-  <div class="summary-card">
-    <div class="label">Core idea</div>
-    <div class="value" style="font-size:14px; font-weight:500; line-height:1.5">A single <code>traceparent</code> header flows through every service; a Collector aggregates the data.</div>
+  <div class="card">
+    <div class="label">Style 2</div>
+    <h4>Voice</h4>
+    <p>Does this sound like us? Brand copy, marketing, and external communications.</p>
   </div>
-  <div class="summary-card">
-    <div class="label">Our opportunity</div>
-    <div class="value" style="font-size:14px; font-weight:500; line-height:1.5">We can receive OTel data as an additional exporter — we do not need to replace anything.</div>
+  <div class="card">
+    <div class="label">Style 3</div>
+    <h4>Structure</h4>
+    <p>Does this belong here, at this length, in this order? Long-form reports and strategy memos.</p>
   </div>
 </div>
 
-<p>OpenTelemetry (OTel) is a CNCF-graduated open-source standard that gives every participating application a common way to emit telemetry — traces, metrics, and logs. A <strong>W3C Trace Context</strong> header (<code>traceparent</code>) carries a trace ID across service boundaries so that downstream systems can correlate all the spans belonging to a single request. The <strong>OTel Collector</strong> sits between applications and observability backends, receiving, processing, and exporting telemetry. As a FinOps integrator, we can tap into this pipeline without disrupting existing observability setups.</p>
-</section>
+<p>A good review tool makes all three cheap. A bad one makes each of them expensive in a different way. The trick is that most teams have never named which of the three they are doing at any given moment, so the tool choice is accidental and the review gets the shape of whatever application happened to be open.</p>
 
-<!-- WHAT IS OTEL -->
-<section id="what-is-otel">
-<h2>2. What is OpenTelemetry?</h2>
+<h2>Comparing the common tools</h2>
 
-<p>OpenTelemetry is an instrumentation framework — it standardizes <em>how</em> applications generate and transmit telemetry data. It is <strong>not</strong> a storage or visualization backend (like Datadog, Grafana, or AWS X-Ray). Instead, it provides SDKs that applications embed, and a Collector process that routes the data to one or more backends of your choice.</p>
-
-<p>OTel covers three "signal types": <strong>traces</strong> (a request's journey across services), <strong>metrics</strong> (numeric measurements like latency or error rates), and <strong>logs</strong> (structured event records). For our purposes, traces are the primary concern because they carry the correlation ID that ties an entire request lifecycle together.</p>
-
-<div class="diagram-card">
-  <div class="diagram-title">Diagram 1 — The three pillars of OTel</div>
-  <pre class="mermaid">
-flowchart LR
-  subgraph Application["Instrumented application"]
-    direction TB
-    T["Traces<br/><i>request flow</i>"]
-    M["Metrics<br/><i>counters, histograms</i>"]
-    L["Logs<br/><i>structured events</i>"]
-  end
-  Application -->|OTLP| C["OTel Collector"]
-  C -->|export| B1["Backend A<br/><i>e.g. Datadog</i>"]
-  C -->|export| B2["Backend B<br/><i>e.g. X-Ray</i>"]
-  C -->|export| B3["Backend C<br/><i>e.g. Us (FinOps)</i>"]
-  style Application fill:#E6F1FB,stroke:#85B7EB,color:#0C447C
-  style C fill:#FAEEDA,stroke:#FAC775,color:#633806
-  style B1 fill:#E1F5EE,stroke:#5DCAA5,color:#085041
-  style B2 fill:#E1F5EE,stroke:#5DCAA5,color:#085041
-  style B3 fill:#EEEDFE,stroke:#AFA9EC,color:#3C3489
-  </pre>
-</div>
-
-<div class="callout key">
-  <strong>Key insight for leadership:</strong> OTel is the industry standard. AWS, GCP, and Azure all ship their own OTel distributions. Customers who adopt OTel can send their telemetry to <em>multiple</em> backends simultaneously — including us — with a configuration change, not a code change.
-</div>
-</section>
-
-<!-- TRACE CONTEXT -->
-<section id="trace-context">
-<h2>3. W3C Trace Context &amp; how correlation works</h2>
-
-<p>The <a href="https://www.w3.org/TR/trace-context/">W3C Trace Context</a> specification defines an HTTP header called <code>traceparent</code> that propagates tracing identity across service boundaries. Its format is:</p>
-
-<p style="text-align:center; margin:20px 0;">
-  <code style="font-size:15px; padding:8px 16px; background:#F1EFE8; border-radius:6px;">
-    traceparent: 00-&lt;trace-id&gt;-&lt;parent-span-id&gt;-&lt;trace-flags&gt;
-  </code>
-</p>
-
-<p>The <strong>trace ID</strong> (32 hex characters) is the correlation key. It is generated by the first service that handles a request and propagated — unchanged — to every downstream service. Each service creates its own <strong>span</strong> (with a unique 16-character span ID) and attaches that span to the shared trace ID. The Collector (or backend) then reconstructs the full call tree by grouping spans that share the same trace ID.</p>
-
-<div class="diagram-card">
-  <div class="diagram-title">Diagram 2 — Trace context propagation across services</div>
-  <pre class="mermaid">
-sequenceDiagram
-    participant U as User / Browser
-    participant A as Service A<br/>(API Gateway)
-    participant B as Service B<br/>(Order Service)
-    participant C as Service C<br/>(Payment Service)
-    participant Col as OTel Collector
-
-    U->>A: POST /order
-    Note over A: Generates trace ID<br/>abc123...
-    A->>B: traceparent: 00-abc123...-span_a-01
-    Note over B: Creates span_b,<br/>same trace ID
-    B->>C: traceparent: 00-abc123...-span_b-01
-    Note over C: Creates span_c,<br/>same trace ID
-
-    A-->>Col: span_a (trace: abc123)
-    B-->>Col: span_b (trace: abc123)
-    C-->>Col: span_c (trace: abc123)
-
-    Note over Col: Correlates all 3 spans<br/>into one trace tree
-  </pre>
-</div>
-
-<div class="callout key">
-  <strong>Key insight:</strong> The trace ID is the universal correlation key. Any system that receives spans tagged with the same trace ID can reconstruct the request's full journey. This is exactly how we, as an integrator, can correlate cost data with application request paths.
-</div>
-</section>
-
-<!-- SPANS AND EVENTS -->
-<section id="spans-events">
-<h2>4. Spans, events, and custom attributes</h2>
-
-<p>A <strong>span</strong> represents a single unit of work — an HTTP handler, a database query, a message consumer. Every span contains a start time, an end time, a name, and a status. Beyond these basics, there are two mechanisms for attaching custom data to a span:</p>
-
-<h3>Span attributes</h3>
-<p>Key-value pairs set on the span itself. These describe the work being done: <code>http.method = "POST"</code>, <code>db.system = "postgresql"</code>, <code>cloud.region = "us-east-1"</code>. OTel defines "semantic conventions" — standardized attribute names — so that tooling can interpret them consistently. Applications can also add their own custom attributes (e.g. <code>finops.cost_center = "team-alpha"</code>).</p>
-
-<h3>Span events</h3>
-<p>Timestamped log entries attached to a span. Think of them as "something interesting happened during this span." An event has a name, a timestamp, and its own set of attributes. For example, a span representing an HTTP request might have an event named <code>cache.miss</code> with an attribute <code>cache.key = "user:42"</code>.</p>
-
-<div class="diagram-card">
-  <div class="diagram-title">Diagram 3 — Anatomy of a span</div>
-  <pre class="mermaid">
-flowchart TB
-    subgraph Span["Span: POST /api/order"]
-        direction TB
-        H["Span headers<br/><i>trace_id, span_id, parent_span_id,<br/>start_time, end_time, status</i>"]
-        A["Attributes (key-value pairs)<br/><i>http.method=POST, http.route=/api/order,<br/>cloud.region=us-east-1,<br/>finops.cost_center=team-alpha</i>"]
-        E["Events (timestamped entries)<br/><i>event: db.query.start { db.statement=SELECT... }<br/>event: cache.miss { cache.key=user:42 }</i>"]
-    end
-    H --> A --> E
-    style Span fill:#E6F1FB,stroke:#85B7EB,color:#0C447C
-    style H fill:#ffffff,stroke:#85B7EB,color:#0C447C
-    style A fill:#ffffff,stroke:#85B7EB,color:#0C447C
-    style E fill:#ffffff,stroke:#85B7EB,color:#0C447C
-  </pre>
-</div>
-
-<div class="callout answer">
-  <strong>Answer to "Does the application need to emit an OTel event with attributes?":</strong> Yes — if you want to track <em>unique, domain-specific</em> data within each span (like cost center, tenant ID, or billing tier), the application must explicitly set those as span attributes or emit span events with attributes. The trace ID and basic span metadata are handled automatically by the OTel SDK, but custom business data requires instrumentation code.
-</div>
-</section>
-
-<!-- COLLECTOR -->
-<section id="collector">
-<h2>5. The OTel Collector: what it does</h2>
-
-<p>The Collector is a standalone process (a binary, container, or sidecar) that acts as a telemetry pipeline. It has three stages:</p>
-
-<div class="diagram-card">
-  <div class="diagram-title">Diagram 4 — OTel Collector internal pipeline</div>
-  <pre class="mermaid">
-flowchart LR
-    subgraph Receivers["Receivers"]
-        R1["OTLP<br/>(gRPC / HTTP)"]
-        R2["Jaeger"]
-        R3["Prometheus"]
-    end
-    subgraph Processors["Processors"]
-        P1["Batching"]
-        P2["Filtering"]
-        P3["Attribute<br/>enrichment"]
-        P4["Sampling"]
-    end
-    subgraph Exporters["Exporters"]
-        E1["OTLP → Backend A"]
-        E2["OTLP → Backend B"]
-        E3["AWS X-Ray"]
-        E4["OTLP → FinOps"]
-    end
-    R1 --> P1
-    R2 --> P1
-    R3 --> P1
-    P1 --> P2 --> P3 --> P4
-    P4 --> E1
-    P4 --> E2
-    P4 --> E3
-    P4 --> E4
-    style Receivers fill:#E6F1FB,stroke:#85B7EB,color:#0C447C
-    style Processors fill:#FAEEDA,stroke:#FAC775,color:#633806
-    style Exporters fill:#E1F5EE,stroke:#5DCAA5,color:#085041
-  </pre>
-</div>
-
-<p><strong>Receivers</strong> accept data in various formats (OTLP, Jaeger, Prometheus, etc.). <strong>Processors</strong> transform the data — batching for efficiency, filtering out noise, enriching with metadata, sampling to reduce volume. <strong>Exporters</strong> send the processed data to one or more destinations. This fan-out capability is critical: a single Collector can feed data to AWS X-Ray, Datadog, <em>and</em> a FinOps platform simultaneously.</p>
-
-<h3>Deployment patterns</h3>
-
-<div class="diagram-card">
-  <div class="diagram-title">Diagram 5 — Agent vs. Gateway deployment</div>
-  <pre class="mermaid">
-flowchart TB
-    subgraph Pattern_A["Pattern A: Agent (sidecar)"]
-        direction LR
-        App1A["App 1"] --> Col1A["Collector<br/>(sidecar)"]
-        App2A["App 2"] --> Col2A["Collector<br/>(sidecar)"]
-        Col1A --> Backend_A["Backend"]
-        Col2A --> Backend_A
-    end
-
-    subgraph Pattern_B["Pattern B: Gateway (centralized)"]
-        direction LR
-        App1B["App 1"] --> GW["Collector<br/>(gateway)"]
-        App2B["App 2"] --> GW
-        App3B["App 3"] --> GW
-        GW --> Backend_B1["Backend A"]
-        GW --> Backend_B2["Backend B"]
-    end
-
-    subgraph Pattern_C["Pattern C: Agent + Gateway (recommended)"]
-        direction LR
-        App1C["App 1"] --> Col1C["Agent"]
-        App2C["App 2"] --> Col2C["Agent"]
-        Col1C --> GWC["Gateway<br/>Collector"]
-        Col2C --> GWC
-        GWC --> Backend_C1["Backend A"]
-        GWC --> Backend_C2["Backend B"]
-    end
-
-    style Pattern_A fill:#ffffff,stroke:#85B7EB
-    style Pattern_B fill:#ffffff,stroke:#5DCAA5
-    style Pattern_C fill:#ffffff,stroke:#AFA9EC
-  </pre>
-</div>
-
-<p>The recommended production pattern is <strong>Agent + Gateway</strong> (Pattern C): lightweight agent collectors run alongside each application (low-latency ingestion, local buffering), forwarding to a centralized gateway collector that handles cross-cutting concerns like sampling, attribute enrichment, and multi-backend export.</p>
-
-<div class="callout warning">
-  <strong>Common misconception:</strong> "There is only one Collector." In practice, organizations often run <em>many</em> Collector instances — one per pod/host (agents) plus one or more centralized gateways. The architecture is flexible and scalable.
-</div>
-</section>
-
-<!-- CLOUD PROVIDERS -->
-<section id="cloud">
-<h2>6. Cloud-provider OTel collectors</h2>
-
-<p>Each major cloud provider ships its own distribution of the OTel Collector, pre-configured with cloud-specific receivers, processors, and exporters:</p>
+<p>Here is the same review task — "add a paragraph to an existing document and have two stakeholders approve it" — across five tools, ranked by total elapsed time from first draft to final merge.</p>
 
 <table>
   <thead>
     <tr>
-      <th>Cloud</th>
-      <th>Distribution</th>
-      <th>Trace backend</th>
-      <th>Metrics backend</th>
-      <th>Key detail</th>
+      <th>Tool</th>
+      <th>Source of truth</th>
+      <th>Review model</th>
+      <th>Typical turnaround</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td><strong>AWS</strong></td>
-      <td>AWS Distro for OpenTelemetry (ADOT)</td>
-      <td>AWS X-Ray</td>
-      <td>CloudWatch, Managed Prometheus</td>
-      <td>Runs on ECS, EKS, EC2, Lambda. Includes AWS resource detectors and SigV4 auth. Pre-built Docker image on ECR.</td>
+      <td>Google Docs</td>
+      <td>Doc itself</td>
+      <td>Inline comments</td>
+      <td>Hours</td>
     </tr>
     <tr>
-      <td><strong>GCP</strong></td>
-      <td>Google Cloud OpenTelemetry Collector</td>
-      <td>Cloud Trace (native OTLP endpoint)</td>
-      <td>Cloud Monitoring, Managed Prometheus</td>
-      <td>Native OTLP ingestion via <code>telemetry.googleapis.com</code>. GKE resource detection built in. Largest attribute size limits.</td>
+      <td>Notion</td>
+      <td>Notion page</td>
+      <td>Inline comments</td>
+      <td>Hours</td>
     </tr>
     <tr>
-      <td><strong>Azure</strong></td>
-      <td>Azure Monitor OpenTelemetry Distro</td>
-      <td>Application Insights</td>
-      <td>Azure Monitor Metrics</td>
-      <td>Managed OTel agent in Container Apps. Uses Application Insights connection string. Supports Managed Identity auth.</td>
+      <td>GitHub PR (raw)</td>
+      <td>Repository</td>
+      <td>Line-level diff</td>
+      <td>Days — non-engineers bounce</td>
+    </tr>
+    <tr>
+      <td>Word + email</td>
+      <td>Attachment</td>
+      <td>Track changes</td>
+      <td>Days to weeks</td>
+    </tr>
+    <tr>
+      <td>MarDoc</td>
+      <td>Repository</td>
+      <td>Inline comments on rendered doc</td>
+      <td>Hours</td>
     </tr>
   </tbody>
 </table>
 
-<div class="diagram-card">
-  <div class="diagram-title">Diagram 6 — Cloud OTel ecosystem (multi-cloud view)</div>
-  <pre class="mermaid">
-flowchart TB
-    subgraph AWS["AWS"]
-        AApp["Application"] --> ADOT["ADOT Collector"]
-        ADOT --> XRay["X-Ray"]
-        ADOT --> CW["CloudWatch"]
-    end
-    subgraph GCP["GCP"]
-        GApp["Application"] --> GCOL["GCP OTel Collector"]
-        GCOL --> CT["Cloud Trace"]
-        GCOL --> CM["Cloud Monitoring"]
-    end
-    subgraph Azure["Azure"]
-        ZApp["Application"] --> AZCOL["Azure OTel Distro"]
-        AZCOL --> AI["App Insights"]
-        AZCOL --> AM["Azure Monitor"]
-    end
+<p>The pattern is not that one tool is universally better. The pattern is that the tools which keep the document close to its source of truth lose the reviewers, and the tools which keep the reviewers happy lose the document. Any workflow that optimizes for only one of those ends up with the other problem rebuilt somewhere else by hand.</p>
 
-    ADOT -->|OTLP export| US["Our FinOps<br/>Platform"]
-    GCOL -->|OTLP export| US
-    AZCOL -->|OTLP export| US
+<h2>A simple review flow</h2>
 
-    style AWS fill:#FAEEDA,stroke:#FAC775,color:#633806
-    style GCP fill:#E6F1FB,stroke:#85B7EB,color:#0C447C
-    style Azure fill:#E1F5EE,stroke:#5DCAA5,color:#085041
-    style US fill:#EEEDFE,stroke:#AFA9EC,color:#3C3489
-  </pre>
-</div>
+<p>The diagram below shows the review path for a document living in a GitHub repository. Every arrow represents a step that has traditionally required a handoff between people on different tools. The entire flow happens in one tab.</p>
 
-<div class="callout key">
-  <strong>Key insight:</strong> All three cloud providers use the standard OTel Collector architecture with OTLP as the common protocol. This means a customer on any cloud can add our OTLP endpoint as an additional exporter without replacing their existing observability tooling.
-</div>
-</section>
-
-<!-- FIVE QUESTIONS -->
-<section id="questions">
-<h2>7. Answering our five questions</h2>
-
-<div class="question-block">
-  <div class="q">Q1: Is there typically an OTel Collector configured to receive application data from each application?</div>
-  <div class="a"><strong>Yes.</strong> In production, most organizations deploy at least one Collector layer. The most common pattern is an agent-mode Collector running as a sidecar or DaemonSet alongside each application, feeding into a gateway-mode Collector for centralized processing and export. The Collector handles batching, retries, enrichment, and multi-destination export — things you don't want each application doing individually.</div>
-</div>
-
-<div class="question-block">
-  <div class="q">Q2: Is there usually only one OTel Collector?</div>
-  <div class="a"><strong>No — there are usually many.</strong> A typical Kubernetes deployment runs one agent Collector per node (as a DaemonSet) plus one or more gateway Collector instances. In a multi-cloud setup, each cloud environment typically has its own Collector fleet. The "one Collector" mental model only applies to the simplest dev/test setups.</div>
-</div>
-
-<div class="question-block">
-  <div class="q">Q3: What are the standard OTel Collectors in AWS, GCP, Azure?</div>
-  <div class="a">See the table in Section 6. In short: <strong>AWS → ADOT</strong> (feeds X-Ray, CloudWatch), <strong>GCP → Google Cloud OTel Collector</strong> (feeds Cloud Trace, Cloud Monitoring with native OTLP), <strong>Azure → Azure Monitor OpenTelemetry Distro</strong> (feeds Application Insights, Azure Monitor). All are distributions of the upstream open-source OTel Collector with cloud-specific plugins.</div>
-</div>
-
-<div class="question-block">
-  <div class="q">Q4: If we want to inspect OTel data from a trace, can we integrate <em>with</em> the OTel Collector?</div>
-  <div class="a"><strong>Yes — this is the recommended approach.</strong> The customer's existing Collector is configured to add our OTLP endpoint as an additional exporter. Their Collector fans out data to their existing backend (e.g. Datadog) <em>and</em> to us simultaneously. We receive a copy of the telemetry; we don't intercept or modify the existing flow. This is a <strong>configuration change</strong> on the customer's Collector — no code changes in their applications.</div>
-</div>
-
-<div class="question-block">
-  <div class="q">Q5: Or must we <em>be</em> the OTel Collector?</div>
-  <div class="a"><strong>We can, but we don't have to.</strong> There are two viable architectures (see Section 8). We can either (a) <strong>be an OTLP receiver endpoint</strong> that the customer's Collector exports to, or (b) <strong>run our own Collector instance</strong> (as a downstream gateway) that receives data from their Collector, processes it for our needs, and feeds our backend. Option (a) is simpler; option (b) gives us more control over filtering and transformation. In neither case do we replace the customer's existing Collector.</div>
-</div>
-</section>
-
-<!-- FINOPS INTEGRATION -->
-<section id="finops">
-<h2>8. FinOps integration patterns: how we plug in</h2>
-
-<p>As a FinOps company, we have two primary integration architectures for consuming OTel trace data from customers. Both preserve the customer's existing observability setup.</p>
-
-<h3>Option A — OTLP receiver endpoint (simpler)</h3>
-<p>We expose an OTLP-compatible endpoint (gRPC on port 4317, HTTP on port 4318). The customer adds our endpoint as an additional exporter in their existing Collector configuration. We receive spans, process them in our own backend, and correlate them with cost data.</p>
-
-<div class="diagram-card">
-  <div class="diagram-title">Diagram 7 — Option A: We are an OTLP endpoint</div>
-  <pre class="mermaid">
+<div class="mermaid">
 flowchart LR
-    App["Customer's<br/>applications"] -->|spans| CC["Customer's<br/>OTel Collector"]
-    CC -->|exporter 1| DD["Datadog /<br/>X-Ray / etc."]
-    CC -->|"exporter 2 (OTLP)"| US["Our OTLP<br/>endpoint<br/><i>finops.example.com:4317</i>"]
-    US --> DB["Our backend<br/><i>correlate traces<br/>with cost data</i>"]
-
-    style App fill:#E6F1FB,stroke:#85B7EB,color:#0C447C
-    style CC fill:#FAEEDA,stroke:#FAC775,color:#633806
-    style DD fill:#E1F5EE,stroke:#5DCAA5,color:#085041
-    style US fill:#EEEDFE,stroke:#AFA9EC,color:#3C3489
-    style DB fill:#EEEDFE,stroke:#AFA9EC,color:#3C3489
-  </pre>
+    A[Author drafts] --> B[Opens PR]
+    B --> C{Reviewer<br/>opens PR}
+    C -->|Reads rendered doc| D[Leaves inline comment]
+    D --> E[Author edits]
+    E --> F[Reviewer approves]
+    F --> G[Merged to main]
 </div>
 
-<h3>Option B — Our own Collector gateway (more control)</h3>
-<p>We run our own OTel Collector instance as a downstream gateway. The customer's Collector exports to ours via OTLP. Our Collector can then apply FinOps-specific processing — filtering to only cost-relevant spans, enriching with our own attributes, sampling — before ingesting into our backend.</p>
+<p>And here is a second diagram showing the internal state of a reviewer's queue — the three buckets every review passes through on the way to being accepted or rejected.</p>
 
-<div class="diagram-card">
-  <div class="diagram-title">Diagram 8 — Option B: We run a downstream Collector</div>
-  <pre class="mermaid">
-flowchart LR
-    App["Customer's<br/>applications"] -->|spans| CC["Customer's<br/>OTel Collector"]
-    CC -->|exporter 1| DD["Datadog /<br/>X-Ray / etc."]
-    CC -->|"exporter 2 (OTLP)"| OUR["Our OTel<br/>Collector<br/><i>gateway mode</i>"]
-    OUR -->|"filter + enrich"| DB["Our backend<br/><i>cost correlation</i>"]
-
-    subgraph Our_Infra["Our infrastructure"]
-        OUR
-        DB
-    end
-
-    style App fill:#E6F1FB,stroke:#85B7EB,color:#0C447C
-    style CC fill:#FAEEDA,stroke:#FAC775,color:#633806
-    style DD fill:#E1F5EE,stroke:#5DCAA5,color:#085041
-    style Our_Infra fill:#EEEDFE,stroke:#AFA9EC,color:#3C3489
-    style OUR fill:#EEEDFE,stroke:#AFA9EC,color:#3C3489
-    style DB fill:#EEEDFE,stroke:#AFA9EC,color:#3C3489
-  </pre>
+<div class="mermaid">
+stateDiagram-v2
+    [*] --> Pending
+    Pending --> Reading: Reviewer opens the doc
+    Reading --> Commenting: Highlights a passage
+    Commenting --> Reading: Finishes a thought
+    Reading --> Submitted: Clicks Submit review
+    Submitted --> [*]
 </div>
 
-<div class="callout finops">
-  <strong>FinOps-specific value:</strong> By receiving trace data, we can map individual request paths to cloud resource consumption. A span that shows <code>cloud.region = us-east-1</code>, <code>cloud.platform = aws_lambda</code>, and <code>finops.cost_center = team-alpha</code> lets us attribute the Lambda invocation cost to the specific team, service, and even API endpoint that triggered it.
+<h2>What a good review comment looks like</h2>
+
+<p>A review comment is a small, structured piece of writing — not a passing thought. It has a target, a claim, and a suggested direction. It assumes the author is doing their best and that the reader of the comment is trying to learn something.</p>
+
+<div class="callout">
+  <strong>Rule of thumb.</strong> If a comment doesn't name what it is pointing at, it is not a review comment — it is a vague feeling. Point at the thing, say what you think, and say what you would change.
 </div>
 
-<h3>What the customer needs to do</h3>
-<p>In either option, the customer change is minimal — they add a few lines to their Collector config:</p>
+<h3>An example</h3>
 
-<div style="background:#2C2C2A; color:#D3D1C7; border-radius:8px; padding:20px; margin:20px 0; font-family:'JetBrains Mono',monospace; font-size:13px; line-height:1.6; overflow-x:auto;">
-<pre style="margin:0;"><span style="color:#5DCAA5;">exporters:</span>
-  <span style="color:#85B7EB;">otlp/existing-backend:</span>
-    endpoint: datadog-agent:4317
+<p>Consider the following draft sentence in a product spec:</p>
 
-  <span style="color:#AFA9EC;">otlp/finops:                           # ← new</span>
-    <span style="color:#AFA9EC;">endpoint: finops.example.com:4317    # ← new</span>
-    <span style="color:#AFA9EC;">headers:                              # ← new</span>
-      <span style="color:#AFA9EC;">api-key: "${FINOPS_API_KEY}"       # ← new</span>
+<pre><code>The system will attempt to retry failed requests
+up to a reasonable number of times.</code></pre>
 
-<span style="color:#5DCAA5;">service:</span>
-  <span style="color:#85B7EB;">pipelines:</span>
-    <span style="color:#85B7EB;">traces:</span>
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [otlp/existing-backend, <span style="color:#AFA9EC;">otlp/finops</span>]  <span style="color:#888780;"># ← added</span>
-</pre>
+<p>The word <code>reasonable</code> is doing a lot of work there. A useful comment does not just flag the word; it proposes a replacement. "Reasonable — can we name a specific number? Three retries with exponential backoff seems to be the shape we use elsewhere." That comment gives the author a clear next action and a reference point.</p>
+
+<div class="callout ok">
+  <strong>Good comment.</strong> "Reasonable is vague — propose three retries with exponential backoff, matching the rest of the codebase."
 </div>
-</section>
 
-<!-- DECISION MATRIX -->
-<section id="decision">
-<h2>9. Decision matrix</h2>
-
-<table>
-  <thead>
-    <tr>
-      <th>Consideration</th>
-      <th>Option A: OTLP endpoint</th>
-      <th>Option B: Our Collector</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Setup complexity for us</td>
-      <td>Lower — build an OTLP-compatible ingestion API</td>
-      <td>Higher — deploy + operate a Collector fleet</td>
-    </tr>
-    <tr>
-      <td>Setup complexity for customer</td>
-      <td>Same (add exporter config)</td>
-      <td>Same (add exporter config)</td>
-    </tr>
-    <tr>
-      <td>Filtering / transformation</td>
-      <td>Done in our application code</td>
-      <td>Done in Collector config (more flexible, standard)</td>
-    </tr>
-    <tr>
-      <td>Data volume control</td>
-      <td>Customer controls sampling</td>
-      <td>We can add our own sampling layer</td>
-    </tr>
-    <tr>
-      <td>Protocol flexibility</td>
-      <td>OTLP only</td>
-      <td>Can also accept Jaeger, Zipkin, Prometheus</td>
-    </tr>
-    <tr>
-      <td>Best for</td>
-      <td>MVP / quick integration</td>
-      <td>Production scale / multi-tenant</td>
-    </tr>
-  </tbody>
-</table>
-
-<div class="callout answer">
-  <strong>Recommendation:</strong> Start with <strong>Option A</strong> (OTLP receiver endpoint) for the initial integration. It's the fastest path to receiving trace data and proving value. Migrate to <strong>Option B</strong> (our own Collector) as we scale and need finer-grained control over filtering, sampling, and multi-tenant processing.
+<div class="callout warn">
+  <strong>Less useful.</strong> "Vague." — no target, no proposed direction, no context. The author has to guess what a better sentence would look like.
 </div>
-</section>
 
-<!-- FOOTER -->
-<footer class="footer">
-  <p>Prepared for leadership and engineering alignment. References: <a href="https://www.w3.org/TR/trace-context/">W3C Trace Context</a>, <a href="https://opentelemetry.io/docs/collector/">OTel Collector docs</a>, <a href="https://aws-otel.github.io/">ADOT</a>, <a href="https://learn.microsoft.com/en-us/azure/azure-monitor/app/opentelemetry">Azure OTel</a>, <a href="https://docs.cloud.google.com/stackdriver/docs/managed-prometheus/setup-otel">GCP OTel</a>.</p>
+<h2>What to try in this demo</h2>
+
+<p>This document is live inside MarDoc. Try these things:</p>
+
+<ul>
+  <li>Select a short sentence and click the comment button that appears.</li>
+  <li>Select a whole paragraph and leave a longer note.</li>
+  <li>Try selecting across two different headings to see how the line range is recorded.</li>
+  <li>Switch to source view and watch the same comments map back to the underlying HTML.</li>
+  <li>Open the comment panel on the right and reply to one of your own comments.</li>
+</ul>
+
+<p>When you're done, you'll have a queued review ready to submit as a single inline GitHub comment — the same way MarDoc handles markdown files. Nothing about the submission path changes; only the rendering layer does.</p>
+
+<footer>
+  <p>Sample document shipped with MarDoc. The text is fictional and exists only to give reviewers something to comment on. Feel free to overwrite it with your own content when you fork.</p>
 </footer>
 
-</div>
+</main>
 </body>
 </html>
