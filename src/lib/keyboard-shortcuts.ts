@@ -42,6 +42,7 @@ export const ALL_SHORTCUTS: Shortcut[] = [
 
   // ─── Help ───────────────────────────────────────────────────────────
   { keys: ["?"], description: "Open keyboard cheatsheet", category: "Help" },
+  { keys: ["⌘", "⇧", "P"], description: "Open command palette", category: "Help" },
 ];
 
 /**
