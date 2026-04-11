@@ -49,6 +49,20 @@ import { transformFootnotes } from "@/lib/footnotes";
 import FindReplaceBar from "./FindReplaceBar";
 import type { Match as FindMatch } from "@/lib/find-replace";
 import Outline from "./Outline";
+import {
+  validateImageFile,
+  generateImagePath,
+  arrayBufferToBase64,
+  replacePendingImageUrls,
+} from "@/lib/image-upload";
+import { commitBase64FileToBranch } from "@/lib/github-api";
+
+interface PendingImage {
+  blobUrl: string;
+  file: File;
+  intendedPath: string;
+  alt: string;
+}
 import { classifyLink, resolvePath, findFileByPath } from "@/lib/link-handler";
 import { useApp } from "@/lib/app-context";
 import { openExternal } from "@/lib/open-external";
@@ -681,6 +695,126 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   // click-to-jump and scroll-spy. Toggled from the toolbar.
   const [outlineOpen, setOutlineOpen] = useState(false);
 
+  // Image upload state — surfaced in the toolbar while a paste / drop
+  // is committing to the branch. Also used by the error toast.
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+
+  // Pending images for the new-file draft flow. Each entry is an image
+  // that's been pasted/dropped into a doc that doesn't yet exist in the
+  // repo — we can't commit it immediately because there's nothing to
+  // commit against, so we store it locally under a blob: URL and defer
+  // the real commit until handleSaveNewFile runs. The markdown source
+  // gets its blob URLs rewritten to real paths right before the doc
+  // itself is committed.
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const pendingImagesRef = useRef<PendingImage[]>([]);
+  pendingImagesRef.current = pendingImages;
+
+  // Clean up blob URLs when the component unmounts or the file changes
+  // so we don't leak memory holding references to discarded drafts.
+  useEffect(() => {
+    return () => {
+      for (const p of pendingImagesRef.current) {
+        URL.revokeObjectURL(p.blobUrl);
+      }
+    };
+  }, []);
+
+  // Ref updated on every render so the TipTap editorProps paste/drop
+  // handlers (frozen at useEditor time) can reach the current upload
+  // function. Same stale-closure workaround as draftScopeRef.
+  const imageUploadRef = useRef<((file: File) => Promise<void>) | null>(null);
+
+  // Upload or queue an image file. Returns the URL to insert into the
+  // editor — either a committed raw.githubusercontent URL (immediate
+  // mode) or a blob: URL (deferred mode for new-file drafts).
+  //
+  // Mode selection:
+  //   - Demo mode → bail with a friendly error
+  //   - Local file (no backing repo) → bail
+  //   - New file (unsaved draft) → defer: store under a blob URL and
+  //     queue in pendingImages. The actual commit happens in
+  //     handleSaveNewFile alongside the doc commit, so abandoned drafts
+  //     don't leave dangling images in the repo.
+  //   - Existing file → commit immediately to the current branch.
+  const uploadImageFile = useCallback(async (file: File): Promise<string | null> => {
+    const scope = draftScopeRef.current;
+    if (scope.isDemoMode) {
+      setImageUploadError("Image upload is disabled in demo mode.");
+      return null;
+    }
+    if (scope.isLocalFile) {
+      setImageUploadError(
+        "Local-only files can't upload images — save this file to the repo first."
+      );
+      return null;
+    }
+    if (!scope.repoFullName || !scope.branch) {
+      setImageUploadError("No repo or branch — cannot upload.");
+      return null;
+    }
+
+    const validation = validateImageFile(file);
+    if (!validation.ok) {
+      setImageUploadError(validation.error || "Invalid image file.");
+      return null;
+    }
+
+    setImageUploadError(null);
+
+    // New-file draft: defer the commit. Store the file under a blob
+    // URL that the editor can render locally, queue it, and hand the
+    // blob URL back so the TipTap insert still sees a valid src. The
+    // commit happens when the user saves the draft to the repo.
+    if (scope.isNewFile) {
+      const blobUrl = URL.createObjectURL(file);
+      const intendedPath = generateImagePath(file.name || "image.png");
+      setPendingImages((prev) => [
+        ...prev,
+        { blobUrl, file, intendedPath, alt: file.name || "image" },
+      ]);
+      return blobUrl;
+    }
+
+    // Existing file: commit immediately to the current branch.
+    setImageUploading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const base64 = arrayBufferToBase64(buffer);
+      const path = generateImagePath(file.name || "image.png");
+      await commitBase64FileToBranch(
+        scope.repoFullName,
+        scope.branch,
+        path,
+        base64,
+        `docs: upload ${path.split("/").pop()}`
+      );
+      return `https://raw.githubusercontent.com/${scope.repoFullName}/${scope.branch}/${path}`;
+    } catch (err: any) {
+      setImageUploadError(err?.message || "Failed to upload image.");
+      return null;
+    } finally {
+      setImageUploading(false);
+    }
+  }, []);
+
+  // Keep the ref to the paste/drop handler up to date. The TipTap
+  // editorProps closures are frozen at useEditor creation time, so
+  // they read from this ref instead of capturing uploadImageFile
+  // directly. uploadImageFile already returns either a committed raw
+  // URL (existing file) or a blob: URL (new-file draft) — either is
+  // inserted as-is and the editor renders it.
+  imageUploadRef.current = async (file: File) => {
+    const src = await uploadImageFile(file);
+    if (!src || !editor) return;
+    editor
+      .chain()
+      .focus()
+      .setImage({ src, alt: file.name || "image" })
+      .run();
+  };
+
   // Markdown fed to the outline extractor. Code view has it in state
   // directly; rich view gets the debounced currentMarkdown, one tick
   // behind the cursor (fine — heading edits are infrequent).
@@ -713,17 +847,20 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     };
   }, [isDirty, setEditorIsDirty]);
 
-  // The TipTap onUpdate handler captures closures ONCE at useEditor time — it
-  // doesn't re-bind when props (filePath, repoFullName, branch, isNewFile)
-  // change. Without this ref, autosave would keep writing drafts to the key
-  // of the first file opened even after the user switches files. Updating
-  // this ref on every render keeps onUpdate looking at current props.
+  // The TipTap onUpdate / handlePaste / handleDrop handlers capture
+  // closures ONCE at useEditor time — they don't re-bind when props
+  // (filePath, repoFullName, branch, isNewFile, isDemoMode) change.
+  // Without this ref, autosave would keep writing drafts to the key of
+  // the first file opened even after the user switches files, and image
+  // uploads would commit to the wrong repo. Updating this ref on every
+  // render keeps the handlers looking at current props.
   const draftScopeRef = useRef({
     repoFullName,
     branch,
     filePath,
     isNewFile,
     isLocalFile,
+    isDemoMode,
   });
   draftScopeRef.current = {
     repoFullName,
@@ -731,6 +868,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     filePath,
     isNewFile,
     isLocalFile,
+    isDemoMode,
   };
   const [showEditPRModal, setShowEditPRModal] = useState(false);
   const [editPRTitle, setEditPRTitle] = useState("");
@@ -787,6 +925,37 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     editorProps: {
       attributes: {
         class: "prose prose-sm max-w-none focus:outline-none min-h-[500px]",
+      },
+      // Paste: intercept image file clipboards (screenshot / clipboard
+      // image) and upload them to the repo. Reads from a ref so a
+      // file-switch doesn't strand the handler on the original scope.
+      handlePaste: (_view, event) => {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.kind === "file" && item.type.startsWith("image/")) {
+            const file = item.getAsFile();
+            if (!file) continue;
+            event.preventDefault();
+            void imageUploadRef.current?.(file);
+            return true;
+          }
+        }
+        return false;
+      },
+      // Drag-drop: same story for files dropped onto the editor surface.
+      handleDrop: (_view, event) => {
+        const e = event as DragEvent;
+        const files = e.dataTransfer?.files;
+        if (!files || files.length === 0) return false;
+        const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
+        if (imageFiles.length === 0) return false;
+        e.preventDefault();
+        for (const file of imageFiles) {
+          void imageUploadRef.current?.(file);
+        }
+        return true;
       },
     },
   });
@@ -1099,6 +1268,32 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         markdown = turndown.turndown(html);
       }
 
+      // Commit queued pending images BEFORE the doc so we can rewrite
+      // their blob: URLs to real paths in the markdown. If any image
+      // fails, the whole save is aborted — we don't commit a doc that
+      // references images that couldn't be uploaded.
+      //
+      // Target branch: PR branch for add-to-PR flows, otherwise the
+      // currently selected branch (the doc will commit there too).
+      const imageTargetBranch = prBranchForNewFile || branch;
+      if (pendingImages.length > 0 && imageTargetBranch) {
+        const urlMap = new Map<string, string>();
+        for (const pending of pendingImages) {
+          const buffer = await pending.file.arrayBuffer();
+          const base64 = arrayBufferToBase64(buffer);
+          await commitBase64FileToBranch(
+            repoFullName,
+            imageTargetBranch,
+            pending.intendedPath,
+            base64,
+            `docs: upload ${pending.intendedPath.split("/").pop()}`
+          );
+          const rawUrl = `https://raw.githubusercontent.com/${repoFullName}/${imageTargetBranch}/${pending.intendedPath}`;
+          urlMap.set(pending.blobUrl, rawUrl);
+        }
+        markdown = replacePendingImageUrls(markdown, urlMap);
+      }
+
       const path = newFilePath.endsWith(".md") ? newFilePath : `${newFilePath}.md`;
 
       if (prBranchForNewFile) {
@@ -1137,12 +1332,19 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         setShowNewFileModal(false);
         refreshRepo();
       }
+
+      // Success — clean up the pending image state and revoke the
+      // local blob URLs so we don't leak memory on long sessions.
+      for (const p of pendingImages) {
+        URL.revokeObjectURL(p.blobUrl);
+      }
+      setPendingImages([]);
     } catch (err: any) {
       setSubmitError(err.message || "Failed to save file");
     } finally {
       setSavingNewFile(false);
     }
-  }, [repoFullName, isDemoMode, editor, newFilePath, newFileTitle, prBranchForNewFile, prNumberForNewFile, pullRequests, openPR, codeView, codeContent, refreshRepo]);
+  }, [repoFullName, isDemoMode, editor, newFilePath, newFileTitle, prBranchForNewFile, prNumberForNewFile, pullRequests, openPR, codeView, codeContent, refreshRepo, pendingImages, branch]);
 
   const handleSubmitEditsAsPR = useCallback(async () => {
     if (!repoFullName || isDemoMode || !editor || !editPRTitle.trim()) return;
@@ -1535,6 +1737,24 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
             {submitError && (
               <span className="text-xs text-red-500 px-2">{submitError}</span>
             )}
+            {/* Image upload indicator — only visible during a paste/drop
+                upload or when the last attempt errored. */}
+            {imageUploading && (
+              <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] px-1.5 select-none">
+                <Loader2 size={10} className="animate-spin" />
+                Uploading image…
+              </span>
+            )}
+            {imageUploadError && !imageUploading && (
+              <button
+                onClick={() => setImageUploadError(null)}
+                className="text-[10px] text-red-500 px-1.5 max-w-[12rem] truncate"
+                title={imageUploadError}
+              >
+                ⚠ {imageUploadError}
+              </button>
+            )}
+
             {/* Word count + reading time. Hidden for empty documents so an
                 empty new-file toolbar doesn't carry "0 words". */}
             {stats.words > 0 && (
