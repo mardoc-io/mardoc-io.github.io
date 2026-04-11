@@ -49,6 +49,12 @@ import { transformFootnotes } from "@/lib/footnotes";
 import FindReplaceBar from "./FindReplaceBar";
 import type { Match as FindMatch } from "@/lib/find-replace";
 import Outline from "./Outline";
+import {
+  validateImageFile,
+  generateImagePath,
+  arrayBufferToBase64,
+} from "@/lib/image-upload";
+import { commitBase64FileToBranch } from "@/lib/github-api";
 import { classifyLink, resolvePath, findFileByPath } from "@/lib/link-handler";
 import { useApp } from "@/lib/app-context";
 import { openExternal } from "@/lib/open-external";
@@ -681,6 +687,88 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   // click-to-jump and scroll-spy. Toggled from the toolbar.
   const [outlineOpen, setOutlineOpen] = useState(false);
 
+  // Image upload state — surfaced in the toolbar while a paste / drop
+  // is committing to the branch. Also used by the error toast.
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+
+  // Ref updated on every render so the TipTap editorProps paste/drop
+  // handlers (frozen at useEditor time) can reach the current upload
+  // function. Same stale-closure workaround as draftScopeRef.
+  const imageUploadRef = useRef<((file: File) => Promise<void>) | null>(null);
+
+  // Upload a File as an image: validate → read ArrayBuffer → encode →
+  // commit to the current branch → return the relative path the editor
+  // should insert. Bails out with a user-visible error if anything
+  // goes wrong, or if the current scope can't support uploads (demo
+  // mode / local file / new file without a backing repo+branch).
+  const uploadImageFile = useCallback(async (file: File): Promise<string | null> => {
+    const scope = draftScopeRef.current;
+    if (scope.isDemoMode) {
+      setImageUploadError("Image upload is disabled in demo mode.");
+      return null;
+    }
+    if (scope.isLocalFile || scope.isNewFile) {
+      setImageUploadError(
+        "Image upload requires a file from a real repo. Save this file to the repo first."
+      );
+      return null;
+    }
+    if (!scope.repoFullName || !scope.branch) {
+      setImageUploadError("No repo or branch — cannot upload.");
+      return null;
+    }
+
+    const validation = validateImageFile(file);
+    if (!validation.ok) {
+      setImageUploadError(validation.error || "Invalid image file.");
+      return null;
+    }
+
+    setImageUploadError(null);
+    setImageUploading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const base64 = arrayBufferToBase64(buffer);
+      const path = generateImagePath(file.name || "image.png");
+      await commitBase64FileToBranch(
+        scope.repoFullName,
+        scope.branch,
+        path,
+        base64,
+        `docs: upload ${path.split("/").pop()}`
+      );
+      return path;
+    } catch (err: any) {
+      setImageUploadError(err?.message || "Failed to upload image.");
+      return null;
+    } finally {
+      setImageUploading(false);
+    }
+  }, []);
+
+  // Keep the ref to the paste/drop handler up to date. The TipTap
+  // editorProps closures are frozen at useEditor creation time, so
+  // they read from this ref instead of capturing uploadImageFile
+  // directly.
+  imageUploadRef.current = async (file: File) => {
+    const path = await uploadImageFile(file);
+    if (!path || !editor) return;
+    // Insert the image into the editor. Use an absolute URL so the
+    // image renders without needing a separate URL rewrite — the
+    // data-original-src attribute preserves the relative path for
+    // the Turndown round-trip.
+    const scope = draftScopeRef.current;
+    const rawUrl = scope.repoFullName && scope.branch
+      ? `https://raw.githubusercontent.com/${scope.repoFullName}/${scope.branch}/${path}`
+      : path;
+    editor
+      .chain()
+      .focus()
+      .setImage({ src: rawUrl, alt: file.name || "image" })
+      .run();
+  };
+
   // Markdown fed to the outline extractor. Code view has it in state
   // directly; rich view gets the debounced currentMarkdown, one tick
   // behind the cursor (fine — heading edits are infrequent).
@@ -713,17 +801,20 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     };
   }, [isDirty, setEditorIsDirty]);
 
-  // The TipTap onUpdate handler captures closures ONCE at useEditor time — it
-  // doesn't re-bind when props (filePath, repoFullName, branch, isNewFile)
-  // change. Without this ref, autosave would keep writing drafts to the key
-  // of the first file opened even after the user switches files. Updating
-  // this ref on every render keeps onUpdate looking at current props.
+  // The TipTap onUpdate / handlePaste / handleDrop handlers capture
+  // closures ONCE at useEditor time — they don't re-bind when props
+  // (filePath, repoFullName, branch, isNewFile, isDemoMode) change.
+  // Without this ref, autosave would keep writing drafts to the key of
+  // the first file opened even after the user switches files, and image
+  // uploads would commit to the wrong repo. Updating this ref on every
+  // render keeps the handlers looking at current props.
   const draftScopeRef = useRef({
     repoFullName,
     branch,
     filePath,
     isNewFile,
     isLocalFile,
+    isDemoMode,
   });
   draftScopeRef.current = {
     repoFullName,
@@ -731,6 +822,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     filePath,
     isNewFile,
     isLocalFile,
+    isDemoMode,
   };
   const [showEditPRModal, setShowEditPRModal] = useState(false);
   const [editPRTitle, setEditPRTitle] = useState("");
@@ -787,6 +879,37 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     editorProps: {
       attributes: {
         class: "prose prose-sm max-w-none focus:outline-none min-h-[500px]",
+      },
+      // Paste: intercept image file clipboards (screenshot / clipboard
+      // image) and upload them to the repo. Reads from a ref so a
+      // file-switch doesn't strand the handler on the original scope.
+      handlePaste: (_view, event) => {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.kind === "file" && item.type.startsWith("image/")) {
+            const file = item.getAsFile();
+            if (!file) continue;
+            event.preventDefault();
+            void imageUploadRef.current?.(file);
+            return true;
+          }
+        }
+        return false;
+      },
+      // Drag-drop: same story for files dropped onto the editor surface.
+      handleDrop: (_view, event) => {
+        const e = event as DragEvent;
+        const files = e.dataTransfer?.files;
+        if (!files || files.length === 0) return false;
+        const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
+        if (imageFiles.length === 0) return false;
+        e.preventDefault();
+        for (const file of imageFiles) {
+          void imageUploadRef.current?.(file);
+        }
+        return true;
       },
     },
   });
@@ -1535,6 +1658,24 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
             {submitError && (
               <span className="text-xs text-red-500 px-2">{submitError}</span>
             )}
+            {/* Image upload indicator — only visible during a paste/drop
+                upload or when the last attempt errored. */}
+            {imageUploading && (
+              <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] px-1.5 select-none">
+                <Loader2 size={10} className="animate-spin" />
+                Uploading image…
+              </span>
+            )}
+            {imageUploadError && !imageUploading && (
+              <button
+                onClick={() => setImageUploadError(null)}
+                className="text-[10px] text-red-500 px-1.5 max-w-[12rem] truncate"
+                title={imageUploadError}
+              >
+                ⚠ {imageUploadError}
+              </button>
+            )}
+
             {/* Word count + reading time. Hidden for empty documents so an
                 empty new-file toolbar doesn't carry "0 words". */}
             {stats.words > 0 && (

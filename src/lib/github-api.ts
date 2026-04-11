@@ -963,6 +963,35 @@ export async function commitFileToPRBranch(
   });
 }
 
+/**
+ * Commit a pre-encoded base64 file (typically a binary asset like an
+ * image) to a branch. Used by the paste / drag-drop image upload flow
+ * in the editor — the caller is responsible for reading the file's
+ * ArrayBuffer and running it through arrayBufferToBase64 from
+ * @/lib/image-upload before calling this.
+ */
+export async function commitBase64FileToBranch(
+  repoFullName: string,
+  branch: string,
+  filePath: string,
+  base64Content: string,
+  message: string
+): Promise<void> {
+  const octokit = getOctokit();
+  if (!octokit) throw new Error("Not authenticated");
+
+  const { owner, repo } = parseOwnerRepo(repoFullName);
+
+  await octokit.repos.createOrUpdateFileContents({
+    owner,
+    repo,
+    path: filePath,
+    message,
+    content: base64Content,
+    branch,
+  });
+}
+
 // ─── Image URL Rewriting ──────────────────────────────────────────────────
 
 /**
