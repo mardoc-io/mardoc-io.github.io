@@ -1,8 +1,8 @@
 # MarDoc
 
-**Review markdown like a document, not a diff.**
+**Markdown and HTML, accessible to everyone on your team.**
 
-MarDoc is a browser-only markdown review and editing tool for GitHub pull requests. It renders your docs as rich, formatted text — headings, tables, images, footnotes, alerts — so you can review prose the way it was meant to be read. Select any passage, leave an inline comment, batch it into a single review, and ship. Edit in WYSIWYG or raw markdown. Paste images and they commit straight to your repo.
+MarDoc is a browser-only document layer over GitHub. It takes the markdown and HTML files that already live in your repo and turns them into rendered documents anyone can read, comment on, and edit — no git knowledge, no command line, no decoding diff syntax. Your PM, your designer, your head of marketing, your legal reviewer, your exec sponsor: everyone who cares about what the docs say can now contribute to them directly, in the place they already live.
 
 > **No backend. No signup. No data leaves your browser.** Your GitHub token is stored locally and every API call goes directly from you to GitHub.
 
@@ -10,73 +10,71 @@ MarDoc is a browser-only markdown review and editing tool for GitHub pull reques
 
 ## The problem
 
-GitHub's pull-request UI treats markdown like source code: plus lines, minus lines, no rendering. For prose — documentation, RFCs, ADRs, AI-generated reports, anything written for human consumption — that's the wrong default. You end up mentally rendering every heading and list while trying to decide if the *content* is actually right. Worse, you can't tell at a glance whether a one-word change improved the sentence or broke it.
+Your engineering team put the docs in source control for good reasons: version history, branch workflows, PR review, a single source of truth that lives next to the code it describes. But that decision locked half your organization out.
 
-MarDoc is the correction.
+Non-engineers on your team — product managers, designers, writers, legal reviewers, executives — open GitHub's pull-request UI and see a wall of `+` and `-` lines wrapped in backticks and asterisks. Markdown they could read just fine as a rendered document is suddenly unreadable as source. So the review doesn't happen. Or it happens in Notion. Or Google Docs. Or a thread of emailed screenshots. And then someone on eng has to copy the feedback back into the repo by hand.
 
-## What it does
+The docs that define your strategy, your brand voice, your API contracts, your onboarding, your incident response, your policy — those docs are only as good as the people who can review them. When review is gated on reading git syntax, most of your team can't participate.
 
-**Render-first review**
-- PR markdown files render as formatted documents with word-level change highlighting
-- Four view modes: Inline diff, Side-by-side, Suggest (edit blocks as proposed changes), Preview (final rendered)
-- Full GFM: headings, lists, tables, fenced code with syntax highlighting, mermaid diagrams, GitHub alerts (`> [!NOTE]`), footnotes (`[^1]`)
-- Scroll-spy outline panel for long documents
+MarDoc removes the gate. Same GitHub repo, same files, same commits — wrapped in a layer anyone can use: rendered documents, inline comments, WYSIWYG editing, paste-to-upload images, real pull requests going back to the repo when they're done. Your docs stay in source control. Your team finally gets to review them.
 
-**Inline commenting that round-trips to GitHub**
-- Select any text → comment appears in the sidebar
-- Comments queue as a pending review, submit as **one** GitHub notification (not N)
-- Inline comments tied to exact line ranges via the PR review API
-- Approve / Request Changes wired to `pulls.createReview`
-- Reply threads, resolve, resolve-all
-- Fallback to general PR comments when a line can't be resolved in the diff
+## For everyone on the team
 
-**Suggestions and edits**
-- Suggest mode: click any block, edit the raw markdown, submit as a GitHub suggestion
-- Accept suggestions applies them as commits to the PR branch
-- Delete button: queue an empty-body suggestion to propose removing a block
-- Full rich editor (TipTap) for direct edits, commit-as-PR workflow
+- **Product managers** reviewing specs, RFCs, and ADRs
+- **Designers** editing UX writing and marketing copy
+- **Technical writers** polishing documentation without touching the command line
+- **Executives and legal reviewers** approving policy, brand, and compliance docs
+- **Engineers** shipping documentation PRs that actually get reviewed
+- **Teams using AI-generated content** — anyone whose LLM outputs land in git-tracked markdown files needs a human-review UX that isn't a unified diff
+- **Open-source maintainers** drowning in documentation contributions from community members who don't know git
 
-**Images**
-- Paste or drag-drop images in the editor → commits to the repo under a folder you configure per-repo (default `docs/images`)
-- Click-popover with width/height inputs, percent or pixels, aspect-ratio lock
-- Drag-handle resize from the corner
-- Center checkbox (wraps in `<div align="center">` so GitHub renders centered)
-- New-file drafts: images queue locally under blob URLs, commit atomically with the doc on save — abandoned drafts don't leak into the repo
+If it's a markdown or HTML file and it lives in a GitHub repo, MarDoc makes it reviewable and editable by everyone, not just the people on the codebase.
 
-**Writing quality-of-life**
-- Autosave to localStorage per `{repo, branch, path}` with a restore banner on reopen
-- Nav-guard modal + `beforeunload` on unsaved changes
-- Cmd+F find/replace in both rich and code views — case/word/regex, navigation, replace-all
-- Cmd+Shift+P command palette (VS Code style)
-- `?` key opens a filterable keyboard shortcut cheatsheet
-- Word count + reading time in the toolbar
-- Dark mode
+## What you can do
 
-**Demo mode**
-- Everything works with sample data — no GitHub token required — so you can try it before you authenticate
+**Read the document, not the diff.**
+Open any `.md` or `.html` file in a pull request and see it rendered — headings, tables, images, lists, footnotes, code samples, mermaid diagrams, GitHub alerts. Four view modes (inline diff, side-by-side, suggestion, preview) for different review styles. Word-level change highlighting, not plus-minus lines. Scroll-spy outline for long docs.
 
-**Tested**
-- 560+ unit tests covering the review pipeline, markdown parsing, find/replace, image upload, suggestion handling, and the contracts behind every feature above
+**Highlight a sentence and leave a comment — like you would in Google Docs.**
+Select any text in the rendered view and type a comment. Your comments queue as a single pending review and go to GitHub as **one** inline review comment notification, not N emails to the author. Approve, request changes, reply to threads, resolve them. Comments are tied to the exact line in the source file, so when the engineer on the team reads them, they land in the right place.
 
-## Who is this for
+**Edit the document in a WYSIWYG editor.**
+No markdown syntax required. Type headings the way you'd type them in a word processor, bold with `Cmd+B`, insert links with `Cmd+K`, make a list by pressing bullet. Toggle to raw markdown if you want — the same document, two views. MarDoc converts back and forth without losing formatting.
 
-- **Technical writers** reviewing documentation PRs without decoding diff syntax
-- **Engineering teams** reviewing ADRs, RFCs, README changes, API docs, and runbooks
-- **Teams reviewing AI-generated documentation** in source control — the crowd feeding GPT/Claude outputs into git-tracked markdown files needs a human-review UX that isn't a plus-minus diff
-- **Open-source maintainers** with large markdown surfaces (READMEs, wikis, docs sites) that get non-stop contributor PRs
-- **Anyone** who writes or reviews prose that happens to live in a GitHub repo
+**Propose changes as suggestions.**
+Click any paragraph, edit it, and your edit becomes a GitHub "suggestion" — the reviewer (or you) can accept it with one click and it lands as a real commit on the PR branch. No manual copy-paste, no "can you change line 47 to say…" comments.
 
-## Why not...
+**Paste images. They just work.**
+Screenshot something, paste it into the editor, and MarDoc uploads the image to your repo automatically — at whatever folder you configured (`docs/images`, `docs/assets`, wherever your team keeps them). Drag-drop works too. Click the image to resize it, tick a box to center it. When you save the document, every image is already there.
 
-**...the native GitHub PR UI?** It shows a diff. For code that's right, for prose it isn't. You cannot see whether a rewritten paragraph reads better until it's rendered, and GitHub doesn't render it during review.
+**Write the way you review.**
+Cmd+F finds and replaces in both the rich and code views. A command palette (`Cmd+Shift+P`) opens everything the app can do. `?` shows every keyboard shortcut in a filterable list. Autosave protects your work in the browser across refreshes. A word count and reading time tick along in the toolbar. Dark mode.
 
-**...github.dev (the `.` keyboard shortcut)?** It's a code editor. It gives you VS Code in the browser, which is great for source code, but it still shows markdown as source text. No rendered review, no inline review comments on rendered blocks, no word-level prose diff.
+**Try it before you connect anything.**
+Demo mode ships with sample repositories and sample pull requests. Every feature above works against the built-in data — no GitHub token required. You find out if MarDoc fits before you give it any credentials.
 
-**...Notion / Confluence?** Your docs stop being version-controlled, reviewable, and linkable from code. Every change requires a separate workflow that doesn't sync back to the repo. MarDoc lets you keep documents in git and review them like they aren't.
+**Verified.**
+560+ unit tests cover the review pipeline, the markdown parsing, the comment submission, the image upload, the suggestion round-trip — every contract the product depends on. `npm test` is clean on every merge.
 
-**...Obsidian / HackMD / Typora?** Those are writing tools. They're excellent at local editing but they aren't PR review tools — no inline GitHub review comments, no batched review submission, no suggestion workflow, no commit-back.
+## Why not…
 
-**...a GitHub App?** MarDoc is client-only on purpose. A GitHub App requires a server you have to trust. MarDoc's trust story is "the code runs in your browser, your token stays local, every API call is direct." If you want self-hosting, `git clone && npm run build` and you have your own copy.
+**…ask engineers to paste docs into Notion / Google Docs so non-technical reviewers can comment, then paste the feedback back?**
+That's the status quo for most teams, and it breaks every link between the document and its repo. No version history. No review-by-PR. No single source of truth. Feedback gets lost in translation and engineering ends up transcribing comments by hand. MarDoc keeps the document in git and brings the non-technical reviewer to it — same tab, same GitHub repo, no synchronization problem.
+
+**…use the native GitHub PR UI?**
+It shows a diff with raw markdown syntax. For code that's fine; for prose it's unreadable. A product manager opening a spec PR on github.com sees ``+## Background`` and `-## Context` and has no idea which version reads better. Half your reviewers bounce. MarDoc fixes the exact thing that kept them out.
+
+**…use github.dev (the `.` keyboard shortcut on any repo page)?**
+It's a code editor — great for developers editing source, useless for non-developers reviewing docs. No rendered view during review, no inline review comments on rendered blocks, no word-level prose diff, no WYSIWYG.
+
+**…use Notion / Confluence / Google Docs as the doc system?**
+Then the docs stop being version-controlled, reviewable-by-PR, and linkable from code. Every change requires a separate workflow that doesn't sync back to the codebase. Docs and code drift. MarDoc lets docs live in the repo and still be editable by people who don't know what a repo is.
+
+**…use Obsidian / HackMD / Typora as the editor?**
+Those are single-user writing tools. They're great at local editing but they aren't review tools — no inline GitHub review comments, no batched review submission, no suggestion-as-commit workflow, no commit-back to the branch.
+
+**…build a GitHub App?**
+MarDoc is client-only on purpose. A GitHub App requires a server you have to trust with your users' tokens. MarDoc's trust story is "the code runs in your browser, your token stays local, every API call is direct from you to GitHub." Self-hosting is `git clone && npm run build` and you have your own copy — no infrastructure, no subscription, no vendor in the middle.
 
 ## Quick start
 
