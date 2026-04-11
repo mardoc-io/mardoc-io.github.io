@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useApp } from "@/lib/app-context";
+import { useTheme } from "@/lib/theme-context";
 import Sidebar from "@/components/Sidebar";
 import Editor from "@/components/Editor";
 import HtmlViewer from "@/components/HtmlViewer";
@@ -10,7 +11,9 @@ import PRReview from "@/components/PRReview";
 import SettingsPanel from "@/components/SettingsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import KeyboardCheatsheet from "@/components/KeyboardCheatsheet";
+import CommandPalette from "@/components/CommandPalette";
 import { shouldOpenCheatsheet } from "@/lib/keyboard-shortcuts";
+import { shouldOpenCommandPalette, type Command } from "@/lib/command-palette";
 import {
   BookOpen,
   Settings,
@@ -38,17 +41,69 @@ export default function Home() {
     repoFiles,
     pullRequests,
     isEmbedded,
+    createNewFile,
   } = useApp();
+  const { toggleTheme } = useTheme();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cheatsheetOpen, setCheatsheetOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
-  // Global `?` opens the keyboard cheatsheet. shouldOpenCheatsheet is a
-  // pure predicate tested in keyboard-shortcuts.test.ts — it bails when
-  // the user is typing in an input / textarea / contenteditable so we
-  // never steal their "?" character.
+  // Palette command registry. Built here because the commands close over
+  // the state setters and context actions available at the page level —
+  // opening Settings, toggling theme, starting a new file, etc. Keep this
+  // in sync with the cheatsheet where shortcuts overlap.
+  const paletteCommands = useMemo<Command[]>(
+    () => [
+      {
+        id: "open-settings",
+        label: "Open Settings",
+        category: "App",
+        keywords: ["preferences", "token", "github"],
+        handler: () => setSettingsOpen(true),
+      },
+      {
+        id: "open-cheatsheet",
+        label: "Show keyboard shortcuts",
+        category: "Help",
+        keywords: ["help", "keys", "bindings", "?"],
+        shortcut: ["?"],
+        handler: () => setCheatsheetOpen(true),
+      },
+      {
+        id: "toggle-theme",
+        label: "Toggle dark mode",
+        category: "View",
+        keywords: ["dark", "light", "theme", "appearance"],
+        handler: () => toggleTheme(),
+      },
+      {
+        id: "new-file",
+        label: "New file",
+        category: "File",
+        keywords: ["create", "add", "markdown"],
+        handler: () => createNewFile(),
+      },
+      {
+        id: "go-home",
+        label: "Go to home / welcome screen",
+        category: "Navigation",
+        keywords: ["back", "welcome", "start"],
+        handler: () => setCurrentView("editor"),
+      },
+    ],
+    [toggleTheme, createNewFile, setCurrentView]
+  );
+
+  // Global keyboard handler for `?` (cheatsheet) and ⌘⇧P (command
+  // palette). Both predicates are pure and unit-tested.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (shouldOpenCommandPalette(e as any)) {
+        e.preventDefault();
+        setPaletteOpen(true);
+        return;
+      }
       if (shouldOpenCheatsheet({ key: e.key, target: e.target as any })) {
         e.preventDefault();
         setCheatsheetOpen(true);
@@ -215,6 +270,13 @@ export default function Home() {
 
       {/* Keyboard cheatsheet (triggered by `?`) */}
       <KeyboardCheatsheet open={cheatsheetOpen} onClose={() => setCheatsheetOpen(false)} />
+
+      {/* Command palette (triggered by ⌘⇧P) */}
+      <CommandPalette
+        open={paletteOpen}
+        commands={paletteCommands}
+        onClose={() => setPaletteOpen(false)}
+      />
     </div>
   );
 }
