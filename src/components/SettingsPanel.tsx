@@ -1,10 +1,15 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Settings, X, Github, LogIn, LogOut, RefreshCw, Lock, Globe, Search } from "lucide-react";
+import { Settings, X, Github, LogIn, LogOut, RefreshCw, Lock, Globe, Search, FolderOpen } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import { fetchUserRepos } from "@/lib/github-api";
 import * as safeStorage from "@/lib/safe-storage";
+import {
+  getImageUploadFolder,
+  setImageUploadFolder,
+  DEFAULT_IMAGE_FOLDER,
+} from "@/lib/image-path-config";
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -23,6 +28,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
   const [tokenInput, setTokenInput] = useState("");
   const [repoInput, setRepoInput] = useState(currentRepo || "");
+  const [imageFolderInput, setImageFolderInput] = useState("");
+  const [imageFolderSaved, setImageFolderSaved] = useState(false);
   const [userRepos, setUserRepos] = useState<
     { fullName: string; description: string; isPrivate: boolean }[]
   >([]);
@@ -42,6 +49,26 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         r.description.toLowerCase().includes(query)
     );
   }, [userRepos, repoFilter]);
+
+  // Load the per-repo image folder setting every time the panel opens
+  // or the current repo changes, so the input shows the current value.
+  useEffect(() => {
+    if (isOpen) {
+      setImageFolderInput(getImageUploadFolder(currentRepo ?? undefined));
+      setImageFolderSaved(false);
+    }
+  }, [isOpen, currentRepo]);
+
+  const handleSaveImageFolder = () => {
+    if (!currentRepo) return;
+    setImageUploadFolder(currentRepo, imageFolderInput);
+    // Re-read so the input reflects the sanitized form (e.g., trailing
+    // slash stripped, invalid input bounced back to default).
+    const saved = getImageUploadFolder(currentRepo);
+    setImageFolderInput(saved);
+    setImageFolderSaved(true);
+    setTimeout(() => setImageFolderSaved(false), 1500);
+  };
 
   // Load user repos: show cached immediately, refresh in background
   useEffect(() => {
@@ -344,6 +371,52 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                       No repositories found. Try entering a repo name manually above.
                     </p>
                   )}
+                </div>
+              )}
+
+              {/* Image upload folder — configurable per repo. The
+                  paste / drag-drop flow commits images under this
+                  folder; defaults to docs/images. */}
+              {currentRepo && (
+                <div className="pt-4 border-t border-[var(--border)]">
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
+                    <span className="inline-flex items-center gap-1.5">
+                      <FolderOpen size={14} className="text-[var(--text-muted)]" />
+                      Image upload folder
+                    </span>
+                  </label>
+                  <p className="text-xs text-[var(--text-muted)] mb-2">
+                    Where paste / drag-drop uploads commit in{" "}
+                    <span className="font-mono">{currentRepo}</span>.
+                    Default: <span className="font-mono">{DEFAULT_IMAGE_FOLDER}</span>
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={imageFolderInput}
+                      onChange={(e) => {
+                        setImageFolderInput(e.target.value);
+                        setImageFolderSaved(false);
+                      }}
+                      placeholder={DEFAULT_IMAGE_FOLDER}
+                      className="flex-1 px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] font-mono"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSaveImageFolder();
+                      }}
+                    />
+                    <button
+                      onClick={handleSaveImageFolder}
+                      className="px-4 py-2 bg-[var(--accent)] text-white text-sm rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
+                    >
+                      {imageFolderSaved ? "Saved ✓" : "Save"}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1.5">
+                    Examples: <span className="font-mono">docs/images</span>,{" "}
+                    <span className="font-mono">docs/assets</span>,{" "}
+                    <span className="font-mono">src/assets/img</span>,{" "}
+                    <span className="font-mono">public/images</span>
+                  </p>
                 </div>
               )}
 

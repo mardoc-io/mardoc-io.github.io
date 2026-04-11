@@ -43,8 +43,11 @@ export function validateImageFile(file: { type: string; size: number }): Validat
 /**
  * Generate a stable, collision-resistant path for an uploaded image.
  *
- * Layout: `docs/images/{YYYY-MM-DD}-{sanitized-stem}-{random}.{ext}`
+ * Layout: `{folder}/{YYYY-MM-DD}-{sanitized-stem}-{random}.{ext}`
  *
+ *   - `folder` is the per-repo configured upload folder
+ *     (src/lib/image-path-config.ts). Defaults to `docs/images` when
+ *     not passed, keeping existing callers working.
  *   - Date prefix keeps uploads sortable in the file tree
  *   - Random suffix prevents collisions when a user pastes the same
  *     clipboard content twice in a row (pasted screenshots always get
@@ -52,7 +55,11 @@ export function validateImageFile(file: { type: string; size: number }): Validat
  *   - Sanitized stem matches the broad shape of the original filename
  *     but is url-safe and lowercased
  */
-export function generateImagePath(originalName: string, now: Date = new Date()): string {
+export function generateImagePath(
+  originalName: string,
+  now: Date = new Date(),
+  folder: string = "docs/images"
+): string {
   const datePrefix = toISODatePrefix(now);
   const randomSuffix = Math.random().toString(36).slice(2, 8);
 
@@ -60,7 +67,12 @@ export function generateImagePath(originalName: string, now: Date = new Date()):
   const sanitizedStem = sanitizeStem(stem) || "image";
   const safeExt = ext || ".png";
 
-  return `docs/images/${datePrefix}-${sanitizedStem}-${randomSuffix}${safeExt}`;
+  // Normalize the folder — strip leading/trailing slashes so the
+  // caller can pass either "docs/images" or "/docs/images/" and we
+  // produce the same output.
+  const normalizedFolder = folder.replace(/^\/+|\/+$/g, "") || "docs/images";
+
+  return `${normalizedFolder}/${datePrefix}-${sanitizedStem}-${randomSuffix}${safeExt}`;
 }
 
 function toISODatePrefix(d: Date): string {

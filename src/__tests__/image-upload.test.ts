@@ -119,6 +119,39 @@ describe("generateImagePath", () => {
     const b = generateImagePath("photo.png", fixedDate);
     expect(a).not.toBe(b);
   });
+
+  // ─── Configurable folder ───────────────────────────────────────────────
+
+  it("uses a configurable folder when passed in", () => {
+    const path = generateImagePath("photo.png", fixedDate, "docs/assets");
+    expect(path.startsWith("docs/assets/")).toBe(true);
+  });
+
+  it("normalizes the folder argument (strips leading/trailing slashes)", () => {
+    expect(generateImagePath("photo.png", fixedDate, "/docs/assets/")).toMatch(
+      /^docs\/assets\//
+    );
+    expect(generateImagePath("photo.png", fixedDate, "public/img")).toMatch(
+      /^public\/img\//
+    );
+  });
+
+  it("falls back to docs/images when folder is empty or only slashes", () => {
+    expect(generateImagePath("photo.png", fixedDate, "")).toMatch(/^docs\/images\//);
+    expect(generateImagePath("photo.png", fixedDate, "/")).toMatch(/^docs\/images\//);
+  });
+
+  it("supports a single-segment folder", () => {
+    expect(generateImagePath("photo.png", fixedDate, "assets")).toMatch(
+      /^assets\//
+    );
+  });
+
+  it("supports deeply nested folders", () => {
+    expect(
+      generateImagePath("photo.png", fixedDate, "src/main/resources/images")
+    ).toMatch(/^src\/main\/resources\/images\//);
+  });
 });
 
 describe("arrayBufferToBase64", () => {
