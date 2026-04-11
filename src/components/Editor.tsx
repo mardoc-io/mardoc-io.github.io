@@ -45,6 +45,8 @@ import {
 } from "@/lib/draft-store";
 import { analyzeMarkdown, type MarkdownStats } from "@/lib/word-count";
 import { transformGitHubAlerts } from "@/lib/github-alerts";
+import FindReplaceBar from "./FindReplaceBar";
+import type { Match as FindMatch } from "@/lib/find-replace";
 import { classifyLink, resolvePath, findFileByPath } from "@/lib/link-handler";
 import { useApp } from "@/lib/app-context";
 import { openExternal } from "@/lib/open-external";
@@ -663,6 +665,10 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   // same debounce tick as the dirty check so we don't run Turndown twice.
   const [stats, setStats] = useState<MarkdownStats>({ words: 0, readingMinutes: 0 });
 
+  // Find/replace panel — only available in code view. In rich view, Cmd+F
+  // falls through to the browser's native find.
+  const [findBarOpen, setFindBarOpen] = useState(false);
+
   // Dirty tracking for existing files — compare current markdown to original
   const [isDirty, setIsDirty] = useState(false);
   const originalMarkdownRef = useRef<string | null>(null);
@@ -921,8 +927,33 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         wrapSelection("[", `](${selected ? "" : "url"})`);
         break;
       }
+      case "f":
+        e.preventDefault();
+        setFindBarOpen(true);
+        break;
     }
   }, [wrapSelection, codeContent]);
+
+  // Handler for FindReplaceBar — when the user navigates to a match, scroll
+  // the code textarea to it and select the matched range.
+  const handleMatchFocused = useCallback((match: FindMatch) => {
+    const textarea = codeTextareaRef.current;
+    if (!textarea) return;
+    textarea.focus();
+    textarea.setSelectionRange(match.start, match.end);
+    // Scroll the match into view. setSelectionRange doesn't auto-scroll in
+    // all browsers, so we measure the match's line and jump scrollTop.
+    const before = codeContent.slice(0, match.start);
+    const lineNumber = (before.match(/\n/g) || []).length;
+    const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight || "20");
+    textarea.scrollTop = Math.max(0, lineNumber * lineHeight - textarea.clientHeight / 2);
+  }, [codeContent]);
+
+  // Leaving code view closes the find bar. Opening the bar requires being
+  // in code view, and the bar only operates on codeContent.
+  useEffect(() => {
+    if (!codeView) setFindBarOpen(false);
+  }, [codeView]);
 
   const handleStartComment = useCallback((selectedText: string) => {
     setPendingSelection(selectedText);
@@ -1623,6 +1654,27 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
                   </button>
                 </div>
               </div>
+            )}
+
+            {codeView && findBarOpen && (
+              <FindReplaceBar
+                text={codeContent}
+                onTextChange={(next) => {
+                  setCodeContent(next);
+                  const { dirty } = reconcileDraft(
+                    draftScopeRef.current,
+                    originalMarkdownRef.current,
+                    next
+                  );
+                  setIsDirty(dirty);
+                  setStats(analyzeMarkdown(next));
+                }}
+                onClose={() => {
+                  setFindBarOpen(false);
+                  codeTextareaRef.current?.focus();
+                }}
+                onMatchFocused={handleMatchFocused}
+              />
             )}
 
             {codeView ? (
