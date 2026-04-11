@@ -169,15 +169,23 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
                   <div className="bg-[var(--surface-secondary)] rounded-lg p-3 mb-4">
                     <p className="text-xs text-[var(--text-secondary)] mb-2">
-                      <strong>How to create a token:</strong>
+                      <strong>How to create a classic token:</strong>
                     </p>
                     <ol className="text-xs text-[var(--text-muted)] space-y-1 list-decimal ml-4">
-                      <li>Go to GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens</li>
-                      <li>Click "Generate new token"</li>
-                      <li>Select the repositories you want to access</li>
-                      <li>Under Permissions, enable: Contents (Read), Pull Requests (Read & Write), Issues (Read & Write)</li>
-                      <li>Generate and paste below</li>
+                      <li>Go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)</li>
+                      <li>Click "Generate new token" → "Generate new token (classic)"</li>
+                      <li>Give it a note (e.g. "MarDoc") and set an expiration</li>
+                      <li>
+                        Check the <strong>repo</strong> scope — this single scope covers reading
+                        code, managing pull requests, and creating review comments
+                      </li>
+                      <li>Click "Generate token", copy the <code className="px-1 rounded bg-[var(--surface)]">ghp_…</code> value, and paste below</li>
                     </ol>
+                    <p className="text-[10px] text-[var(--text-muted)] mt-2 italic">
+                      Classic tokens are simpler than fine-grained ones — one scope, one click.
+                      If you already have a fine-grained token with Contents + Pull Requests +
+                      Issues permissions, it will also work.
+                    </p>
                   </div>
 
                   <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
@@ -188,7 +196,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                       type="password"
                       value={tokenInput}
                       onChange={(e) => setTokenInput(e.target.value)}
-                      placeholder="github_pat_..."
+                      placeholder="ghp_..."
                       className="flex-1 px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] font-mono"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handleConnect();
