@@ -43,6 +43,7 @@ import {
   reconcileDraft,
   resolveDraftOnLoad,
 } from "@/lib/draft-store";
+import { analyzeMarkdown, type MarkdownStats } from "@/lib/word-count";
 import { classifyLink, resolvePath, findFileByPath } from "@/lib/link-handler";
 import { useApp } from "@/lib/app-context";
 import { openExternal } from "@/lib/open-external";
@@ -657,6 +658,10 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   const [codeContent, setCodeContent] = useState("");
   const codeTextareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Word count + reading time — displayed in the toolbar. Recomputed in the
+  // same debounce tick as the dirty check so we don't run Turndown twice.
+  const [stats, setStats] = useState<MarkdownStats>({ words: 0, readingMinutes: 0 });
+
   // Dirty tracking for existing files — compare current markdown to original
   const [isDirty, setIsDirty] = useState(false);
   const originalMarkdownRef = useRef<string | null>(null);
@@ -751,6 +756,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         const currentMd = turndown.turndown(editor.getHTML());
         const { dirty } = reconcileDraft(scope, originalMarkdownRef.current, currentMd);
         setIsDirty(dirty);
+        setStats(analyzeMarkdown(currentMd));
       }, 300);
     },
     editorProps: {
@@ -774,6 +780,8 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
           // Capture baseline markdown for dirty comparison
           const turndown = createTurndownService();
           originalMarkdownRef.current = turndown.turndown(editor.getHTML());
+          // Initialize the word-count display from the loaded content.
+          setStats(analyzeMarkdown(originalMarkdownRef.current));
 
           // Check for a locally-saved draft that differs from upstream — if
           // found, offer to restore it. resolveDraftOnLoad handles the
@@ -1467,6 +1475,16 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
             {submitError && (
               <span className="text-xs text-red-500 px-2">{submitError}</span>
             )}
+            {/* Word count + reading time. Hidden for empty documents so an
+                empty new-file toolbar doesn't carry "0 words". */}
+            {stats.words > 0 && (
+              <span
+                className="hidden sm:inline text-[10px] text-[var(--text-muted)] font-mono px-1.5 select-none"
+                title={`${stats.words.toLocaleString()} words · ~${stats.readingMinutes} min read`}
+              >
+                {stats.words.toLocaleString()} words · {stats.readingMinutes} min
+              </span>
+            )}
             <button
               onClick={toggleCodeView}
               className={`flex items-center gap-1 px-2 py-1 text-[11px] rounded-md transition-colors ${
@@ -1619,6 +1637,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
                     next
                   );
                   setIsDirty(dirty);
+                  setStats(analyzeMarkdown(next));
                 }}
                 onKeyDown={handleCodeViewKeyDown}
                 className="w-full min-h-[60vh] p-4 font-mono text-sm leading-relaxed bg-[var(--surface-secondary)] text-[var(--text-primary)] border border-[var(--border)] rounded-lg resize-y focus:outline-none focus:border-[var(--accent)]"
