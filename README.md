@@ -2,9 +2,9 @@
 
 **Markdown is the AI era's lingua franca. MarDoc makes it accessible to everyone on your team.**
 
-Every major LLM — ChatGPT, Claude, Gemini — emits markdown by default. Reports, specs, research, analyses, strategy memos, onboarding guides, documentation of every kind: AI-generated content is increasingly written in markdown and HTML, and increasingly lives in GitHub repos next to the code and pipelines that produced it. That's the right architecture — version-controlled, branch-reviewable, linkable from the systems that use it, a single source of truth.
+Every major LLM — ChatGPT, Claude, Gemini — emits markdown by default. Reports, specs, research, analyses, strategy memos, onboarding guides, documentation of every kind: AI-generated content is increasingly written in markdown and HTML, and increasingly lives in GitHub repos next to the code and pipelines that produced it. That's the right architecture — version-controlled, branch-reviewable, linkable from the systems that use it, a single source of truth, and close to the source so the docs don't rot while the code moves on without them.
 
-But reviewing those files still requires knowing git, decoding diffs, and navigating tooling designed for engineers. In an era where AI is dissolving the "you need to be technical" gate across every other kind of work — writing, research, analysis, design, even coding — one specific barrier remains. And it's the barrier that keeps most of your team out of reviewing the content AI is generating for the organization.
+But reviewing those files still requires knowing git, decoding diffs, and navigating tooling designed for engineers. In an era where AI is dissolving the *you need to be technical* gate across every other kind of work — writing, research, analysis, design, even coding — one specific barrier remains. And it's the barrier that keeps most of your team out of reviewing the content AI is generating for the organization.
 
 MarDoc is the bridge. Same GitHub repo, same files, same commits — rendered as documents, commented like Google Docs, edited in a WYSIWYG editor, committed back as real pull requests. Anyone on your team — PM, designer, writer, marketer, legal reviewer, exec sponsor — can review and edit AI-generated markdown and HTML without ever learning the word "diff."
 
@@ -62,23 +62,12 @@ Demo mode ships with sample repositories and sample pull requests. Every feature
 
 ## Why not…
 
-**…ask engineers to paste docs into Notion / Google Docs so non-technical reviewers can comment, then paste the feedback back?**
-That's the status quo for most teams, and it breaks every link between the document and its repo. No version history. No review-by-PR. No single source of truth. Feedback gets lost in translation and engineering ends up transcribing comments by hand. MarDoc keeps the document in git and brings the non-technical reviewer to it — same tab, same GitHub repo, no synchronization problem.
-
-**…use the native GitHub PR UI?**
-It shows a diff with raw markdown syntax. For code that's fine; for prose it's unreadable. A product manager opening a spec PR on github.com sees ``+## Background`` and `-## Context` and has no idea which version reads better. Half your reviewers bounce. MarDoc fixes the exact thing that kept them out.
-
-**…use github.dev (the `.` keyboard shortcut on any repo page)?**
-It's a code editor — great for developers editing source, useless for non-developers reviewing docs. No rendered view during review, no inline review comments on rendered blocks, no word-level prose diff, no WYSIWYG.
-
-**…use Notion / Confluence / Google Docs as the doc system?**
-Then the docs stop being version-controlled, reviewable-by-PR, and linkable from code. Every change requires a separate workflow that doesn't sync back to the codebase. Docs and code drift. MarDoc lets docs live in the repo and still be editable by people who don't know what a repo is.
-
-**…use Obsidian / HackMD / Typora as the editor?**
-Those are single-user writing tools. They're great at local editing but they aren't review tools — no inline GitHub review comments, no batched review submission, no suggestion-as-commit workflow, no commit-back to the branch.
-
-**…build a GitHub App?**
-MarDoc is client-only on purpose. A GitHub App requires a server you have to trust with your users' tokens. MarDoc's trust story is "the code runs in your browser, your token stays local, every API call is direct from you to GitHub." Self-hosting is `git clone && npm run build` and you have your own copy — no infrastructure, no subscription, no vendor in the middle.
+- **…ask engineers to paste docs into Notion / Google Docs so non-technical reviewers can comment, then paste the feedback back?** That's the status quo for most teams, and it breaks every link between the document and its repo. No version history. No review-by-PR. No single source of truth. Feedback gets lost in translation and engineering ends up transcribing comments by hand. MarDoc keeps the document in git and brings the non-technical reviewer to it — same tab, same GitHub repo, no synchronization problem.
+- **…use the native GitHub PR UI?** It shows a diff with raw markdown syntax. For code that's fine; for prose it's unreadable. A product manager opening a spec PR on github.com sees ``+## Background`` and `-## Context` and has no idea which version reads better. Half your reviewers bounce. MarDoc fixes the exact thing that kept them out.
+- **…use github.dev (the `.` keyboard shortcut on any repo page)?** It's a code editor — great for developers editing source, useless for non-developers reviewing docs. No rendered view during review, no inline review comments on rendered blocks, no word-level prose diff, no WYSIWYG.
+- **…use Notion / Confluence / Google Docs as the doc system?** Then the docs stop being version-controlled, reviewable-by-PR, and linkable from code. Every change requires a separate workflow that doesn't sync back to the codebase. Docs and code drift. MarDoc lets docs live in the repo and still be editable by people who don't know what a repo is.
+- **…use Obsidian / HackMD / Typora as the editor?** Those are single-user writing tools. They're great at local editing but they aren't review tools — no inline GitHub review comments, no batched review submission, no suggestion-as-commit workflow, no commit-back to the branch.
+- **…build a GitHub App?** MarDoc is client-only on purpose. A GitHub App requires a server you have to trust with your users' tokens. MarDoc's trust story is "the code runs in your browser, your token stays local, every API call is direct from you to GitHub." Self-hosting is `git clone && npm run build` and you have your own copy — no infrastructure, no subscription, no vendor in the middle.
 
 ## Quick start
 
