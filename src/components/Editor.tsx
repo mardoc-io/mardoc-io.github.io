@@ -47,6 +47,7 @@ import { analyzeMarkdown, type MarkdownStats } from "@/lib/word-count";
 import { transformGitHubAlerts } from "@/lib/github-alerts";
 import FindReplaceBar from "./FindReplaceBar";
 import type { Match as FindMatch } from "@/lib/find-replace";
+import Outline from "./Outline";
 import { classifyLink, resolvePath, findFileByPath } from "@/lib/link-handler";
 import { useApp } from "@/lib/app-context";
 import { openExternal } from "@/lib/open-external";
@@ -72,6 +73,7 @@ import {
   Highlighter,
   FileCode,
   Braces,
+  List as ListIcon,
   MessageSquarePlus,
   MessageSquare,
   Send,
@@ -665,9 +667,23 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   // same debounce tick as the dirty check so we don't run Turndown twice.
   const [stats, setStats] = useState<MarkdownStats>({ words: 0, readingMinutes: 0 });
 
+  // Current markdown view used by feature widgets that render off the raw
+  // source (outline / TOC). Updated in the same debounce tick as the
+  // dirty check to avoid an extra Turndown pass.
+  const [currentMarkdown, setCurrentMarkdown] = useState("");
+
   // Find/replace panel — only available in code view. In rich view, Cmd+F
   // falls through to the browser's native find.
   const [findBarOpen, setFindBarOpen] = useState(false);
+
+  // Outline / TOC side panel. Shows the current document's headings with
+  // click-to-jump and scroll-spy. Toggled from the toolbar.
+  const [outlineOpen, setOutlineOpen] = useState(false);
+
+  // Markdown fed to the outline extractor. Code view has it in state
+  // directly; rich view gets the debounced currentMarkdown, one tick
+  // behind the cursor (fine — heading edits are infrequent).
+  const outlineMarkdown = codeView ? codeContent : currentMarkdown;
 
   // Dirty tracking for existing files — compare current markdown to original
   const [isDirty, setIsDirty] = useState(false);
@@ -764,6 +780,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         const { dirty } = reconcileDraft(scope, originalMarkdownRef.current, currentMd);
         setIsDirty(dirty);
         setStats(analyzeMarkdown(currentMd));
+        setCurrentMarkdown(currentMd);
       }, 300);
     },
     editorProps: {
@@ -787,8 +804,9 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
           // Capture baseline markdown for dirty comparison
           const turndown = createTurndownService();
           originalMarkdownRef.current = turndown.turndown(editor.getHTML());
-          // Initialize the word-count display from the loaded content.
+          // Initialize downstream feature state from the loaded content.
           setStats(analyzeMarkdown(originalMarkdownRef.current));
+          setCurrentMarkdown(originalMarkdownRef.current);
 
           // Check for a locally-saved draft that differs from upstream — if
           // found, offer to restore it. resolveDraftOnLoad handles the
@@ -1257,6 +1275,15 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
 
   return (
     <div className="h-full flex">
+      {/* Outline / TOC side panel */}
+      {outlineOpen && !isNewFile && (
+        <Outline
+          markdown={outlineMarkdown}
+          editorContainerRef={editorContainerRef}
+          onClose={() => setOutlineOpen(false)}
+        />
+      )}
+
       {/* Main editor column */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Toolbar */}
@@ -1517,6 +1544,14 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
                 {stats.words.toLocaleString()} words · {stats.readingMinutes} min
               </span>
             )}
+            <button
+              onClick={() => setOutlineOpen((v) => !v)}
+              className={`toolbar-btn ${outlineOpen ? "active" : ""}`}
+              title={outlineOpen ? "Hide outline" : "Show outline / table of contents"}
+              aria-pressed={outlineOpen}
+            >
+              <ListIcon size={15} />
+            </button>
             <button
               onClick={toggleCodeView}
               className={`flex items-center gap-1 px-2 py-1 text-[11px] rounded-md transition-colors ${
