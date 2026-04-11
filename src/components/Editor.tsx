@@ -71,6 +71,7 @@ import {
 } from "@/lib/draft-store";
 import { analyzeMarkdown, type MarkdownStats } from "@/lib/word-count";
 import { parseImageDimension, formatImageDimension, unwrapCenteredImages, type ImageDimension } from "@/lib/image-resize";
+import { computeDragResize } from "@/lib/image-drag-resize";
 import { transformGitHubAlerts } from "@/lib/github-alerts";
 import { transformFootnotes } from "@/lib/footnotes";
 import FindReplaceBar from "./FindReplaceBar";
@@ -327,6 +328,14 @@ function LinkImageBubble({
   const [editHeight, setEditHeight] = useState("");
   const [editCenter, setEditCenter] = useState(false);
   const [lockAspect, setLockAspect] = useState(true);
+  // Drag-to-resize state. Captured on mousedown on the handle, read on
+  // mousemove. dragStart is non-null while a drag is active.
+  const dragStart = useRef<{
+    startWidth: number;
+    startHeight: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
   // Natural image aspect ratio (intrinsic width / height) captured from
   // the rendered <img>. Used to auto-fill the other dimension when the
   // aspect lock is on.
@@ -488,7 +497,81 @@ function LinkImageBubble({
     setEditing(false);
   };
 
+  // Drag-to-resize handlers. On mousedown we snapshot the image's
+  // current rendered dimensions and the pointer position, then
+  // listen for mousemove / mouseup at the window level so the drag
+  // keeps working even if the pointer leaves the handle element.
+  const onDragStart = (e: React.MouseEvent) => {
+    if (target.type !== "image") return;
+    if (!(target.element instanceof HTMLImageElement)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const img = target.element;
+    // Use rendered bounding-box dimensions as the starting point so
+    // drag math matches what the user sees. Fall back to natural size.
+    const rect = img.getBoundingClientRect();
+    dragStart.current = {
+      startWidth: Math.round(rect.width) || img.naturalWidth || 0,
+      startHeight: Math.round(rect.height) || img.naturalHeight || 0,
+      startX: e.clientX,
+      startY: e.clientY,
+    };
+    const onMove = (ev: MouseEvent) => {
+      const start = dragStart.current;
+      if (!start) return;
+      const next = computeDragResize({
+        startWidth: start.startWidth,
+        startHeight: start.startHeight,
+        dx: ev.clientX - start.startX,
+        dy: ev.clientY - start.startY,
+        lockAspectRatio: lockAspect,
+      });
+      // Push new dimensions into the image node's attributes. The
+      // node is whatever is currently selected — we assume the click
+      // that opened the bubble also selected the image.
+      editor
+        .chain()
+        .updateAttributes("image", {
+          width: String(next.width),
+          height: String(next.height),
+        })
+        .run();
+    };
+    const onUp = () => {
+      dragStart.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  // Drag handle position — only for image targets. Rendered absolute
+  // in the same coordinate space as the bubble, positioned on the
+  // image's bottom-right corner so the user can drag it to resize.
+  const showHandle = target.type === "image";
+  const handleSize = 12;
+  const handleTop =
+    rect.bottom - containerRect.top - handleSize / 2;
+  const handleLeft =
+    rect.right - containerRect.left - handleSize / 2;
+
   return (
+    <>
+      {showHandle && (
+        <div
+          className="absolute z-50 bg-[var(--accent)] border-2 border-white dark:border-[var(--surface)] rounded-sm shadow-md cursor-nwse-resize hover:scale-125 transition-transform"
+          style={{
+            top: handleTop,
+            left: handleLeft,
+            width: handleSize,
+            height: handleSize,
+          }}
+          onMouseDown={onDragStart}
+          title="Drag to resize"
+          aria-label="Resize image"
+        />
+      )}
     <div
       ref={bubbleRef}
       className="absolute z-50"
@@ -648,6 +731,7 @@ function LinkImageBubble({
         )}
       </div>
     </div>
+    </>
   );
 }
 
