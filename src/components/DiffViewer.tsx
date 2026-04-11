@@ -47,6 +47,8 @@ import { renderMermaidBlocks } from "@/lib/mermaid";
 import { highlightCodeBlocks } from "@/lib/highlight";
 import { useWideFormat } from "@/lib/use-wide-format";
 import { isHtmlFile } from "@/lib/file-types";
+import { injectSourceLineAttributes } from "@/lib/html-source-lines";
+import { buildIframeSelectionScript } from "@/lib/html-selection";
 import { extractCommentSuggestions, mergeSuggestions } from "@/lib/suggestion-extract";
 import { parseSuggestionBody } from "@/lib/suggestion-body";
 
@@ -695,6 +697,13 @@ export default function DiffViewer({
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const [pendingCommentInput, setPendingCommentInput] = useState("");
+  // Pre-computed source-line range for the pending selection — set
+  // when the selection comes from the HTML review iframe (which has
+  // the data-mardoc-line attributes to resolve lines exactly).
+  // Markdown selections still compute the range via mapSelectionToLines
+  // at submit time.
+  const [pendingSelectionRange, setPendingSelectionRange] =
+    useState<{ startLine: number; endLine: number } | null>(null);
 
   // Suggest mode state
   const [pendingSuggestions, setPendingSuggestions] = useState<PendingSuggestion[]>([]);
@@ -716,27 +725,57 @@ export default function DiffViewer({
     renderMermaidBlocks(contentRef.current);
   }, [file, viewMode, fileIsHtml, comments]);
 
-  // Listen for iframe resize messages (HTML file rendering)
+  // Listen for iframe messages (HTML file rendering):
+  //   - mardoc-iframe-resize: auto-size the iframe to its content
+  //   - mardoc-html-selection: user selected text inside the iframe,
+  //     flow it into the pending-comment pipeline
   useEffect(() => {
     if (!fileIsHtml) return;
     const iframe = htmlIframeRef.current;
-    if (!iframe) return;
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === "mardoc-iframe-resize" && typeof event.data.height === "number") {
-        iframe.style.height = `${event.data.height + 20}px`;
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+
+      if (data.type === "mardoc-iframe-resize" && typeof data.height === "number" && iframe) {
+        iframe.style.height = `${data.height + 20}px`;
+        return;
+      }
+
+      if (data.type === "mardoc-html-selection" && typeof data.text === "string") {
+        // Only accept selections from our own iframe
+        if (iframe && event.source !== iframe.contentWindow) return;
+        const startLine = typeof data.startLine === "number" ? data.startLine : 1;
+        const endLine = typeof data.endLine === "number" ? data.endLine : startLine;
+        setPendingSelection(data.text);
+        setPendingSelectionRange({ startLine, endLine });
+        setShowPanel(true);
       }
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [fileIsHtml, htmlViewMode, htmlShowBase]);
 
-  // Prepare HTML srcdoc with injected resize script
+  // Prepare HTML srcdoc with injected source-line attributes,
+  // resize script, and selection listener. Source-line injection
+  // tags every element with `data-mardoc-line` so that when a user
+  // selects text inside the iframe, the selection script can walk
+  // up to find the source line and postMessage it to the parent.
   const htmlSrcdoc = useMemo(() => {
     if (!fileIsHtml) return "";
     const raw = htmlShowBase ? file.baseContent : file.headContent;
+    // Inject per-element source line attributes. Only on the head
+    // (new) view — we don't need comment-target lines on the base
+    // since comments always target the head revision.
+    const tagged = htmlShowBase ? raw : injectSourceLineAttributes(raw);
     const resizeScript = `<script>(function(){function p(){window.parent.postMessage({type:'mardoc-iframe-resize',height:document.documentElement.scrollHeight},'*')}window.addEventListener('load',function(){setTimeout(p,100)});new MutationObserver(p).observe(document.body,{childList:true,subtree:true,attributes:true});setTimeout(p,500);setTimeout(p,2000)})()</script>`;
-    if (raw.includes("</body>")) return raw.replace("</body>", `${resizeScript}</body>`);
-    return raw + resizeScript;
+    // Only attach the selection listener in head view — base is
+    // reference-only and shouldn't accept comments.
+    const selectionScript = htmlShowBase
+      ? ""
+      : `<script>${buildIframeSelectionScript()}</script>`;
+    const injected = resizeScript + selectionScript;
+    if (tagged.includes("</body>")) return tagged.replace("</body>", `${injected}</body>`);
+    return tagged + injected;
   }, [fileIsHtml, file.baseContent, file.headContent, htmlShowBase]);
 
   // Simple source diff for HTML files
@@ -1001,15 +1040,28 @@ export default function DiffViewer({
   const submitSelectionComment = useCallback(() => {
     if (!pendingSelection || !pendingCommentInput.trim()) return;
 
-    // Map selected text to line numbers in the head content
-    const { startLine, endLine } = mapSelectionToLines(file.headContent, pendingSelection);
+    // If we already have a source-line range (from the HTML iframe
+    // selection listener — which resolves lines exactly via
+    // data-mardoc-line attributes), trust it. Otherwise fall back
+    // to fuzzy-matching the selected text against the source, which
+    // is how the markdown flow has always worked.
+    const { startLine, endLine } =
+      pendingSelectionRange ??
+      mapSelectionToLines(file.headContent, pendingSelection);
 
     // Let PRDetail handle state + GitHub API — it flows back through the comments prop
     onAddComment(0, pendingCommentInput.trim(), pendingSelection, startLine, endLine);
 
     setPendingSelection(null);
+    setPendingSelectionRange(null);
     setPendingCommentInput("");
-  }, [pendingSelection, pendingCommentInput, file.headContent, onAddComment]);
+  }, [
+    pendingSelection,
+    pendingSelectionRange,
+    pendingCommentInput,
+    file.headContent,
+    onAddComment,
+  ]);
 
   const handleReply = useCallback((commentId: string, body: string) => {
     if (onReplyComment) {
@@ -1251,6 +1303,7 @@ export default function DiffViewer({
                   }
                   if (e.key === "Escape") {
                     setPendingSelection(null);
+                    setPendingSelectionRange(null);
                     setPendingCommentInput("");
                   }
                 }}
@@ -1265,6 +1318,7 @@ export default function DiffViewer({
               <button
                 onClick={() => {
                   setPendingSelection(null);
+                  setPendingSelectionRange(null);
                   setPendingCommentInput("");
                 }}
                 className="text-xs px-2 py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"

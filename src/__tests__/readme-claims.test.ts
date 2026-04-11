@@ -30,6 +30,8 @@ import { mapSelectionToLines } from "@/lib/github-api";
 import { mergeFreshComments } from "@/lib/comment-merge";
 import { buildSuggestionBody, parseSuggestionBody } from "@/lib/suggestion-body";
 import { isLineResolutionError } from "@/lib/review-fallback";
+import { injectSourceLineAttributes } from "@/lib/html-source-lines";
+import { resolveSelectionSourceLines } from "@/lib/html-selection";
 import type { PRComment } from "@/types";
 
 // ─── Claim: "rich, formatted documents — not raw text with + and -" ──
@@ -263,6 +265,68 @@ describe("README claim: posted back to GitHub as an inline review comment", () =
         message: "Review Can not approve your own pull request",
       })
     ).toBe(false);
+  });
+});
+
+// ─── Claim: "markdown and HTML" — HTML review parity ────────────────
+
+describe("README claim: HTML files support the same review flow as markdown", () => {
+  // The README says MarDoc works on "any `.md` or `.html` file in a
+  // pull request". Feature 033 makes the select-passage/leave-a-comment
+  // flow work on HTML. These tests pin the load-bearing invariants.
+
+  const htmlSource = [
+    "<!DOCTYPE html>",
+    "<html>",
+    "<body>",
+    "<h1>Findings</h1>",
+    "<p>The system behaved as expected.</p>",
+    "<ul>",
+    "<li>Item one</li>",
+    "<li>Item two</li>",
+    "</ul>",
+    "</body>",
+    "</html>",
+  ].join("\n");
+
+  it("HTML source can be tagged with per-element source-line attributes", () => {
+    const injected = injectSourceLineAttributes(htmlSource);
+    // Every element opening tag carries a data-mardoc-line
+    expect(injected).toMatch(/<h1[^>]*data-mardoc-line="4"/);
+    expect(injected).toMatch(/<p[^>]*data-mardoc-line="5"/);
+    expect(injected).toMatch(/<li[^>]*data-mardoc-line="7"/);
+    expect(injected).toMatch(/<li[^>]*data-mardoc-line="8"/);
+  });
+
+  it("a selection in a tagged HTML document resolves to the correct source-line range", () => {
+    const injected = injectSourceLineAttributes(htmlSource);
+    document.body.innerHTML = injected;
+
+    // User selects "Item one" (li on source line 7)
+    const firstLi = document.querySelectorAll("li")[0];
+    const textNode = firstLi.firstChild!;
+    const range = resolveSelectionSourceLines(textNode, textNode);
+    expect(range).toEqual({ startLine: 7, endLine: 7 });
+  });
+
+  it("a multi-element HTML selection produces a range spanning both source lines", () => {
+    const injected = injectSourceLineAttributes(htmlSource);
+    document.body.innerHTML = injected;
+
+    // User drags from the h1 (line 4) to the p (line 5)
+    const h1Text = document.querySelector("h1")!.firstChild!;
+    const pText = document.querySelector("p")!.firstChild!;
+    const range = resolveSelectionSourceLines(h1Text, pText);
+    expect(range).toEqual({ startLine: 4, endLine: 5 });
+  });
+
+  it("injected HTML is still byte-identical to the source after stripping the attribute", () => {
+    // Round-trip guarantee: injection doesn't reformat the source in
+    // any way a reviewer would notice. The rendered output matches
+    // the reviewer's expectations of the file they pushed.
+    const injected = injectSourceLineAttributes(htmlSource);
+    const stripped = injected.replace(/\s*data-mardoc-line="\d+"/g, "");
+    expect(stripped).toBe(htmlSource);
   });
 });
 

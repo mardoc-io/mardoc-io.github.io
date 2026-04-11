@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Field Guide to Document Review in the AI Era</title>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#eff6ff',
+      primaryTextColor: '#1e3a8a',
+      primaryBorderColor: '#60a5fa',
+      secondaryColor: '#ecfdf5',
+      secondaryTextColor: '#065f46',
+      secondaryBorderColor: '#34d399',
+      tertiaryColor: '#fef3c7',
+      tertiaryTextColor: '#92400e',
+      tertiaryBorderColor: '#fbbf24',
+      lineColor: '#6b7280',
+      fontSize: '13px',
+      fontFamily: '"Inter", -apple-system, "Segoe UI", system-ui, sans-serif'
+    }
+  });
+</script>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --paper: #fafaf7;
+    --accent: #2563eb;
+    --accent-soft: #eff6ff;
+    --accent-dark: #1e3a8a;
+    --muted: #6b7280;
+    --rule: #e5e7eb;
+    --card-bg: #ffffff;
+    --warn: #f59e0b;
+    --warn-soft: #fffbeb;
+    --ok: #10b981;
+    --ok-soft: #ecfdf5;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    line-height: 1.65;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 48px 32px 96px;
+  }
+  header {
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 28px;
+    margin-bottom: 40px;
+  }
+  header .kicker {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 11px;
+    color: var(--accent);
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  h1 {
+    font-size: 38px;
+    line-height: 1.15;
+    margin: 0 0 14px;
+    letter-spacing: -0.01em;
+  }
+  header .byline {
+    color: var(--muted);
+    font-size: 14px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+  }
+  h2 {
+    font-size: 26px;
+    margin-top: 44px;
+    margin-bottom: 14px;
+    letter-spacing: -0.005em;
+  }
+  h3 {
+    font-size: 19px;
+    margin-top: 30px;
+    margin-bottom: 10px;
+  }
+  p { margin: 0 0 16px; }
+  blockquote {
+    border-left: 4px solid var(--accent);
+    background: var(--accent-soft);
+    margin: 28px 0;
+    padding: 18px 22px;
+    font-style: italic;
+    color: var(--accent-dark);
+    border-radius: 0 6px 6px 0;
+  }
+  ul, ol { padding-left: 24px; }
+  li { margin-bottom: 6px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 28px 0;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    background: var(--card-bg);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  th, td {
+    text-align: left;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--rule);
+  }
+  th {
+    background: #f8fafc;
+    font-weight: 600;
+    color: #374151;
+    letter-spacing: 0.02em;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+  tr:last-child td { border-bottom: none; }
+  code {
+    font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    background: #f3f4f6;
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: #be185d;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 18px 22px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+    box-shadow: 0 2px 6px rgba(15,23,42,0.1);
+  }
+  pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+  }
+  .callout {
+    background: var(--card-bg);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--accent);
+    padding: 18px 22px;
+    margin: 28px 0;
+    border-radius: 6px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .callout strong { color: var(--accent); }
+  .callout.warn {
+    border-left-color: var(--warn);
+    background: var(--warn-soft);
+  }
+  .callout.warn strong { color: #b45309; }
+  .callout.ok {
+    border-left-color: var(--ok);
+    background: var(--ok-soft);
+  }
+  .callout.ok strong { color: #047857; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 28px 0;
+  }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card .label {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .card h4 {
+    margin: 0 0 8px;
+    font-size: 16px;
+  }
+  .card p {
+    margin: 0;
+    font-size: 13px;
+    color: #4b5563;
+    line-height: 1.55;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+  }
+  .mermaid {
+    background: var(--card-bg);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 24px;
+    margin: 28px 0;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  footer {
+    margin-top: 72px;
+    padding-top: 28px;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 13px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (max-width: 640px) {
+    .cards { grid-template-columns: 1fr; }
+    main { padding: 32px 20px 64px; }
+    h1 { font-size: 30px; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <div class="kicker">Sample Document</div>
+  <h1>The Field Guide to Document Review in the AI Era</h1>
+  <div class="byline">A demo document for MarDoc — highlight any passage and leave a comment.</div>
+</header>
+
+<p>This is a sample HTML document shipped with MarDoc. Use it to try the review flow the same way you would on any <code>.html</code> file in a real repository: select a sentence, leave a comment, reply, resolve. Every interaction is routed through the same GitHub review API that markdown files use — the only thing that changes is the rendering layer.</p>
+
+<blockquote>
+  If the reviewer can't read the document, they can't review the document. HTML and markdown are how AI writes; they should be how humans review.
+</blockquote>
+
+<h2>Why document review is the bottleneck</h2>
+
+<p>Most organizations have quietly accumulated three review workflows, each of which makes a different set of people unhappy. Engineers review code in pull requests. Writers review prose in Google Docs or Notion. Everyone else reviews whatever the last meeting's action item ended up in — a spreadsheet, a Slack thread, a draft email nobody ever sends.</p>
+
+<p>When AI-generated content enters the picture, the bottleneck becomes obvious. A language model can produce a four-thousand-word technical brief in ninety seconds. A human can review it in forty-five minutes. The constraint is no longer production; it is attention. And attention, unlike compute, does not scale by adding another GPU.</p>
+
+<h3>The three review styles</h3>
+
+<p>Every review task falls into one of three shapes. Understanding which shape you're dealing with tells you which tool to use.</p>
+
+<div class="cards">
+  <div class="card">
+    <div class="label">Style 1</div>
+    <h4>Correctness</h4>
+    <p>Does this assert something true? Technical docs, legal language, anything with an audit trail.</p>
+  </div>
+  <div class="card">
+    <div class="label">Style 2</div>
+    <h4>Voice</h4>
+    <p>Does this sound like us? Brand copy, marketing, and external communications.</p>
+  </div>
+  <div class="card">
+    <div class="label">Style 3</div>
+    <h4>Structure</h4>
+    <p>Does this belong here, at this length, in this order? Long-form reports and strategy memos.</p>
+  </div>
+</div>
+
+<p>A good review tool makes all three cheap. A bad one makes each of them expensive in a different way. The trick is that most teams have never named which of the three they are doing at any given moment, so the tool choice is accidental and the review gets the shape of whatever application happened to be open.</p>
+
+<h2>Comparing the common tools</h2>
+
+<p>Here is the same review task — "add a paragraph to an existing document and have two stakeholders approve it" — across five tools, ranked by total elapsed time from first draft to final merge.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Tool</th>
+      <th>Source of truth</th>
+      <th>Review model</th>
+      <th>Typical turnaround</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Google Docs</td>
+      <td>Doc itself</td>
+      <td>Inline comments</td>
+      <td>Hours</td>
+    </tr>
+    <tr>
+      <td>Notion</td>
+      <td>Notion page</td>
+      <td>Inline comments</td>
+      <td>Hours</td>
+    </tr>
+    <tr>
+      <td>GitHub PR (raw)</td>
+      <td>Repository</td>
+      <td>Line-level diff</td>
+      <td>Days — non-engineers bounce</td>
+    </tr>
+    <tr>
+      <td>Word + email</td>
+      <td>Attachment</td>
+      <td>Track changes</td>
+      <td>Days to weeks</td>
+    </tr>
+    <tr>
+      <td>MarDoc</td>
+      <td>Repository</td>
+      <td>Inline comments on rendered doc</td>
+      <td>Hours</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>The pattern is not that one tool is universally better. The pattern is that the tools which keep the document close to its source of truth lose the reviewers, and the tools which keep the reviewers happy lose the document. Any workflow that optimizes for only one of those ends up with the other problem rebuilt somewhere else by hand.</p>
+
+<h2>A simple review flow</h2>
+
+<p>The diagram below shows the review path for a document living in a GitHub repository. Every arrow represents a step that has traditionally required a handoff between people on different tools. The entire flow happens in one tab.</p>
+
+<div class="mermaid">
+flowchart LR
+    A[Author drafts] --> B[Opens PR]
+    B --> C{Reviewer<br/>opens PR}
+    C -->|Reads rendered doc| D[Leaves inline comment]
+    D --> E[Author edits]
+    E --> F[Reviewer approves]
+    F --> G[Merged to main]
+</div>
+
+<p>And here is a second diagram showing the internal state of a reviewer's queue — the three buckets every review passes through on the way to being accepted or rejected.</p>
+
+<div class="mermaid">
+stateDiagram-v2
+    [*] --> Pending
+    Pending --> Reading: Reviewer opens the doc
+    Reading --> Commenting: Highlights a passage
+    Commenting --> Reading: Finishes a thought
+    Reading --> Submitted: Clicks Submit review
+    Submitted --> [*]
+</div>
+
+<h2>What a good review comment looks like</h2>
+
+<p>A review comment is a small, structured piece of writing — not a passing thought. It has a target, a claim, and a suggested direction. It assumes the author is doing their best and that the reader of the comment is trying to learn something.</p>
+
+<div class="callout">
+  <strong>Rule of thumb.</strong> If a comment doesn't name what it is pointing at, it is not a review comment — it is a vague feeling. Point at the thing, say what you think, and say what you would change.
+</div>
+
+<h3>An example</h3>
+
+<p>Consider the following draft sentence in a product spec:</p>
+
+<pre><code>The system will attempt to retry failed requests
+up to a reasonable number of times.</code></pre>
+
+<p>The word <code>reasonable</code> is doing a lot of work there. A useful comment does not just flag the word; it proposes a replacement. "Reasonable — can we name a specific number? Three retries with exponential backoff seems to be the shape we use elsewhere." That comment gives the author a clear next action and a reference point.</p>
+
+<div class="callout ok">
+  <strong>Good comment.</strong> "Reasonable is vague — propose three retries with exponential backoff, matching the rest of the codebase."
+</div>
+
+<div class="callout warn">
+  <strong>Less useful.</strong> "Vague." — no target, no proposed direction, no context. The author has to guess what a better sentence would look like.
+</div>
+
+<h2>What to try in this demo</h2>
+
+<p>This document is live inside MarDoc. Try these things:</p>
+
+<ul>
+  <li>Select a short sentence and click the comment button that appears.</li>
+  <li>Select a whole paragraph and leave a longer note.</li>
+  <li>Try selecting across two different headings to see how the line range is recorded.</li>
+  <li>Switch to source view and watch the same comments map back to the underlying HTML.</li>
+  <li>Open the comment panel on the right and reply to one of your own comments.</li>
+</ul>
+
+<p>When you're done, you'll have a queued review ready to submit as a single inline GitHub comment — the same way MarDoc handles markdown files. Nothing about the submission path changes; only the rendering layer does.</p>
+
+<footer>
+  <p>Sample document shipped with MarDoc. The text is fictional and exists only to give reviewers something to comment on. Feel free to overwrite it with your own content when you fork.</p>
+</footer>
+
+</main>
+</body>
+</html>
