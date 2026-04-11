@@ -44,6 +44,7 @@ import {
   resolveDraftOnLoad,
 } from "@/lib/draft-store";
 import { analyzeMarkdown, type MarkdownStats } from "@/lib/word-count";
+import { transformGitHubAlerts } from "@/lib/github-alerts";
 import { classifyLink, resolvePath, findFileByPath } from "@/lib/link-handler";
 import { useApp } from "@/lib/app-context";
 import { openExternal } from "@/lib/open-external";
@@ -123,7 +124,7 @@ const showdownConverter = new Showdown.Converter({
 });
 
 function markdownToHtml(md: string, repoFullName?: string, branch?: string, filePath?: string): string {
-  const html = showdownConverter.makeHtml(md);
+  const html = transformGitHubAlerts(showdownConverter.makeHtml(md));
   if (repoFullName && branch && filePath) {
     return rewriteImageUrls(html, repoFullName, branch, filePath);
   }
@@ -835,7 +836,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       setCodeView(true);
       editor.setEditable(false);
     } else {
-      let rawHtml = showdownConverter.makeHtml(codeContent);
+      let rawHtml = transformGitHubAlerts(showdownConverter.makeHtml(codeContent));
       if (repoFullName && branch && filePath) {
         rawHtml = rewriteImageUrls(rawHtml, repoFullName, branch, filePath);
       }

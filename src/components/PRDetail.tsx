@@ -26,6 +26,7 @@ import {
 } from "@/lib/github-api";
 import { mergeFreshComments } from "@/lib/comment-merge";
 import { buildSuggestionBody, parseSuggestionBody } from "@/lib/suggestion-body";
+import { transformGitHubAlerts } from "@/lib/github-alerts";
 import DiffViewer from "./DiffViewer";
 import Showdown from "showdown";
 
@@ -534,7 +535,7 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
           {pr.description && (
             <div
               className="mt-2 text-sm text-[var(--text-secondary)] prose prose-sm dark:prose-invert max-w-none max-h-40 overflow-y-auto border-t border-[var(--border)] pt-2"
-              dangerouslySetInnerHTML={{ __html: descriptionConverter.makeHtml(pr.description) }}
+              dangerouslySetInnerHTML={{ __html: transformGitHubAlerts(descriptionConverter.makeHtml(pr.description)) }}
             />
           )}
         </div>

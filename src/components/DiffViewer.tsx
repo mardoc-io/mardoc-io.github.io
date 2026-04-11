@@ -45,6 +45,7 @@ import { useWideFormat } from "@/lib/use-wide-format";
 import { isHtmlFile } from "@/lib/file-types";
 import { extractCommentSuggestions, mergeSuggestions } from "@/lib/suggestion-extract";
 import { parseSuggestionBody } from "@/lib/suggestion-body";
+import { transformGitHubAlerts } from "@/lib/github-alerts";
 
 interface DiffViewerProps {
   file: PRFile;
@@ -164,7 +165,7 @@ const diffShowdownConverter = new Showdown.Converter({
 });
 
 function blockToHtml(block: string): string {
-  return highlightCodeBlocks(diffShowdownConverter.makeHtml(block));
+  return highlightCodeBlocks(transformGitHubAlerts(diffShowdownConverter.makeHtml(block)));
 }
 
 function computeWordDiff(oldText: string, newText: string): string {
