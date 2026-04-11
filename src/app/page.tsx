@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useApp } from "@/lib/app-context";
 import Sidebar from "@/components/Sidebar";
 import Editor from "@/components/Editor";
@@ -9,6 +9,8 @@ import PRDetail from "@/components/PRDetail";
 import PRReview from "@/components/PRReview";
 import SettingsPanel from "@/components/SettingsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
+import KeyboardCheatsheet from "@/components/KeyboardCheatsheet";
+import { shouldOpenCheatsheet } from "@/lib/keyboard-shortcuts";
 import {
   BookOpen,
   Settings,
@@ -16,6 +18,7 @@ import {
   GitPullRequest,
   Loader2,
   AlertCircle,
+  Keyboard,
 } from "lucide-react";
 
 export default function Home() {
@@ -38,6 +41,22 @@ export default function Home() {
   } = useApp();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [cheatsheetOpen, setCheatsheetOpen] = useState(false);
+
+  // Global `?` opens the keyboard cheatsheet. shouldOpenCheatsheet is a
+  // pure predicate tested in keyboard-shortcuts.test.ts — it bails when
+  // the user is typing in an input / textarea / contenteditable so we
+  // never steal their "?" character.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (shouldOpenCheatsheet({ key: e.key, target: e.target as any })) {
+        e.preventDefault();
+        setCheatsheetOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
     <div className="h-screen flex flex-col">
@@ -68,6 +87,16 @@ export default function Home() {
               <AlertCircle size={12} />
               <span className="max-w-48 truncate">{error}</span>
             </div>
+          )}
+          {!isEmbedded && (
+            <button
+              onClick={() => setCheatsheetOpen(true)}
+              className="toolbar-btn"
+              title="Keyboard shortcuts (?)"
+              aria-label="Keyboard shortcuts"
+            >
+              <Keyboard size={16} />
+            </button>
           )}
           {!isEmbedded && (
             <button
@@ -183,6 +212,9 @@ export default function Home() {
 
       {/* Settings modal */}
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {/* Keyboard cheatsheet (triggered by `?`) */}
+      <KeyboardCheatsheet open={cheatsheetOpen} onClose={() => setCheatsheetOpen(false)} />
     </div>
   );
 }
