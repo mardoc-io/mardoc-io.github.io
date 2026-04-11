@@ -84,13 +84,18 @@ export interface SizedImageInput {
   alt: string;
   width: ImageDimension | null;
   height: ImageDimension | null;
+  /** When true, wrap the rendered tag in `<div align="center">...</div>`
+   *  so GitHub renders the image centered. GitHub's markdown sanitizer
+   *  strips `class` and `style` from inline `<img>`, but it keeps the
+   *  `align` attribute on block wrappers, so this is the clean path. */
+  center?: boolean;
 }
 
 /**
  * Build an HTML `<img>` tag with the given attributes, with every
  * attribute value HTML-escaped so nothing the user typed can break
  * the tag boundary. Used by the Turndown image rule when either
- * dimension is set.
+ * dimension is set or the image is marked centered.
  */
 export function buildSizedImageHTML(input: SizedImageInput): string {
   const parts: string[] = ["<img"];
@@ -102,7 +107,38 @@ export function buildSizedImageHTML(input: SizedImageInput): string {
   if (input.height) {
     parts.push(`height="${formatDimensionAttr(input.height)}"`);
   }
-  return parts.join(" ") + ">";
+  const tag = parts.join(" ") + ">";
+  if (input.center) {
+    return `<div align="center">${tag}</div>`;
+  }
+  return tag;
+}
+
+/**
+ * Pre-processor that runs on showdown-rendered HTML before TipTap
+ * parses it. Detects `<div align="center">` or `<p align="center">`
+ * wrappers whose only meaningful child is an `<img>`, unwraps them,
+ * and tags the inner image with `data-center="true"` so the Image
+ * extension's parseHTML can restore the centered attribute.
+ *
+ * Wrappers that contain additional content (caption text, multiple
+ * elements) are left alone — the user wrote something custom and the
+ * editor shouldn't flatten it on round-trip.
+ */
+export function unwrapCenteredImages(html: string): string {
+  if (!html) return html;
+  // Match `<div align="center">` or `<p align="center">` containing a
+  // single `<img>` (with optional surrounding whitespace). The inner
+  // tag may already have attributes; we preserve them and append
+  // `data-center="true"`.
+  const re = /<(div|p)\s+align="center"\s*>\s*(<img\b[^>]*?\/?>)\s*<\/\1>/gi;
+  return html.replace(re, (_full, _tag, imgTag: string) => {
+    // Only rewrite if the captured img doesn't already have data-center
+    // so idempotent passes don't duplicate the attribute.
+    if (/\bdata-center\b/.test(imgTag)) return imgTag;
+    // Insert data-center="true" right before the closing `>`.
+    return imgTag.replace(/\s*\/?>$/, ' data-center="true">');
+  });
 }
 
 function escapeAttribute(value: string): string {

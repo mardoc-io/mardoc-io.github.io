@@ -45,6 +45,19 @@ const Image = BaseImage.extend({
         parseHTML: (el) => el.getAttribute("height"),
         renderHTML: (attrs) => (attrs.height ? { height: attrs.height } : {}),
       },
+      // Center flag: stored on the <img> as data-center="true" so it
+      // round-trips through HTML parsing. Turndown's image rule wraps
+      // the output in <div align="center"> when this is set; the
+      // markdownToHtml pre-processor unwraps centered divs on the way
+      // back in so the attribute is restored.
+      center: {
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-center") === "true",
+        renderHTML: (attrs) =>
+          attrs.center
+            ? { "data-center": "true", class: "mardoc-center-image" }
+            : {},
+      },
     };
   },
 });
@@ -57,7 +70,7 @@ import {
   resolveDraftOnLoad,
 } from "@/lib/draft-store";
 import { analyzeMarkdown, type MarkdownStats } from "@/lib/word-count";
-import { parseImageDimension, formatImageDimension, type ImageDimension } from "@/lib/image-resize";
+import { parseImageDimension, formatImageDimension, unwrapCenteredImages, type ImageDimension } from "@/lib/image-resize";
 import { transformGitHubAlerts } from "@/lib/github-alerts";
 import { transformFootnotes } from "@/lib/footnotes";
 import FindReplaceBar from "./FindReplaceBar";
@@ -69,6 +82,7 @@ import {
   arrayBufferToBase64,
   replacePendingImageUrls,
 } from "@/lib/image-upload";
+import { getImageUploadFolder } from "@/lib/image-path-config";
 import { commitBase64FileToBranch } from "@/lib/github-api";
 
 interface PendingImage {
@@ -159,7 +173,12 @@ const showdownConverter = new Showdown.Converter({
 });
 
 function markdownToHtml(md: string, repoFullName?: string, branch?: string, filePath?: string): string {
-  const html = transformGitHubAlerts(showdownConverter.makeHtml(transformFootnotes(md)));
+  // Order matters: footnotes → showdown → alerts → center unwrap →
+  // relative-image rewrite. unwrapCenteredImages has to run on the
+  // rendered HTML AFTER showdown / alerts so it sees the final
+  // <div align="center"><img></div> structure.
+  let html = transformGitHubAlerts(showdownConverter.makeHtml(transformFootnotes(md)));
+  html = unwrapCenteredImages(html);
   if (repoFullName && branch && filePath) {
     return rewriteImageUrls(html, repoFullName, branch, filePath);
   }
@@ -284,6 +303,8 @@ interface BubbleTarget {
   // what's already set instead of starting blank.
   width?: string;
   height?: string;
+  // Whether the image is currently marked centered (data-center="true").
+  center?: boolean;
 }
 
 function LinkImageBubble({
@@ -304,6 +325,7 @@ function LinkImageBubble({
   const [editAlt, setEditAlt] = useState("");
   const [editWidth, setEditWidth] = useState("");
   const [editHeight, setEditHeight] = useState("");
+  const [editCenter, setEditCenter] = useState(false);
   const [lockAspect, setLockAspect] = useState(true);
   // Natural image aspect ratio (intrinsic width / height) captured from
   // the rendered <img>. Used to auto-fill the other dimension when the
@@ -366,6 +388,7 @@ function LinkImageBubble({
     setEditAlt(target.alt || "");
     setEditWidth(target.width || "");
     setEditHeight(target.height || "");
+    setEditCenter(!!target.center);
 
     // Capture the natural aspect ratio of the rendered <img> so the
     // aspect lock can drive one input from the other. Fall back to the
@@ -428,16 +451,17 @@ function LinkImageBubble({
       // size.
       const widthParsed = parseImageDimension(editWidth);
       const heightParsed = parseImageDimension(editHeight);
-      const attrs: Record<string, string | null> = {
+      const attrs: Record<string, string | boolean | null> = {
         src: editUrl,
         alt: editAlt,
         width: widthParsed ? formatImageDimension(widthParsed) : null,
         height: heightParsed ? formatImageDimension(heightParsed) : null,
+        center: editCenter,
       };
       editor.chain().focus().setImage(attrs as any).run();
 
       // setImage in TipTap's Image extension ignores non-standard
-      // attributes on some versions. Force the width/height via
+      // attributes on some versions. Force width/height/center via
       // updateAttributes on the current node as a safety net.
       editor
         .chain()
@@ -445,6 +469,7 @@ function LinkImageBubble({
         .updateAttributes("image", {
           width: attrs.width,
           height: attrs.height,
+          center: attrs.center,
         })
         .run();
     }
@@ -557,6 +582,21 @@ function LinkImageBubble({
                       px or %
                     </span>
                   </div>
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-[10px] text-[var(--text-secondary)] cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editCenter}
+                      onChange={(e) => setEditCenter(e.target.checked)}
+                    />
+                    <span>
+                      Center image{" "}
+                      <span className="text-[var(--text-muted)]">
+                        (wraps in {"<div align=\"center\">"})
+                      </span>
+                    </span>
+                  </label>
                 </div>
               </>
             )}
@@ -908,13 +948,17 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
 
     setImageUploadError(null);
 
+    // Read the per-repo configured upload folder. Falls back to
+    // docs/images when unset — see image-path-config.ts.
+    const folder = getImageUploadFolder(scope.repoFullName);
+
     // New-file draft: defer the commit. Store the file under a blob
     // URL that the editor can render locally, queue it, and hand the
     // blob URL back so the TipTap insert still sees a valid src. The
     // commit happens when the user saves the draft to the repo.
     if (scope.isNewFile) {
       const blobUrl = URL.createObjectURL(file);
-      const intendedPath = generateImagePath(file.name || "image.png");
+      const intendedPath = generateImagePath(file.name || "image.png", new Date(), folder);
       setPendingImages((prev) => [
         ...prev,
         { blobUrl, file, intendedPath, alt: file.name || "image" },
@@ -927,7 +971,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     try {
       const buffer = await file.arrayBuffer();
       const base64 = arrayBufferToBase64(buffer);
-      const path = generateImagePath(file.name || "image.png");
+      const path = generateImagePath(file.name || "image.png", new Date(), folder);
       await commitBase64FileToBranch(
         scope.repoFullName,
         scope.branch,
@@ -1175,7 +1219,9 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       setCodeView(true);
       editor.setEditable(false);
     } else {
-      let rawHtml = transformGitHubAlerts(showdownConverter.makeHtml(transformFootnotes(codeContent)));
+      let rawHtml = unwrapCenteredImages(
+        transformGitHubAlerts(showdownConverter.makeHtml(transformFootnotes(codeContent)))
+      );
       if (repoFullName && branch && filePath) {
         rawHtml = rewriteImageUrls(rawHtml, repoFullName, branch, filePath);
       }
@@ -1570,6 +1616,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         element: img,
         width: img.getAttribute("width") || "",
         height: img.getAttribute("height") || "",
+        center: img.getAttribute("data-center") === "true",
       });
       return;
     }

@@ -15,6 +15,7 @@ import {
   parseImageDimension,
   formatImageDimension,
   buildSizedImageHTML,
+  unwrapCenteredImages,
   type ImageDimension,
 } from "@/lib/image-resize";
 
@@ -229,5 +230,115 @@ describe("buildSizedImageHTML", () => {
     const formatted = formatImageDimension(first);
     const second = parseImageDimension(formatted);
     expect(second).toEqual(first);
+  });
+
+  // ─── center=true in the build output ───────────────────────────────────
+
+  it("wraps the <img> in <div align='center'> when center is true", () => {
+    const out = buildSizedImageHTML({
+      src: "x.png",
+      alt: "centered",
+      width: { value: 300, unit: "px" },
+      height: null,
+      center: true,
+    });
+    expect(out).toContain('<div align="center">');
+    expect(out).toContain("</div>");
+    // The <img> tag itself should still be inside, with its width.
+    expect(out).toContain('width="300"');
+    expect(out).toContain('src="x.png"');
+  });
+
+  it("does not wrap when center is false or omitted", () => {
+    const out = buildSizedImageHTML({
+      src: "x.png",
+      alt: "",
+      width: null,
+      height: null,
+    });
+    expect(out).not.toContain("<div");
+    expect(out.startsWith("<img")).toBe(true);
+  });
+});
+
+// ─── unwrapCenteredImages ────────────────────────────────────────────────
+
+describe("unwrapCenteredImages", () => {
+  it("returns HTML unchanged when there's no centered wrapper", () => {
+    const html = '<p>Hello <img src="x.png"> world.</p>';
+    expect(unwrapCenteredImages(html)).toBe(html);
+  });
+
+  it("unwraps a div-wrapped centered image and tags it with data-center", () => {
+    const html = '<div align="center"><img src="x.png" alt="hi"></div>';
+    const out = unwrapCenteredImages(html);
+    expect(out).not.toContain("<div");
+    expect(out).toContain('data-center="true"');
+    expect(out).toContain('src="x.png"');
+    expect(out).toContain('alt="hi"');
+  });
+
+  it("unwraps a p-wrapped centered image", () => {
+    const html = '<p align="center"><img src="x.png"></p>';
+    const out = unwrapCenteredImages(html);
+    expect(out).not.toContain("<p");
+    expect(out).toContain('data-center="true"');
+  });
+
+  it("is case-insensitive on the align value", () => {
+    const html = '<div align="CENTER"><img src="x.png"></div>';
+    const out = unwrapCenteredImages(html);
+    expect(out).toContain('data-center="true"');
+  });
+
+  it("preserves width and height attributes on the unwrapped image", () => {
+    const html =
+      '<div align="center"><img src="x.png" width="300" height="200"></div>';
+    const out = unwrapCenteredImages(html);
+    expect(out).toContain('width="300"');
+    expect(out).toContain('height="200"');
+    expect(out).toContain('data-center="true"');
+  });
+
+  it("handles multiple centered images in the same document", () => {
+    const html =
+      '<div align="center"><img src="a.png"></div>' +
+      "<p>gap</p>" +
+      '<div align="center"><img src="b.png"></div>';
+    const out = unwrapCenteredImages(html);
+    expect((out.match(/data-center="true"/g) || []).length).toBe(2);
+    expect(out).toContain('src="a.png"');
+    expect(out).toContain('src="b.png"');
+    expect(out).toContain("<p>gap</p>");
+  });
+
+  it("does not touch a div wrapper that contains more than just an image", () => {
+    // If the wrapper has text or other nodes alongside the image, leave
+    // it alone — the user wrote something custom and we shouldn't
+    // flatten it.
+    const html =
+      '<div align="center"><img src="x.png"><p>caption</p></div>';
+    const out = unwrapCenteredImages(html);
+    expect(out).toContain("<div");
+    expect(out).not.toContain("data-center");
+  });
+
+  it("does not touch divs with a different align value", () => {
+    const html = '<div align="right"><img src="x.png"></div>';
+    const out = unwrapCenteredImages(html);
+    expect(out).toContain("<div");
+    expect(out).toContain('align="right"');
+    expect(out).not.toContain("data-center");
+  });
+
+  it("handles whitespace around the img inside the wrapper", () => {
+    const html = '<div align="center">\n  <img src="x.png">\n</div>';
+    const out = unwrapCenteredImages(html);
+    expect(out).toContain('data-center="true"');
+    expect(out).not.toContain("<div");
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(unwrapCenteredImages("")).toBe("");
   });
 });
