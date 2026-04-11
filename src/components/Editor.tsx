@@ -53,8 +53,16 @@ import {
   validateImageFile,
   generateImagePath,
   arrayBufferToBase64,
+  replacePendingImageUrls,
 } from "@/lib/image-upload";
 import { commitBase64FileToBranch } from "@/lib/github-api";
+
+interface PendingImage {
+  blobUrl: string;
+  file: File;
+  intendedPath: string;
+  alt: string;
+}
 import { classifyLink, resolvePath, findFileByPath } from "@/lib/link-handler";
 import { useApp } from "@/lib/app-context";
 import { openExternal } from "@/lib/open-external";
@@ -692,25 +700,53 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   const [imageUploading, setImageUploading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
 
+  // Pending images for the new-file draft flow. Each entry is an image
+  // that's been pasted/dropped into a doc that doesn't yet exist in the
+  // repo — we can't commit it immediately because there's nothing to
+  // commit against, so we store it locally under a blob: URL and defer
+  // the real commit until handleSaveNewFile runs. The markdown source
+  // gets its blob URLs rewritten to real paths right before the doc
+  // itself is committed.
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const pendingImagesRef = useRef<PendingImage[]>([]);
+  pendingImagesRef.current = pendingImages;
+
+  // Clean up blob URLs when the component unmounts or the file changes
+  // so we don't leak memory holding references to discarded drafts.
+  useEffect(() => {
+    return () => {
+      for (const p of pendingImagesRef.current) {
+        URL.revokeObjectURL(p.blobUrl);
+      }
+    };
+  }, []);
+
   // Ref updated on every render so the TipTap editorProps paste/drop
   // handlers (frozen at useEditor time) can reach the current upload
   // function. Same stale-closure workaround as draftScopeRef.
   const imageUploadRef = useRef<((file: File) => Promise<void>) | null>(null);
 
-  // Upload a File as an image: validate → read ArrayBuffer → encode →
-  // commit to the current branch → return the relative path the editor
-  // should insert. Bails out with a user-visible error if anything
-  // goes wrong, or if the current scope can't support uploads (demo
-  // mode / local file / new file without a backing repo+branch).
+  // Upload or queue an image file. Returns the URL to insert into the
+  // editor — either a committed raw.githubusercontent URL (immediate
+  // mode) or a blob: URL (deferred mode for new-file drafts).
+  //
+  // Mode selection:
+  //   - Demo mode → bail with a friendly error
+  //   - Local file (no backing repo) → bail
+  //   - New file (unsaved draft) → defer: store under a blob URL and
+  //     queue in pendingImages. The actual commit happens in
+  //     handleSaveNewFile alongside the doc commit, so abandoned drafts
+  //     don't leave dangling images in the repo.
+  //   - Existing file → commit immediately to the current branch.
   const uploadImageFile = useCallback(async (file: File): Promise<string | null> => {
     const scope = draftScopeRef.current;
     if (scope.isDemoMode) {
       setImageUploadError("Image upload is disabled in demo mode.");
       return null;
     }
-    if (scope.isLocalFile || scope.isNewFile) {
+    if (scope.isLocalFile) {
       setImageUploadError(
-        "Image upload requires a file from a real repo. Save this file to the repo first."
+        "Local-only files can't upload images — save this file to the repo first."
       );
       return null;
     }
@@ -726,6 +762,22 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
     }
 
     setImageUploadError(null);
+
+    // New-file draft: defer the commit. Store the file under a blob
+    // URL that the editor can render locally, queue it, and hand the
+    // blob URL back so the TipTap insert still sees a valid src. The
+    // commit happens when the user saves the draft to the repo.
+    if (scope.isNewFile) {
+      const blobUrl = URL.createObjectURL(file);
+      const intendedPath = generateImagePath(file.name || "image.png");
+      setPendingImages((prev) => [
+        ...prev,
+        { blobUrl, file, intendedPath, alt: file.name || "image" },
+      ]);
+      return blobUrl;
+    }
+
+    // Existing file: commit immediately to the current branch.
     setImageUploading(true);
     try {
       const buffer = await file.arrayBuffer();
@@ -738,7 +790,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         base64,
         `docs: upload ${path.split("/").pop()}`
       );
-      return path;
+      return `https://raw.githubusercontent.com/${scope.repoFullName}/${scope.branch}/${path}`;
     } catch (err: any) {
       setImageUploadError(err?.message || "Failed to upload image.");
       return null;
@@ -750,22 +802,16 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   // Keep the ref to the paste/drop handler up to date. The TipTap
   // editorProps closures are frozen at useEditor creation time, so
   // they read from this ref instead of capturing uploadImageFile
-  // directly.
+  // directly. uploadImageFile already returns either a committed raw
+  // URL (existing file) or a blob: URL (new-file draft) — either is
+  // inserted as-is and the editor renders it.
   imageUploadRef.current = async (file: File) => {
-    const path = await uploadImageFile(file);
-    if (!path || !editor) return;
-    // Insert the image into the editor. Use an absolute URL so the
-    // image renders without needing a separate URL rewrite — the
-    // data-original-src attribute preserves the relative path for
-    // the Turndown round-trip.
-    const scope = draftScopeRef.current;
-    const rawUrl = scope.repoFullName && scope.branch
-      ? `https://raw.githubusercontent.com/${scope.repoFullName}/${scope.branch}/${path}`
-      : path;
+    const src = await uploadImageFile(file);
+    if (!src || !editor) return;
     editor
       .chain()
       .focus()
-      .setImage({ src: rawUrl, alt: file.name || "image" })
+      .setImage({ src, alt: file.name || "image" })
       .run();
   };
 
@@ -1222,6 +1268,32 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         markdown = turndown.turndown(html);
       }
 
+      // Commit queued pending images BEFORE the doc so we can rewrite
+      // their blob: URLs to real paths in the markdown. If any image
+      // fails, the whole save is aborted — we don't commit a doc that
+      // references images that couldn't be uploaded.
+      //
+      // Target branch: PR branch for add-to-PR flows, otherwise the
+      // currently selected branch (the doc will commit there too).
+      const imageTargetBranch = prBranchForNewFile || branch;
+      if (pendingImages.length > 0 && imageTargetBranch) {
+        const urlMap = new Map<string, string>();
+        for (const pending of pendingImages) {
+          const buffer = await pending.file.arrayBuffer();
+          const base64 = arrayBufferToBase64(buffer);
+          await commitBase64FileToBranch(
+            repoFullName,
+            imageTargetBranch,
+            pending.intendedPath,
+            base64,
+            `docs: upload ${pending.intendedPath.split("/").pop()}`
+          );
+          const rawUrl = `https://raw.githubusercontent.com/${repoFullName}/${imageTargetBranch}/${pending.intendedPath}`;
+          urlMap.set(pending.blobUrl, rawUrl);
+        }
+        markdown = replacePendingImageUrls(markdown, urlMap);
+      }
+
       const path = newFilePath.endsWith(".md") ? newFilePath : `${newFilePath}.md`;
 
       if (prBranchForNewFile) {
@@ -1260,12 +1332,19 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
         setShowNewFileModal(false);
         refreshRepo();
       }
+
+      // Success — clean up the pending image state and revoke the
+      // local blob URLs so we don't leak memory on long sessions.
+      for (const p of pendingImages) {
+        URL.revokeObjectURL(p.blobUrl);
+      }
+      setPendingImages([]);
     } catch (err: any) {
       setSubmitError(err.message || "Failed to save file");
     } finally {
       setSavingNewFile(false);
     }
-  }, [repoFullName, isDemoMode, editor, newFilePath, newFileTitle, prBranchForNewFile, prNumberForNewFile, pullRequests, openPR, codeView, codeContent, refreshRepo]);
+  }, [repoFullName, isDemoMode, editor, newFilePath, newFileTitle, prBranchForNewFile, prNumberForNewFile, pullRequests, openPR, codeView, codeContent, refreshRepo, pendingImages, branch]);
 
   const handleSubmitEditsAsPR = useCallback(async () => {
     if (!repoFullName || isDemoMode || !editor || !editPRTitle.trim()) return;

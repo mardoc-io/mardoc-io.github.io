@@ -93,6 +93,34 @@ function sanitizeStem(stem: string): string {
  * into arguments exceeds the JS engine's argument-count limit. This
  * walks the buffer in chunks and concatenates the base64 piecewise.
  */
+/**
+ * Replace pending-upload blob URLs in a markdown string with their
+ * final committed paths.
+ *
+ * Used by the "draft a new doc with images" flow: while the doc is
+ * still in the editor (unsaved), images are displayed via blob: URLs
+ * that render locally but aren't valid references in committed
+ * markdown. On save, each blob is committed to the branch and its
+ * URL gets rewritten to the committed path here.
+ *
+ * Simple literal-substring replacement, regex-escaped so blob URLs
+ * with `.`, `:`, `/` don't break the match. Callers are responsible
+ * for ensuring blob URLs never prefix each other (the runtime uses
+ * UUID-based blob URLs so this is never a concern in practice).
+ */
+export function replacePendingImageUrls(
+  markdown: string,
+  replacements: Map<string, string>
+): string {
+  if (!markdown || replacements.size === 0) return markdown;
+  let result = markdown;
+  replacements.forEach((newUrl, oldUrl) => {
+    const escaped = oldUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    result = result.replace(new RegExp(escaped, "g"), newUrl);
+  });
+  return result;
+}
+
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   if (bytes.length === 0) return "";
