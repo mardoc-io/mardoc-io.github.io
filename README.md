@@ -1,8 +1,12 @@
 # MarDoc
 
-**Markdown and HTML, accessible to everyone on your team.**
+**Markdown is the AI era's lingua franca. MarDoc makes it accessible to everyone on your team.**
 
-MarDoc is a browser-only document layer over GitHub. It takes the markdown and HTML files that already live in your repo and turns them into rendered documents anyone can read, comment on, and edit — no git knowledge, no command line, no decoding diff syntax. Your PM, your designer, your head of marketing, your legal reviewer, your exec sponsor: everyone who cares about what the docs say can now contribute to them directly, in the place they already live.
+Every major LLM — ChatGPT, Claude, Gemini — emits markdown by default. Reports, specs, research, analyses, strategy memos, onboarding guides, documentation of every kind: AI-generated content is increasingly written in markdown and HTML, and increasingly lives in GitHub repos next to the code and pipelines that produced it. That's the right architecture — version-controlled, branch-reviewable, linkable from the systems that use it, a single source of truth.
+
+But reviewing those files still requires knowing git, decoding diffs, and navigating tooling designed for engineers. In an era where AI is dissolving the "you need to be technical" gate across every other kind of work — writing, research, analysis, design, even coding — one specific barrier remains. And it's the barrier that keeps most of your team out of reviewing the content AI is generating for the organization.
+
+MarDoc is the bridge. Same GitHub repo, same files, same commits — rendered as documents, commented like Google Docs, edited in a WYSIWYG editor, committed back as real pull requests. Anyone on your team — PM, designer, writer, marketer, legal reviewer, exec sponsor — can review and edit AI-generated markdown and HTML without ever learning the word "diff."
 
 > **No backend. No signup. No data leaves your browser.** Your GitHub token is stored locally and every API call goes directly from you to GitHub.
 
@@ -10,13 +14,13 @@ MarDoc is a browser-only document layer over GitHub. It takes the markdown and H
 
 ## The problem
 
-Your engineering team put the docs in source control for good reasons: version history, branch workflows, PR review, a single source of truth that lives next to the code it describes. But that decision locked half your organization out.
+Your engineering team put the docs in source control for good reasons. Your AI pipelines put their outputs there for the same reasons: version history, branch workflows, PR review, a single source of truth that lives next to the code and workflows that use it. That decision is correct — and it's exactly why the content is now *stuck* there.
 
-Non-engineers on your team — product managers, designers, writers, legal reviewers, executives — open GitHub's pull-request UI and see a wall of `+` and `-` lines wrapped in backticks and asterisks. Markdown they could read just fine as a rendered document is suddenly unreadable as source. So the review doesn't happen. Or it happens in Notion. Or Google Docs. Or a thread of emailed screenshots. And then someone on eng has to copy the feedback back into the repo by hand.
+Non-engineers on your team open GitHub's pull-request UI and see a wall of `+` and `-` lines wrapped in backticks and asterisks. Markdown they could read just fine as a rendered document is suddenly unreadable as source. So the review either doesn't happen, or it happens in Notion or Google Docs, and someone on eng has to copy the feedback back into the repo by hand. Meanwhile the volume of AI-generated markdown keeps going up.
 
-The docs that define your strategy, your brand voice, your API contracts, your onboarding, your incident response, your policy — those docs are only as good as the people who can review them. When review is gated on reading git syntax, most of your team can't participate.
+The docs that define your strategy, your brand voice, your API contracts, your onboarding, your incident response, your compliance posture, the reports your executives read — those documents are only as good as the people who can review them. When review is gated on reading git syntax, most of your team can't participate, and every AI-generated document becomes a bottleneck at the engineer who has to translate it for everyone else.
 
-MarDoc removes the gate. Same GitHub repo, same files, same commits — wrapped in a layer anyone can use: rendered documents, inline comments, WYSIWYG editing, paste-to-upload images, real pull requests going back to the repo when they're done. Your docs stay in source control. Your team finally gets to review them.
+MarDoc removes the gate. Same GitHub repo, same files, same commits — wrapped in a layer anyone can use: rendered documents, inline comments, WYSIWYG editing, paste-to-upload images, real pull requests going back to the repo when they're done. Your docs stay in source control. Your team — *all* of it — finally gets to review them.
 
 ## For everyone on the team
 
