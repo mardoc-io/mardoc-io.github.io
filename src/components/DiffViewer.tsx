@@ -1,8 +1,12 @@
 "use client";
 
 import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
-import { diffWords } from "diff";
-import Showdown from "showdown";
+import {
+  parseBlocks,
+  computeBlockLineRanges,
+  blockToHtml as blockToHtmlRaw,
+  computeWordDiff,
+} from "@/lib/diff-blocks";
 import { PRFile, PRComment, PendingSuggestion } from "@/types";
 import {
   MessageSquare,
@@ -45,8 +49,6 @@ import { useWideFormat } from "@/lib/use-wide-format";
 import { isHtmlFile } from "@/lib/file-types";
 import { extractCommentSuggestions, mergeSuggestions } from "@/lib/suggestion-extract";
 import { parseSuggestionBody } from "@/lib/suggestion-body";
-import { transformGitHubAlerts } from "@/lib/github-alerts";
-import { transformFootnotes } from "@/lib/footnotes";
 
 interface DiffViewerProps {
   file: PRFile;
@@ -92,94 +94,14 @@ interface PanelComment {
 }
 
 // ─── Markdown Parsing Helpers ──────────────────────────────────────────────
-
-function parseBlocks(md: string): string[] {
-  const blocks: string[] = [];
-  const lines = md.split("\n");
-  let currentBlock = "";
-  let inCodeBlock = false;
-
-  for (const line of lines) {
-    if (line.startsWith("```")) {
-      if (inCodeBlock) {
-        currentBlock += line + "\n";
-        blocks.push(currentBlock.trim());
-        currentBlock = "";
-        inCodeBlock = false;
-      } else {
-        if (currentBlock.trim()) blocks.push(currentBlock.trim());
-        currentBlock = line + "\n";
-        inCodeBlock = true;
-      }
-    } else if (inCodeBlock) {
-      currentBlock += line + "\n";
-    } else if (line.trim() === "") {
-      if (currentBlock.trim()) {
-        blocks.push(currentBlock.trim());
-        currentBlock = "";
-      }
-    } else {
-      currentBlock += line + "\n";
-    }
-  }
-  if (currentBlock.trim()) blocks.push(currentBlock.trim());
-  return blocks;
-}
-
-function computeBlockLineRanges(
-  source: string,
-  blocks: string[]
-): { startLine: number; endLine: number }[] {
-  const ranges: { startLine: number; endLine: number }[] = [];
-  let searchFrom = 0;
-
-  for (const block of blocks) {
-    const idx = source.indexOf(block, searchFrom);
-    if (idx === -1) {
-      // Fallback: approximate from current position
-      ranges.push({ startLine: 1, endLine: 1 });
-      continue;
-    }
-    const beforeStart = source.slice(0, idx);
-    const beforeEnd = source.slice(0, idx + block.length);
-    const startLine = (beforeStart.match(/\n/g) || []).length + 1;
-    const endLine = (beforeEnd.match(/\n/g) || []).length + 1;
-    ranges.push({ startLine, endLine });
-    searchFrom = idx + block.length;
-  }
-
-  return ranges;
-}
-
-// Use showdown for robust markdown → HTML conversion in diff blocks
-const diffShowdownConverter = new Showdown.Converter({
-  tables: true,
-  tasklists: true,
-  strikethrough: true,
-  ghCodeBlocks: true,
-  simplifiedAutoLink: true,
-  literalMidWordUnderscores: true,
-  simpleLineBreaks: false,
-  openLinksInNewWindow: true,
-  emoji: true,
-  ghCompatibleHeaderId: true,
-});
+//
+// parseBlocks, computeBlockLineRanges, and computeWordDiff moved to
+// @/lib/diff-blocks so they can be unit-tested in isolation. The
+// DiffViewer wraps blockToHtml with highlightCodeBlocks (its own
+// concern) to add syntax highlighting to fenced code blocks.
 
 function blockToHtml(block: string): string {
-  return highlightCodeBlocks(
-    transformGitHubAlerts(diffShowdownConverter.makeHtml(transformFootnotes(block)))
-  );
-}
-
-function computeWordDiff(oldText: string, newText: string): string {
-  const changes = diffWords(oldText, newText);
-  return changes
-    .map((part) => {
-      if (part.added) return `<span class="diff-added">${part.value}</span>`;
-      if (part.removed) return `<span class="diff-removed">${part.value}</span>`;
-      return part.value;
-    })
-    .join("");
+  return highlightCodeBlocks(blockToHtmlRaw(block));
 }
 
 // ─── Floating Selection Toolbar ────────────────────────────────────────────
