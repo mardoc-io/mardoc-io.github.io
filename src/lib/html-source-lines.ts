@@ -192,7 +192,7 @@ function addAttribute(tagBody: string, lineNumber: number): string {
   const attr = `${ATTR_NAME}="${lineNumber}"`;
 
   // Self-closing: `<br />` or `<br/>`
-  const selfClosingMatch = interior.match(/^(.*?)(\s*\/)$/s);
+  const selfClosingMatch = interior.match(/^([\s\S]*?)(\s*\/)$/);
   if (selfClosingMatch) {
     const [, body, tail] = selfClosingMatch;
     const spacer = body.endsWith(" ") || body.length === 0 ? "" : " ";
