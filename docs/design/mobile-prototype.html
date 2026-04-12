@@ -331,11 +331,7 @@ html, body {
   border: 1px solid var(--oxblood-deep);
 }
 
-/* ─── Screen 1: Home / Review Queue ──────────────────── */
-
-.screen-home .hero {
-  padding: 24px var(--edge) 28px;
-}
+/* ─── Shared kicker (used in reading + PR detail) ────── */
 
 .kicker {
   font-family: var(--font-mono);
@@ -364,193 +360,299 @@ html, body {
 .kicker.start { justify-content: flex-start; }
 .kicker.start::after { max-width: 20px; }
 
-.screen-home h1 {
+/* ─── Screen 1: Home / Review Queue (utilitarian) ────── */
+
+.queue-header {
+  padding: 8px var(--edge) 16px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.queue-header .count-block {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.queue-header .big-number {
   font-family: var(--font-display);
   font-weight: 600;
   font-variation-settings: "opsz" 144;
-  font-size: 56px;
-  line-height: 0.95;
-  letter-spacing: -0.03em;
-  margin: 0 0 14px;
+  font-size: 64px;
+  line-height: 0.85;
+  letter-spacing: -0.04em;
   color: var(--ink);
 }
 
-.screen-home h1 em {
+.queue-header .big-number em {
   font-style: italic;
-  font-weight: 500;
   color: var(--oxblood);
+  font-weight: 500;
 }
 
-.screen-home .lede {
-  font-family: var(--font-body);
-  font-size: 17px;
-  line-height: 1.5;
-  color: var(--ink-soft);
-  margin: 0;
-  max-width: 34ch;
+.queue-header .count-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+  font-weight: 500;
+  padding-bottom: 6px;
+  max-width: 90px;
+  line-height: 1.3;
 }
 
-.ornament {
+.queue-header .fresh-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  background: transparent;
+  border: 1px solid var(--rule-soft);
+  border-radius: 100px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+
+.queue-header .fresh-dot::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sage);
+  box-shadow: 0 0 0 2px rgba(77, 106, 85, 0.2);
+}
+
+.queue-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px var(--edge) 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  border-bottom: 2px solid var(--rule);
+}
+
+.queue-tabs::-webkit-scrollbar { display: none; }
+.queue-tabs { scrollbar-width: none; }
+
+.queue-tab {
+  flex-shrink: 0;
+  padding: 9px 14px;
+  border: 1px solid var(--rule-soft);
+  background: transparent;
+  border-radius: 100px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-faint);
+  letter-spacing: 0.02em;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 28px var(--edge) 20px;
-  color: var(--rule-strong);
+  gap: 8px;
+  transition: all var(--dur-fast) var(--ease);
+  scroll-snap-align: start;
+  white-space: nowrap;
 }
 
-.ornament::before,
-.ornament::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: currentColor;
+.queue-tab .tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--rule-soft);
+  color: var(--ink-faint);
+  font-size: 10px;
+  font-weight: 600;
 }
 
-.ornament-mark {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-style: italic;
-  letter-spacing: 0.3em;
-  color: var(--oxblood);
-  opacity: 0.7;
+.queue-tab.active {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
 }
 
-/* PR card — editorial article style */
+.queue-tab.active .tab-count {
+  background: var(--oxblood);
+  color: var(--paper);
+}
+
+/* ─── PR list — compact inbox style ─────────────────── */
+
 .pr-list {
   padding: 0 var(--edge) 120px;
 }
 
 .pr-card {
-  display: block;
-  padding: 22px 0 24px;
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  padding: 16px 0;
   border-bottom: 1px solid var(--rule-soft);
   cursor: pointer;
   position: relative;
-  transition: transform var(--dur-fast) var(--ease);
+  transition: transform var(--dur-fast) var(--ease), background var(--dur-fast);
   -webkit-user-select: none;
   user-select: none;
 }
 
 .pr-card:active {
-  transform: translateX(4px);
+  transform: translateX(3px);
+  background: var(--paper-alt);
 }
 
-.pr-card.hero {
-  padding: 8px 0 28px;
-  margin-bottom: 4px;
-  border-bottom: 2px solid var(--rule);
+/* Status rail — the colored vertical bar at the left of each card */
+.pr-card .rail {
+  width: 3px;
+  border-radius: 3px;
+  background: var(--rule-soft);
+  flex-shrink: 0;
+  align-self: stretch;
 }
+.pr-card.review .rail { background: var(--oxblood); }
+.pr-card.draft .rail { background: var(--gold); }
+.pr-card.merged .rail { background: var(--sage); }
 
-.pr-card .meta {
+.pr-card .body { flex: 1; min-width: 0; }
+
+.pr-card .top-line {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 500;
   color: var(--ink-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  margin-bottom: 12px;
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+  min-width: 0;
 }
 
-.pr-card .num {
+.pr-card .top-line .num {
   color: var(--oxblood);
   font-weight: 600;
+  flex-shrink: 0;
 }
 
-.pr-card .meta .dot {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.4;
+.pr-card .top-line .repo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
-.pr-card .status-pill {
-  padding: 2px 8px;
-  border-radius: 3px;
-  background: var(--paper-alt);
-  color: var(--ink-soft);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-}
-
-.pr-card .status-pill.open {
-  background: transparent;
-  border: 1px solid var(--sage);
-  color: var(--sage);
-}
-
-.pr-card .status-pill.review {
-  background: transparent;
-  border: 1px solid var(--oxblood);
-  color: var(--oxblood);
+.pr-card .top-line .time {
+  flex-shrink: 0;
+  font-weight: 500;
 }
 
 .pr-card h2 {
   font-family: var(--font-display);
   font-weight: 500;
-  font-variation-settings: "opsz" 48;
-  font-size: 26px;
-  line-height: 1.12;
-  letter-spacing: -0.015em;
-  margin: 0 0 10px;
+  font-variation-settings: "opsz" 24;
+  font-size: 17px;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+  margin: 0 0 8px;
   color: var(--ink);
 }
 
-.pr-card.hero h2 {
-  font-size: 36px;
-  font-weight: 600;
-  font-variation-settings: "opsz" 144;
-  line-height: 1.04;
-  margin-bottom: 14px;
-}
-
-.pr-card p.dek {
-  font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.55;
-  color: var(--ink-soft);
-  margin: 0 0 16px;
-  max-width: 44ch;
-}
-
-.pr-card .footer {
+.pr-card .status-row {
   display: flex;
   align-items: center;
   gap: 10px;
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--ink-faint);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
 }
 
+.pr-card .status-row .sep {
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.pr-card .status-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.pr-card.review .status-label { color: var(--oxblood); }
+.pr-card.draft .status-label { color: var(--gold); }
+.pr-card.merged .status-label { color: var(--sage); }
+
 .pr-card .tiny-avatar {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--oxblood);
   color: var(--paper);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
-  font-weight: 600;
+  font-size: 8px;
+  font-weight: 700;
   flex-shrink: 0;
 }
 
 .pr-card .tiny-avatar.sage { background: var(--sage); }
 .pr-card .tiny-avatar.gold { background: var(--gold); }
 
-.pr-card .footer .sep {
-  color: var(--rule-strong);
+.pr-card .thread-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  background: var(--oxblood-wash);
+  color: var(--oxblood);
+  border-radius: 100px;
+  font-weight: 600;
 }
 
-/* ─── Screen 2: PR detail / Table of contents ────────── */
+.pr-card .thread-badge svg {
+  width: 10px;
+  height: 10px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+
+.section-divider {
+  padding: 14px var(--edge) 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--rule-soft);
+}
+
+/* ─── Screen 2: PR detail (utilitarian file browser) ── */
 
 .screen-pr .top-bar .wordmark {
-  font-size: 13px;
+  font-size: 12px;
   font-family: var(--font-mono);
   font-weight: 500;
   letter-spacing: 0.08em;
@@ -559,153 +661,274 @@ html, body {
 }
 
 .pr-header {
-  padding: 12px var(--edge) 28px;
+  padding: 10px var(--edge) 18px;
+}
+
+.pr-header .meta-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.03em;
+  margin-bottom: 10px;
+}
+
+.pr-header .meta-line .num {
+  color: var(--oxblood);
+  font-weight: 700;
+}
+
+.pr-header .meta-line .status-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--oxblood);
+  padding: 2px 7px;
+  border: 1px solid var(--oxblood);
+  border-radius: 3px;
 }
 
 .pr-header h1 {
   font-family: var(--font-display);
   font-weight: 600;
-  font-variation-settings: "opsz" 144;
-  font-size: 38px;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  margin: 14px 0 18px;
+  font-variation-settings: "opsz" 48;
+  font-size: 24px;
+  line-height: 1.22;
+  letter-spacing: -0.01em;
+  margin: 0 0 12px;
   color: var(--ink);
-}
-
-.pr-header h1 em {
-  font-style: italic;
-  color: var(--oxblood);
-  font-weight: 500;
 }
 
 .pr-header .description {
   font-family: var(--font-body);
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.55;
   color: var(--ink-soft);
-  margin: 0 0 24px;
-  max-width: 48ch;
+  margin: 0 0 14px;
+  max-width: 50ch;
 }
 
 .pr-header .author-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: 10px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10px;
   color: var(--ink-faint);
   letter-spacing: 0.03em;
 }
 
 .pr-header .author-row .tiny-avatar {
-  width: 26px;
-  height: 26px;
-  font-size: 10px;
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
 }
 
-.toc-header {
+.pr-header .author-row .diff-stats {
+  margin-left: auto;
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 0 var(--edge) 12px;
-  margin-top: 8px;
+  gap: 6px;
 }
 
-.toc-header .label {
+.pr-header .author-row .diff-added { color: var(--sage); font-weight: 600; }
+.pr-header .author-row .diff-removed { color: var(--oxblood); font-weight: 600; }
+
+/* Quick action bar */
+.action-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px var(--edge) 14px;
+  border-top: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+  background: var(--paper-alt);
+}
+
+.action-bar button {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--rule-soft);
+  background: var(--paper);
+  border-radius: 10px;
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: var(--oxblood);
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 600;
+  transition: transform var(--dur-fast);
+}
+
+.action-bar button:active { transform: scale(0.95); }
+
+.action-bar button.primary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.action-bar button svg {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* File list header */
+.files-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px var(--edge) 10px;
+}
+
+.files-header .label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
   font-weight: 600;
 }
 
-.toc-header .count {
-  font-family: var(--font-display);
-  font-size: 13px;
+.files-header .count {
+  font-family: var(--font-mono);
+  font-size: 10px;
   color: var(--ink-faint);
-  font-style: italic;
 }
 
-.file-toc {
+.file-list {
   padding: 0 var(--edge) 140px;
-  border-top: 2px solid var(--rule);
 }
 
 .file-entry {
   display: flex;
-  align-items: flex-start;
-  gap: 20px;
-  padding: 22px 0;
-  border-bottom: 1px solid var(--rule-soft);
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+  border-top: 1px solid var(--rule-soft);
   cursor: pointer;
-  transition: transform var(--dur-fast) var(--ease);
+  transition: transform var(--dur-fast) var(--ease), background var(--dur-fast);
   -webkit-user-select: none;
   user-select: none;
 }
 
-.file-entry:active { transform: translateX(4px); }
-
-.file-entry .folio {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--ink-whisper);
-  font-weight: 500;
-  padding-top: 6px;
-  width: 28px;
-  flex-shrink: 0;
+.file-entry:active {
+  transform: translateX(3px);
+  background: var(--paper-alt);
 }
+
+.file-entry .icon-wrap {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--paper-alt);
+  border: 1px solid var(--rule-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  letter-spacing: 0.02em;
+}
+
+.file-entry .icon-wrap.md { color: var(--sage); }
+.file-entry .icon-wrap.html { color: var(--oxblood); }
+.file-entry .icon-wrap.ts { color: var(--gold); }
 
 .file-entry .file-body { flex: 1; min-width: 0; }
 
+.file-entry .file-path {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  line-height: 1.3;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
 .file-entry .file-name {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: 500;
-  font-variation-settings: "opsz" 24;
-  font-size: 19px;
+  font-size: 15px;
   line-height: 1.3;
   color: var(--ink);
-  letter-spacing: -0.01em;
-  margin-bottom: 4px;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .file-entry .file-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  margin-top: 4px;
   font-family: var(--font-mono);
   font-size: 9px;
   color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
+.file-entry .file-meta .change-added { color: var(--sage); font-weight: 600; }
+.file-entry .file-meta .change-removed { color: var(--oxblood); font-weight: 600; }
+.file-entry .file-meta .new-tag {
+  padding: 1px 6px;
+  background: var(--oxblood-wash);
+  color: var(--oxblood);
+  border-radius: 3px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-.file-entry .file-meta .change-added { color: var(--sage); }
-.file-entry .file-meta .change-removed { color: var(--oxblood); }
+.file-entry .right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
 
 .file-entry .comment-badge {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
-  border-radius: 20px;
+  padding: 3px 7px;
+  border-radius: 10px;
   background: var(--oxblood-wash);
   color: var(--oxblood);
   font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 600;
-  margin-top: 6px;
-  align-self: flex-start;
-  flex-shrink: 0;
+  font-weight: 700;
 }
 
 .file-entry .comment-badge svg {
   width: 10px;
   height: 10px;
   stroke: currentColor;
+  fill: none;
+  stroke-width: 2.2;
+}
+
+.file-entry .chevron {
+  width: 10px;
+  height: 10px;
+  stroke: var(--ink-whisper);
   fill: none;
   stroke-width: 2;
 }
@@ -1598,7 +1821,7 @@ html, body {
     <!-- Screens -->
     <div class="screens">
 
-      <!-- ═══ SCREEN 1: HOME ═══════════════════════════════ -->
+      <!-- ═══ SCREEN 1: HOME — Review queue ═══════════════ -->
       <section class="screen screen-home active" data-screen="home">
 
         <div class="top-bar">
@@ -1606,181 +1829,279 @@ html, body {
             <svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18"/></svg>
           </button>
           <div class="wordmark">Mar<em>Doc</em></div>
-          <div class="avatar" onclick="drawer.toggle()">JB</div>
+          <button class="icon-btn" aria-label="Search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          </button>
         </div>
 
-        <div class="hero">
-          <div class="kicker stagger">Tuesday, April 11 · Review queue</div>
-          <h1 class="stagger">Your <em>desk</em>.</h1>
-          <p class="lede stagger">Three documents waiting on you, two drafts in progress. Take your time.</p>
+        <div class="queue-header">
+          <div class="count-block stagger">
+            <span class="big-number">3</span>
+            <span class="count-label">Awaiting<br>your review</span>
+          </div>
+          <span class="fresh-dot stagger">Synced · 2m</span>
         </div>
 
-        <div class="ornament"><span class="ornament-mark">❦</span></div>
+        <div class="queue-tabs">
+          <button class="queue-tab active stagger">Needs review <span class="tab-count">3</span></button>
+          <button class="queue-tab stagger">Authored <span class="tab-count">2</span></button>
+          <button class="queue-tab stagger">Watching <span class="tab-count">8</span></button>
+          <button class="queue-tab stagger">All</button>
+        </div>
 
         <div class="pr-list">
-          <article class="pr-card hero stagger" onclick="nav.to('pr')">
-            <div class="meta">
-              <span class="num">PR 61</span>
-              <span>mardoc-io / mardoc-io.github.io</span>
-              <span class="dot"></span>
-              <span class="status-pill review">Needs review</span>
-            </div>
-            <h2>Inline comments on HTML files.</h2>
-            <p class="dek">Feature 033 closes the HTML parity gap. Reviewers can now highlight any passage in a rendered HTML document and leave a comment — the same flow markdown already supports.</p>
-            <div class="footer">
-              <span class="tiny-avatar">JB</span>
-              <span>joe.barnett</span>
-              <span class="sep">·</span>
-              <span>2 hrs ago</span>
-              <span class="sep">·</span>
-              <span>8 files</span>
-              <span class="sep">·</span>
-              <span>3 threads</span>
-            </div>
-          </article>
 
-          <article class="pr-card stagger" onclick="nav.to('pr')">
-            <div class="meta">
-              <span class="num">PR 62</span>
-              <span>mardoc-io / mardoc-io.github.io</span>
-              <span class="dot"></span>
-              <span class="status-pill open">Draft</span>
+          <div class="pr-card review stagger" onclick="nav.to('pr')">
+            <div class="rail"></div>
+            <div class="body">
+              <div class="top-line">
+                <span class="num">#61</span>
+                <span class="repo">mardoc-io/mardoc-io.github.io</span>
+                <span class="time">2h</span>
+              </div>
+              <h2>Inline comments on HTML files</h2>
+              <div class="status-row">
+                <span class="status-label">Needs review</span>
+                <span class="sep"></span>
+                <span class="tiny-avatar">JB</span>
+                <span>joe.barnett</span>
+                <span class="sep"></span>
+                <span>8 files</span>
+                <span class="sep"></span>
+                <span class="thread-badge">
+                  <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                  3
+                </span>
+              </div>
             </div>
-            <h2>Cellphone mode — the field guide.</h2>
-            <p class="dek">Design-first story for feature 038. Editorial, confident, thumb-first. This prototype is the thing you are currently reading.</p>
-            <div class="footer">
-              <span class="tiny-avatar sage">AL</span>
-              <span>a.lee</span>
-              <span class="sep">·</span>
-              <span>yesterday</span>
-              <span class="sep">·</span>
-              <span>1 file</span>
-            </div>
-          </article>
+          </div>
 
-          <article class="pr-card stagger" onclick="nav.to('pr')">
-            <div class="meta">
-              <span class="num">PR 60</span>
-              <span>mardoc-io / mardoc-io.github.io</span>
-              <span class="dot"></span>
-              <span class="status-pill">Merged</span>
+          <div class="pr-card review stagger" onclick="nav.to('pr')">
+            <div class="rail"></div>
+            <div class="body">
+              <div class="top-line">
+                <span class="num">#58</span>
+                <span class="repo">mardoc-io/mardoc-io.github.io</span>
+                <span class="time">5h</span>
+              </div>
+              <h2>Drag-to-resize handle on selected images</h2>
+              <div class="status-row">
+                <span class="status-label">Needs review</span>
+                <span class="sep"></span>
+                <span class="tiny-avatar sage">AL</span>
+                <span>a.lee</span>
+                <span class="sep"></span>
+                <span>4 files</span>
+              </div>
             </div>
-            <h2>Back the README claims.</h2>
-            <p class="dek">560+ unit tests, a README truthfulness audit, and a refactor that makes the diff rendering testable in isolation.</p>
-            <div class="footer">
-              <span class="tiny-avatar gold">MR</span>
-              <span>m.rivera</span>
-              <span class="sep">·</span>
-              <span>last week</span>
-              <span class="sep">·</span>
-              <span>14 files</span>
+          </div>
+
+          <div class="pr-card review stagger" onclick="nav.to('pr')">
+            <div class="rail"></div>
+            <div class="body">
+              <div class="top-line">
+                <span class="num">#57</span>
+                <span class="repo">mardoc-io/mardoc-io.github.io</span>
+                <span class="time">1d</span>
+              </div>
+              <h2>Private repo image loading via authenticated fetch</h2>
+              <div class="status-row">
+                <span class="status-label">Needs review</span>
+                <span class="sep"></span>
+                <span class="tiny-avatar gold">MR</span>
+                <span>m.rivera</span>
+                <span class="sep"></span>
+                <span>6 files</span>
+                <span class="sep"></span>
+                <span class="thread-badge">
+                  <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                  1
+                </span>
+              </div>
             </div>
-          </article>
+          </div>
+
+          <div class="section-divider">Your drafts</div>
+
+          <div class="pr-card draft stagger" onclick="nav.to('pr')">
+            <div class="rail"></div>
+            <div class="body">
+              <div class="top-line">
+                <span class="num">#62</span>
+                <span class="repo">mardoc-io/mardoc-io.github.io</span>
+                <span class="time">1d</span>
+              </div>
+              <h2>Cellphone mode viewer (feature 038)</h2>
+              <div class="status-row">
+                <span class="status-label">Draft</span>
+                <span class="sep"></span>
+                <span>1 file</span>
+                <span class="sep"></span>
+                <span>+2207 −0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pr-card merged stagger" onclick="nav.to('pr')">
+            <div class="rail"></div>
+            <div class="body">
+              <div class="top-line">
+                <span class="num">#60</span>
+                <span class="repo">mardoc-io/mardoc-io.github.io</span>
+                <span class="time">2d</span>
+              </div>
+              <h2>Back the README claims, harden review pipeline</h2>
+              <div class="status-row">
+                <span class="status-label">Merged</span>
+                <span class="sep"></span>
+                <span class="tiny-avatar gold">MR</span>
+                <span>m.rivera</span>
+                <span class="sep"></span>
+                <span>14 files</span>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </section>
 
-      <!-- ═══ SCREEN 2: PR DETAIL ═════════════════════════ -->
+      <!-- ═══ SCREEN 2: PR detail ═════════════════════════ -->
       <section class="screen screen-pr" data-screen="pr">
 
         <div class="top-bar">
           <button class="icon-btn" onclick="nav.back()" aria-label="Back">
             <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
-          <div class="wordmark">mardoc-io · PR 61</div>
+          <div class="wordmark">mardoc-io / mardoc-io.github.io</div>
           <button class="icon-btn" aria-label="More">
             <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
           </button>
         </div>
 
         <div class="pr-header">
-          <div class="kicker start stagger">Pull request · needs review</div>
-          <h1 class="stagger">Inline comments <em>on HTML</em> files.</h1>
-          <p class="description stagger">Feature 033 closes the HTML parity gap. Reviewers can now highlight any passage in a rendered HTML document and leave a comment — the same flow markdown already supports. Flows through the existing pending-review pipeline, batched submission unchanged.</p>
+          <div class="meta-line stagger">
+            <span class="num">#61</span>
+            <span class="status-label">Needs review</span>
+            <span>opened 2h ago</span>
+          </div>
+          <h1 class="stagger">Inline comments on HTML files</h1>
+          <p class="description stagger">Feature 033 closes the HTML parity gap. Reviewers can highlight any passage in a rendered HTML document and leave a comment — the same flow markdown already supports.</p>
           <div class="author-row stagger">
             <span class="tiny-avatar">JB</span>
             <span>joe.barnett</span>
-            <span>·</span>
-            <span>opened 2 hrs ago</span>
-            <span>·</span>
-            <span>+1,684 −10</span>
+            <span class="diff-stats">
+              <span class="diff-added">+1,684</span>
+              <span class="diff-removed">−10</span>
+            </span>
           </div>
         </div>
 
-        <div class="toc-header">
-          <span class="label">Files changed</span>
-          <span class="count">vii in total</span>
+        <div class="action-bar stagger">
+          <button class="primary">
+            <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+            Review
+          </button>
+          <button>
+            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            Comments · 3
+          </button>
+          <button>
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            Timeline
+          </button>
         </div>
 
-        <div class="file-toc">
+        <div class="files-header">
+          <span class="label">Files changed</span>
+          <span class="count">5 files</span>
+        </div>
+
+        <div class="file-list">
+
           <div class="file-entry stagger" onclick="nav.to('read')">
-            <span class="folio">01</span>
+            <div class="icon-wrap html">HTM</div>
             <div class="file-body">
-              <div class="file-name">public/demo.html</div>
+              <div class="file-path">public/</div>
+              <div class="file-name">demo.html</div>
               <div class="file-meta">
+                <span class="new-tag">New</span>
                 <span class="change-added">+284</span>
-                <span>·</span>
-                <span>New file</span>
               </div>
+            </div>
+            <div class="right">
+              <svg class="chevron" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
             </div>
           </div>
 
           <div class="file-entry stagger" onclick="nav.to('read')">
-            <span class="folio">02</span>
+            <div class="icon-wrap ts">TS</div>
             <div class="file-body">
-              <div class="file-name">src/lib/html-source-lines.ts</div>
+              <div class="file-path">src/lib/</div>
+              <div class="file-name">html-source-lines.ts</div>
               <div class="file-meta">
+                <span class="new-tag">New</span>
                 <span class="change-added">+233</span>
-                <span>·</span>
-                <span>New file</span>
               </div>
+            </div>
+            <div class="right">
               <div class="comment-badge">
                 <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                 2
               </div>
+              <svg class="chevron" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
             </div>
           </div>
 
           <div class="file-entry stagger" onclick="nav.to('read')">
-            <span class="folio">03</span>
+            <div class="icon-wrap ts">TS</div>
             <div class="file-body">
-              <div class="file-name">src/lib/html-selection.ts</div>
+              <div class="file-path">src/lib/</div>
+              <div class="file-name">html-selection.ts</div>
               <div class="file-meta">
+                <span class="new-tag">New</span>
                 <span class="change-added">+128</span>
-                <span>·</span>
-                <span>New file</span>
               </div>
             </div>
+            <div class="right">
+              <svg class="chevron" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
           </div>
 
           <div class="file-entry stagger" onclick="nav.to('read')">
-            <span class="folio">04</span>
+            <div class="icon-wrap ts">TSX</div>
             <div class="file-body">
-              <div class="file-name">src/components/DiffViewer.tsx</div>
+              <div class="file-path">src/components/</div>
+              <div class="file-name">DiffViewer.tsx</div>
               <div class="file-meta">
                 <span class="change-added">+49</span>
                 <span class="change-removed">−9</span>
-                <span>·</span>
-                <span>Modified</span>
               </div>
+            </div>
+            <div class="right">
+              <svg class="chevron" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
             </div>
           </div>
 
           <div class="file-entry stagger" onclick="nav.to('read')">
-            <span class="folio">05</span>
+            <div class="icon-wrap md">MD</div>
             <div class="file-body">
-              <div class="file-name">docs/features/033-html-inline-comments.md</div>
+              <div class="file-path">docs/features/</div>
+              <div class="file-name">033-html-inline-comments.md</div>
               <div class="file-meta">
+                <span class="new-tag">New</span>
                 <span class="change-added">+92</span>
-                <span>·</span>
-                <span>New file</span>
               </div>
+            </div>
+            <div class="right">
               <div class="comment-badge">
                 <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                 1
               </div>
+              <svg class="chevron" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
             </div>
           </div>
+
         </div>
 
       </section>
