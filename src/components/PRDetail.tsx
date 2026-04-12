@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { PullRequest, PRComment, PendingSuggestion } from "@/types";
 import { useApp } from "@/lib/app-context";
+import { isRateLimited, isRateLimitError, markRateLimited, extractResetFromError } from "@/lib/rate-limit";
 import {
   createPRComment,
   replyToReviewComment,
@@ -76,11 +77,14 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
   // to @/lib/comment-merge and covered by comment-merge.test.ts.
   const refreshFromGitHub = useCallback(async () => {
     if (isDemoMode || !currentRepo || !pr.number) return;
+    if (isRateLimited()) return;
     try {
       const fresh = await fetchPRComments(currentRepo, pr.number);
       setComments((prev) => mergeFreshComments(prev, fresh));
-    } catch {
-      // Silently skip — the next poll or retry will catch up.
+    } catch (err) {
+      if (isRateLimitError(err)) {
+        markRateLimited(extractResetFromError(err));
+      }
     }
   }, [isDemoMode, currentRepo, pr.number]);
 
@@ -91,7 +95,7 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
   const scheduleRefreshHedge = useCallback(() => {
     for (const delay of [1500, 4000, 8000]) {
       setTimeout(() => {
-        void refreshFromGitHub();
+        if (!isRateLimited()) void refreshFromGitHub();
       }, delay);
     }
   }, [refreshFromGitHub]);

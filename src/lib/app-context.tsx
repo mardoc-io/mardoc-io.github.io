@@ -328,7 +328,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setPRList((prev) =>
             prev.map((p) => ({ ...p, mdFileCount: counts.get(p.number) ?? 0 }))
           );
-        });
+        }).catch(() => {});
       }
     } catch (err: any) {
       console.error("Failed to load PRs:", err);

@@ -5,11 +5,35 @@ import { RepoFile, PullRequest, PRFile, PRComment } from "@/types";
 import { isDocumentFile } from "@/lib/file-types";
 import { utf8ToBase64, base64ToUtf8 } from "@/lib/base64-utf8";
 import { isLineResolutionError, runInlineFallback } from "@/lib/review-fallback";
+import {
+  updateFromHeaders,
+  isRateLimitError,
+  markRateLimited,
+  extractResetFromError,
+} from "@/lib/rate-limit";
 
 let octokitInstance: Octokit | null = null;
 
 export function initOctokit(token: string) {
   octokitInstance = new Octokit({ auth: token });
+
+  // Track rate-limit headers on every response so the circuit
+  // breaker can proactively pause before we get a hard 403.
+  octokitInstance.hook.after("request", (_response, options) => {
+    const headers = (options as any)?.request?.headers ?? ((_response as any)?.headers);
+    if (headers) updateFromHeaders(headers);
+  });
+
+  // When an API call fails with a rate-limit error, mark the
+  // breaker so the 30s poll and propagation hedge stop firing.
+  octokitInstance.hook.error("request", (error) => {
+    if (isRateLimitError(error)) {
+      const reset = extractResetFromError(error);
+      markRateLimited(reset);
+    }
+    throw error;
+  });
+
   return octokitInstance;
 }
 
