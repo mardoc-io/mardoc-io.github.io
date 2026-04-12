@@ -13,6 +13,8 @@ import {
   isTransientError,
 } from "@/lib/rate-limit";
 import { computeBackoff } from "@/lib/fetch-retry";
+import { requestEmbedImage } from "@/lib/embed-image-bridge";
+import { resolvePath, classifyLink } from "@/lib/link-handler";
 
 let octokitInstance: Octokit | null = null;
 
@@ -1158,6 +1160,87 @@ export async function loadAuthenticatedImages(
       img.setAttribute(
         "title",
         "This image could not be loaded. Your token may lack access to the source repository."
+      );
+    }
+  });
+}
+
+/**
+ * Load images referenced by relative paths when running inside the
+ * VS Code webview embed. The browser has no filesystem access, so
+ * relative paths like `./images/arch.png` normally render as broken
+ * images. This function finds them, resolves against the current
+ * file's directory, and asks the VS Code extension for the bytes
+ * via the embed-image-bridge postMessage channel.
+ *
+ * Safe to call outside embed mode — it detects `window.parent ===
+ * window` via the bridge and silently no-ops.
+ *
+ * Absolute URLs (https://, //cdn.../) and authenticated GitHub URLs
+ * are skipped — those go through loadAuthenticatedImages or render
+ * natively.
+ */
+export async function loadEmbedLocalImages(
+  container: HTMLElement,
+  currentFilePath: string
+): Promise<void> {
+  if (typeof window === "undefined" || window.parent === window) return;
+
+  const IMAGE_MIME: Record<string, string> = {
+    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
+    gif: "image/gif", svg: "image/svg+xml", webp: "image/webp",
+    bmp: "image/bmp",
+  };
+
+  // Candidates: any img whose current src doesn't point at an external
+  // URL and wasn't already loaded. Skip already-loaded data: URIs.
+  const allImgs = Array.from(
+    container.querySelectorAll<HTMLImageElement>("img")
+  );
+  const candidates = allImgs.filter((img) => {
+    const src = img.getAttribute("src") || "";
+    if (!src) return false;
+    if (src.startsWith("data:")) return false;
+    if (src.startsWith("http://") || src.startsWith("https://")) return false;
+    if (src.startsWith("//")) return false;
+    // Skip anything that's already going through loadAuthenticatedImages
+    if (img.dataset.ghPath) return false;
+    return classifyLink(src) === "relative";
+  });
+
+  if (candidates.length === 0) return;
+
+  const results = await Promise.allSettled(
+    candidates.map(async (img) => {
+      const src = img.getAttribute("src") || "";
+      const resolved = resolvePath(currentFilePath, src);
+      const { data, mimeType } = await requestEmbedImage(resolved);
+      // Prefer the mimeType from the extension; fall back to the
+      // file extension in case the extension doesn't set one.
+      const ext = resolved.split(".").pop()?.toLowerCase() || "";
+      const mime = mimeType || IMAGE_MIME[ext] || "application/octet-stream";
+      if (!img.getAttribute("data-original-src")) {
+        img.setAttribute("data-original-src", src);
+      }
+      img.src = `data:${mime};base64,${data.replace(/\n/g, "")}`;
+    })
+  );
+
+  // Mark failures with the same placeholder class as
+  // loadAuthenticatedImages so failed images show a consistent
+  // broken-image state instead of an actual broken thumbnail.
+  results.forEach((result, i) => {
+    if (result.status === "rejected") {
+      const img = candidates[i];
+      img.classList.add("mardoc-image-failed");
+      const origSrc = img.getAttribute("src") || "image";
+      img.setAttribute(
+        "alt",
+        img.getAttribute("alt") || `Could not load ${origSrc}`
+      );
+      img.setAttribute(
+        "title",
+        `Local image not found: ${origSrc}. VS Code may not have permission to read the file.`
       );
     }
   });

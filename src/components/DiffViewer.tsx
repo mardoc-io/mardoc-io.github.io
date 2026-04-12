@@ -39,7 +39,7 @@ import {
   Trash2,
 } from "lucide-react";
 import ContextMenu from "./ContextMenu";
-import { mapSelectionToLines, rewriteImageUrls, loadAuthenticatedImages } from "@/lib/github-api";
+import { mapSelectionToLines, rewriteImageUrls, loadAuthenticatedImages, loadEmbedLocalImages } from "@/lib/github-api";
 import { classifyLink } from "@/lib/link-handler";
 import { useApp } from "@/lib/app-context";
 import { openExternal } from "@/lib/open-external";
@@ -747,6 +747,9 @@ export default function DiffViewer({
   useEffect(() => {
     if (!contentRef.current || fileIsHtml) return;
     loadAuthenticatedImages(contentRef.current);
+    // Load relative-path images from the local filesystem when
+    // running inside the VS Code webview embed. No-op elsewhere.
+    loadEmbedLocalImages(contentRef.current, file.path);
     renderMermaidBlocks(contentRef.current);
   }, [file, viewMode, fileIsHtml, comments]);
 
