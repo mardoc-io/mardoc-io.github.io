@@ -1,0 +1,2207 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f6f1e4">
+<title>MarDoc Mobile — Design Prototype</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,400;1,9..144,600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   MarDoc Mobile — Editorial Prototype
+   Feature 038 — cellphone mode viewer
+
+   Aesthetic: warm paper, ink black, oxblood accent.
+   The document is the hero; chrome recedes like marginalia.
+   ============================================================ */
+
+:root {
+  /* Paper & ink */
+  --paper: #f7f1e1;
+  --paper-alt: #f0e8d1;
+  --paper-deep: #e8dec0;
+  --paper-bright: #fdf9ec;
+  --ink: #1a1410;
+  --ink-soft: #3d342b;
+  --ink-faint: #7a6f5e;
+  --ink-whisper: #b4a98f;
+
+  /* Accent family */
+  --oxblood: #7c2d12;
+  --oxblood-bright: #9a3412;
+  --oxblood-deep: #431407;
+  --oxblood-wash: rgba(124, 45, 18, 0.08);
+  --ember: #c2410c;
+  --gold: #a16207;
+  --sage: #4d6a55;
+
+  /* Rules */
+  --rule: #cdbf96;
+  --rule-soft: #e1d6b0;
+  --rule-strong: #9c8e65;
+
+  /* Typography */
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: "Newsreader", Georgia, serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Menlo, monospace;
+
+  /* Layout */
+  --edge: 24px;
+  --screen-max: 440px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur: 420ms;
+  --dur-fast: 220ms;
+}
+
+[data-theme="dark"] {
+  --paper: #17120c;
+  --paper-alt: #1e1810;
+  --paper-deep: #261e14;
+  --paper-bright: #1e180e;
+  --ink: #f5eddb;
+  --ink-soft: #d6ccb4;
+  --ink-faint: #8a7f68;
+  --ink-whisper: #5a5141;
+  --oxblood: #f97316;
+  --oxblood-bright: #fb923c;
+  --oxblood-deep: #fdba74;
+  --oxblood-wash: rgba(249, 115, 22, 0.1);
+  --rule: #3a3222;
+  --rule-soft: #2a2418;
+  --rule-strong: #5c5039;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: #201810;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+  font-feature-settings: "kern", "liga", "onum";
+}
+
+/* ─── Stage (desktop preview) ──────────────────────────── */
+
+.stage {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, #3a2a1c 0%, #1a1208 70%),
+    #0e0a04;
+  position: relative;
+}
+
+.stage::before {
+  content: "MARDOC · MOBILE DESIGN PROTOTYPE · FEATURE 038";
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: rgba(246, 241, 228, 0.35);
+}
+
+.phone {
+  width: 100%;
+  max-width: var(--screen-max);
+  height: min(900px, calc(100vh - 120px));
+  background: var(--paper);
+  position: relative;
+  overflow: hidden;
+  border-radius: 50px;
+  box-shadow:
+    0 50px 100px -20px rgba(0,0,0,0.6),
+    0 30px 60px -30px rgba(0,0,0,0.8),
+    0 0 0 10px #0a0605,
+    0 0 0 11px #2a1f12,
+    0 0 0 12px #3a2c1a,
+    inset 0 2px 4px rgba(255, 240, 200, 0.08);
+}
+
+@media (max-width: 520px) {
+  .stage {
+    padding: 0;
+    background: var(--paper);
+  }
+  .stage::before { display: none; }
+  .phone {
+    max-width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+/* Paper grain — subtle SVG noise */
+.phone::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.55;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.25 0 0 0 0 0.1 0 0 0 0.25 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  z-index: 200;
+}
+
+[data-theme="dark"] .phone::before {
+  opacity: 0.4;
+  mix-blend-mode: screen;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.9 0 0 0 0 0.8 0 0 0 0 0.5 0 0 0 0.2 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* ─── Status bar ─────────────────────────────────────── */
+
+.status-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 28px 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  z-index: 150;
+  pointer-events: none;
+  letter-spacing: 0.02em;
+}
+
+.status-bar .indicators {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.status-bar .indicators::before {
+  content: "";
+  width: 17px;
+  height: 11px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 11'><path d='M0 11h1v-3H0zm2.5 0h1V7h-1zm2.5 0h1V5h-1zm2.5 0h1V3h-1zm2.5 0h1V1h-1z'/></svg>") center / contain no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 11'><path d='M0 11h1v-3H0zm2.5 0h1V7h-1zm2.5 0h1V5h-1zm2.5 0h1V3h-1zm2.5 0h1V1h-1z'/></svg>") center / contain no-repeat;
+}
+
+/* ─── Screens container ───────────────────────────────── */
+
+.screens {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(24px);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+  background: var(--paper);
+  will-change: opacity, transform;
+}
+
+.screen.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.screen.outgoing {
+  opacity: 0;
+  transform: translateX(-24px);
+  transition: opacity 260ms var(--ease), transform 260ms var(--ease);
+}
+
+.screen::-webkit-scrollbar { display: none; }
+.screen { scrollbar-width: none; }
+
+/* ─── Shared chrome ───────────────────────────────────── */
+
+.top-bar {
+  position: sticky;
+  top: 0;
+  background: var(--paper);
+  z-index: 50;
+  padding: 52px var(--edge) 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.top-bar.stuck {
+  border-bottom-color: var(--rule-soft);
+}
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--rule-soft);
+  background: transparent;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease), background var(--dur-fast), border-color var(--dur-fast);
+  flex-shrink: 0;
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
+  background: var(--paper-alt);
+}
+
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.top-bar .wordmark {
+  flex: 1;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: "opsz" 144;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.top-bar .wordmark em {
+  font-style: italic;
+  color: var(--oxblood);
+  font-weight: 500;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--paper);
+  background: var(--oxblood);
+  flex-shrink: 0;
+  border: 1px solid var(--oxblood-deep);
+}
+
+/* ─── Screen 1: Home / Review Queue ──────────────────── */
+
+.screen-home .hero {
+  padding: 24px var(--edge) 28px;
+}
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--oxblood);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.kicker::before,
+.kicker::after {
+  content: "";
+  height: 1px;
+  background: var(--oxblood);
+  flex: 1;
+  max-width: 28px;
+  opacity: 0.5;
+}
+
+.kicker.start::before { display: none; }
+.kicker.start { justify-content: flex-start; }
+.kicker.start::after { max-width: 20px; }
+
+.screen-home h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: "opsz" 144;
+  font-size: 56px;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  margin: 0 0 14px;
+  color: var(--ink);
+}
+
+.screen-home h1 em {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--oxblood);
+}
+
+.screen-home .lede {
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin: 0;
+  max-width: 34ch;
+}
+
+.ornament {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 28px var(--edge) 20px;
+  color: var(--rule-strong);
+}
+
+.ornament::before,
+.ornament::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: currentColor;
+}
+
+.ornament-mark {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-style: italic;
+  letter-spacing: 0.3em;
+  color: var(--oxblood);
+  opacity: 0.7;
+}
+
+/* PR card — editorial article style */
+.pr-list {
+  padding: 0 var(--edge) 120px;
+}
+
+.pr-card {
+  display: block;
+  padding: 22px 0 24px;
+  border-bottom: 1px solid var(--rule-soft);
+  cursor: pointer;
+  position: relative;
+  transition: transform var(--dur-fast) var(--ease);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pr-card:active {
+  transform: translateX(4px);
+}
+
+.pr-card.hero {
+  padding: 8px 0 28px;
+  margin-bottom: 4px;
+  border-bottom: 2px solid var(--rule);
+}
+
+.pr-card .meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-bottom: 12px;
+}
+
+.pr-card .num {
+  color: var(--oxblood);
+  font-weight: 600;
+}
+
+.pr-card .meta .dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.4;
+}
+
+.pr-card .status-pill {
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--paper-alt);
+  color: var(--ink-soft);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.pr-card .status-pill.open {
+  background: transparent;
+  border: 1px solid var(--sage);
+  color: var(--sage);
+}
+
+.pr-card .status-pill.review {
+  background: transparent;
+  border: 1px solid var(--oxblood);
+  color: var(--oxblood);
+}
+
+.pr-card h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-variation-settings: "opsz" 48;
+  font-size: 26px;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  margin: 0 0 10px;
+  color: var(--ink);
+}
+
+.pr-card.hero h2 {
+  font-size: 36px;
+  font-weight: 600;
+  font-variation-settings: "opsz" 144;
+  line-height: 1.04;
+  margin-bottom: 14px;
+}
+
+.pr-card p.dek {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin: 0 0 16px;
+  max-width: 44ch;
+}
+
+.pr-card .footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
+.pr-card .tiny-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--oxblood);
+  color: var(--paper);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.pr-card .tiny-avatar.sage { background: var(--sage); }
+.pr-card .tiny-avatar.gold { background: var(--gold); }
+
+.pr-card .footer .sep {
+  color: var(--rule-strong);
+}
+
+/* ─── Screen 2: PR detail / Table of contents ────────── */
+
+.screen-pr .top-bar .wordmark {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+.pr-header {
+  padding: 12px var(--edge) 28px;
+}
+
+.pr-header h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: "opsz" 144;
+  font-size: 38px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 14px 0 18px;
+  color: var(--ink);
+}
+
+.pr-header h1 em {
+  font-style: italic;
+  color: var(--oxblood);
+  font-weight: 500;
+}
+
+.pr-header .description {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin: 0 0 24px;
+  max-width: 48ch;
+}
+
+.pr-header .author-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.03em;
+}
+
+.pr-header .author-row .tiny-avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 10px;
+}
+
+.toc-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 var(--edge) 12px;
+  margin-top: 8px;
+}
+
+.toc-header .label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--oxblood);
+  font-weight: 600;
+}
+
+.toc-header .count {
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+.file-toc {
+  padding: 0 var(--edge) 140px;
+  border-top: 2px solid var(--rule);
+}
+
+.file-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.file-entry:active { transform: translateX(4px); }
+
+.file-entry .folio {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-whisper);
+  font-weight: 500;
+  padding-top: 6px;
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.file-entry .file-body { flex: 1; min-width: 0; }
+
+.file-entry .file-name {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-variation-settings: "opsz" 24;
+  font-size: 19px;
+  line-height: 1.3;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.file-entry .file-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.file-entry .file-meta .change-added { color: var(--sage); }
+.file-entry .file-meta .change-removed { color: var(--oxblood); }
+
+.file-entry .comment-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: var(--oxblood-wash);
+  color: var(--oxblood);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 6px;
+  align-self: flex-start;
+  flex-shrink: 0;
+}
+
+.file-entry .comment-badge svg {
+  width: 10px;
+  height: 10px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+
+/* ─── Screen 3: Reading view ─────────────────────────── */
+
+.screen-read .reading-bar {
+  position: sticky;
+  top: 0;
+  background: var(--paper);
+  z-index: 50;
+  padding: 52px 20px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--dur-fast);
+}
+
+.screen-read .reading-bar.stuck {
+  background: rgba(247, 241, 225, 0.92);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-bottom-color: var(--rule-soft);
+}
+
+.reading-bar .file-label {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reading-bar .progress {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--oxblood);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.article {
+  padding: 28px 28px 180px;
+  color: var(--ink);
+}
+
+.article .kicker {
+  margin-bottom: 18px;
+}
+
+.article h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: "opsz" 144;
+  font-size: 38px;
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  margin: 0 0 16px;
+}
+
+.article .byline {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 28px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.article .byline::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+  max-width: 80px;
+}
+
+.article p {
+  font-family: var(--font-body);
+  font-size: 18px;
+  line-height: 1.65;
+  margin: 0 0 20px;
+  color: var(--ink);
+  font-variation-settings: "opsz" 16;
+}
+
+.article p.first::first-letter {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variation-settings: "opsz" 144;
+  font-size: 72px;
+  line-height: 0.85;
+  float: left;
+  padding: 6px 10px 0 0;
+  color: var(--oxblood);
+  font-style: italic;
+}
+
+.article h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: "opsz" 48;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  margin: 36px 0 14px;
+  color: var(--ink);
+}
+
+.article h2::before {
+  content: "§";
+  color: var(--oxblood);
+  font-style: italic;
+  margin-right: 10px;
+  font-weight: 400;
+}
+
+.article blockquote {
+  margin: 32px -6px;
+  padding: 0 0 0 28px;
+  border-left: 3px solid var(--oxblood);
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-variation-settings: "opsz" 48;
+  font-style: italic;
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
+.article .pull-ornament {
+  text-align: center;
+  margin: 36px 0;
+  color: var(--oxblood);
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: 0.5em;
+  opacity: 0.6;
+}
+
+.article .selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Selection styling — rich oxblood underline */
+.article ::selection {
+  background: var(--oxblood-wash);
+  color: var(--oxblood-deep);
+}
+
+[data-theme="dark"] .article ::selection {
+  background: rgba(249, 115, 22, 0.2);
+  color: var(--oxblood-bright);
+}
+
+/* Floating "pen" cue that appears on selection */
+.selection-cue {
+  position: fixed;
+  z-index: 300;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--oxblood);
+  color: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 10px 30px -5px rgba(124, 45, 18, 0.5),
+    0 0 0 3px var(--paper),
+    0 0 0 4px var(--oxblood-wash);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -70%) scale(0.5);
+  transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease-spring);
+  cursor: pointer;
+}
+
+.selection-cue.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -70%) scale(1);
+}
+
+.selection-cue svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Reading FAB — queue button */
+.queue-fab {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 14px 22px 14px 18px;
+  border-radius: 100px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: none;
+  box-shadow:
+    0 20px 40px -10px rgba(26, 20, 16, 0.5),
+    0 0 0 1px rgba(0, 0, 0, 0.1);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.queue-fab:active { transform: translateX(-50%) scale(0.96); }
+
+.queue-fab .count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  background: var(--oxblood);
+  color: var(--paper);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.queue-fab svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ─── Bottom Sheet ────────────────────────────────────── */
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(26, 20, 16, 0.5);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur) var(--ease);
+  z-index: 90;
+}
+
+.backdrop.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--paper);
+  border-radius: 28px 28px 0 0;
+  z-index: 100;
+  transform: translateY(100%);
+  transition: transform var(--dur) var(--ease-out);
+  max-height: 86%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -20px 50px -10px rgba(0, 0, 0, 0.3);
+}
+
+.sheet.open { transform: translateY(0); }
+
+.sheet .handle {
+  width: 44px;
+  height: 5px;
+  background: var(--rule);
+  border-radius: 3px;
+  margin: 12px auto 4px;
+  flex-shrink: 0;
+}
+
+.sheet-header {
+  padding: 12px 28px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.sheet-header .title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--oxblood);
+  font-weight: 600;
+}
+
+.sheet-close {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+}
+
+.sheet-body {
+  padding: 12px 28px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.quoted-passage {
+  border-left: 3px solid var(--oxblood);
+  padding: 4px 0 4px 18px;
+  margin: 12px 0 24px;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-variation-settings: "opsz" 48;
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.quoted-passage .quote-mark {
+  font-family: var(--font-display);
+  color: var(--oxblood);
+  font-size: 24px;
+  line-height: 0;
+  vertical-align: -8px;
+  margin-right: 4px;
+}
+
+.comment-input-wrap {
+  background: var(--paper-bright);
+  border: 1px solid var(--rule-soft);
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+.comment-input-wrap:focus-within {
+  border-color: var(--oxblood);
+  box-shadow: 0 0 0 3px var(--oxblood-wash);
+}
+
+.comment-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  resize: none;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+  min-height: 80px;
+}
+
+.comment-input::placeholder {
+  color: var(--ink-whisper);
+  font-style: italic;
+}
+
+.sheet-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.tag-pill {
+  padding: 7px 12px;
+  border-radius: 100px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+}
+
+.tag-pill.active {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.sheet-submit {
+  width: 100%;
+  padding: 18px;
+  background: var(--oxblood);
+  color: var(--paper);
+  border: none;
+  border-radius: 100px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  font-variation-settings: "opsz" 24;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease), background var(--dur-fast);
+  box-shadow:
+    0 12px 28px -8px rgba(124, 45, 18, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.sheet-submit:active {
+  transform: scale(0.98);
+  background: var(--oxblood-bright);
+}
+
+.sheet-submit svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ─── Screen 4: Review submit ─────────────────────────── */
+
+.review-header {
+  padding: 12px var(--edge) 28px;
+}
+
+.review-header h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: "opsz" 144;
+  font-size: 46px;
+  line-height: 0.98;
+  letter-spacing: -0.025em;
+  margin: 14px 0 14px;
+}
+
+.review-header h1 em {
+  font-style: italic;
+  color: var(--oxblood);
+  font-weight: 500;
+}
+
+.review-header .lede {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 44ch;
+  margin: 0 0 4px;
+}
+
+.comment-list {
+  padding: 0 var(--edge) 28px;
+  border-top: 2px solid var(--rule);
+  margin-top: 16px;
+}
+
+.queued-comment {
+  padding: 22px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  position: relative;
+}
+
+.queued-comment .folio {
+  position: absolute;
+  left: -4px;
+  top: 24px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--oxblood);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  transform: translateX(-100%) translateX(-12px);
+}
+
+.queued-comment .passage {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-variation-settings: "opsz" 24;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+  padding-left: 12px;
+  border-left: 2px solid var(--rule);
+}
+
+.queued-comment .note {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+  margin: 0 0 10px;
+}
+
+.queued-comment .edit-row {
+  display: flex;
+  gap: 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.queued-comment .edit-row button {
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.queued-comment .edit-row button:hover,
+.queued-comment .edit-row button.remove { color: var(--oxblood); }
+
+.verdict-section {
+  padding: 20px var(--edge) 28px;
+  background: var(--paper-alt);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.verdict-section .label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--oxblood);
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.verdict-options {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.verdict-pill {
+  padding: 12px 16px;
+  border-radius: 100px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all var(--dur-fast) var(--ease);
+}
+
+.verdict-pill svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+
+.verdict-pill.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.verdict-pill.active.approve { background: var(--sage); border-color: var(--sage); }
+.verdict-pill.active.request { background: var(--oxblood); border-color: var(--oxblood); }
+
+.overall-input {
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.overall-input textarea {
+  width: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  resize: none;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+  min-height: 60px;
+}
+
+.overall-input textarea::placeholder {
+  color: var(--ink-whisper);
+  font-style: italic;
+}
+
+.submit-bar {
+  padding: 20px var(--edge) 32px;
+  background: var(--paper);
+}
+
+.submit-bar button {
+  width: 100%;
+  padding: 20px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 100px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  font-variation-settings: "opsz" 24;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  box-shadow:
+    0 14px 32px -10px rgba(26, 20, 16, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.submit-bar button:active { transform: scale(0.98); }
+
+.submit-bar button svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ─── Drawer ──────────────────────────────────────────── */
+
+.drawer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 86%;
+  max-width: 340px;
+  background: var(--paper-deep);
+  z-index: 120;
+  transform: translateX(-100%);
+  transition: transform var(--dur) var(--ease-out);
+  padding: 52px 28px 28px;
+  border-right: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.drawer.open { transform: translateX(0); }
+
+.drawer .brand {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  font-variation-settings: "opsz" 144;
+  letter-spacing: -0.01em;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--rule);
+}
+
+.drawer .brand em {
+  font-style: italic;
+  color: var(--oxblood);
+  font-weight: 500;
+}
+
+.drawer .brand .tag {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink-faint);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.drawer .repo-card {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.drawer .repo-card .label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--oxblood);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.drawer .repo-card .name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.drawer nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drawer nav a {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 4px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  font-weight: 500;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color var(--dur-fast), border-color var(--dur-fast);
+}
+
+.drawer nav a:hover,
+.drawer nav a.current {
+  color: var(--oxblood);
+}
+
+.drawer nav a.current {
+  border-bottom-color: var(--oxblood);
+}
+
+.drawer nav a svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.drawer .spacer { flex: 1; }
+
+.drawer .theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 100px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+  cursor: pointer;
+  width: fit-content;
+}
+
+.drawer .theme-toggle svg {
+  width: 16px;
+  height: 16px;
+  stroke: var(--oxblood);
+  fill: none;
+  stroke-width: 2;
+}
+
+/* ─── Toast ───────────────────────────────────────────── */
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 32px;
+  transform: translate(-50%, 100%);
+  background: var(--ink);
+  color: var(--paper);
+  padding: 14px 22px;
+  border-radius: 100px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  z-index: 180;
+  opacity: 0;
+  transition: transform var(--dur) var(--ease), opacity var(--dur);
+  pointer-events: none;
+  box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toast svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--oxblood-bright);
+  fill: none;
+  stroke-width: 2;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ─── Staggered reveals ──────────────────────────────── */
+
+.stagger {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: stagger-in 780ms var(--ease-out) forwards;
+}
+
+.screen.active .stagger { animation-play-state: running; }
+.stagger:nth-child(1) { animation-delay: 60ms; }
+.stagger:nth-child(2) { animation-delay: 130ms; }
+.stagger:nth-child(3) { animation-delay: 200ms; }
+.stagger:nth-child(4) { animation-delay: 270ms; }
+.stagger:nth-child(5) { animation-delay: 340ms; }
+.stagger:nth-child(6) { animation-delay: 410ms; }
+
+@keyframes stagger-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Utility ────────────────────────────────────────── */
+
+.visually-hidden { position: absolute; left: -9999px; }
+
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="phone" id="phone">
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <span class="indicators"></span>
+    </div>
+
+    <!-- Screens -->
+    <div class="screens">
+
+      <!-- ═══ SCREEN 1: HOME ═══════════════════════════════ -->
+      <section class="screen screen-home active" data-screen="home">
+
+        <div class="top-bar">
+          <button class="icon-btn" onclick="drawer.toggle()" aria-label="Menu">
+            <svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18"/></svg>
+          </button>
+          <div class="wordmark">Mar<em>Doc</em></div>
+          <div class="avatar" onclick="drawer.toggle()">JB</div>
+        </div>
+
+        <div class="hero">
+          <div class="kicker stagger">Tuesday, April 11 · Review queue</div>
+          <h1 class="stagger">Your <em>desk</em>.</h1>
+          <p class="lede stagger">Three documents waiting on you, two drafts in progress. Take your time.</p>
+        </div>
+
+        <div class="ornament"><span class="ornament-mark">❦</span></div>
+
+        <div class="pr-list">
+          <article class="pr-card hero stagger" onclick="nav.to('pr')">
+            <div class="meta">
+              <span class="num">PR 61</span>
+              <span>mardoc-io / mardoc-io.github.io</span>
+              <span class="dot"></span>
+              <span class="status-pill review">Needs review</span>
+            </div>
+            <h2>Inline comments on HTML files.</h2>
+            <p class="dek">Feature 033 closes the HTML parity gap. Reviewers can now highlight any passage in a rendered HTML document and leave a comment — the same flow markdown already supports.</p>
+            <div class="footer">
+              <span class="tiny-avatar">JB</span>
+              <span>joe.barnett</span>
+              <span class="sep">·</span>
+              <span>2 hrs ago</span>
+              <span class="sep">·</span>
+              <span>8 files</span>
+              <span class="sep">·</span>
+              <span>3 threads</span>
+            </div>
+          </article>
+
+          <article class="pr-card stagger" onclick="nav.to('pr')">
+            <div class="meta">
+              <span class="num">PR 62</span>
+              <span>mardoc-io / mardoc-io.github.io</span>
+              <span class="dot"></span>
+              <span class="status-pill open">Draft</span>
+            </div>
+            <h2>Cellphone mode — the field guide.</h2>
+            <p class="dek">Design-first story for feature 038. Editorial, confident, thumb-first. This prototype is the thing you are currently reading.</p>
+            <div class="footer">
+              <span class="tiny-avatar sage">AL</span>
+              <span>a.lee</span>
+              <span class="sep">·</span>
+              <span>yesterday</span>
+              <span class="sep">·</span>
+              <span>1 file</span>
+            </div>
+          </article>
+
+          <article class="pr-card stagger" onclick="nav.to('pr')">
+            <div class="meta">
+              <span class="num">PR 60</span>
+              <span>mardoc-io / mardoc-io.github.io</span>
+              <span class="dot"></span>
+              <span class="status-pill">Merged</span>
+            </div>
+            <h2>Back the README claims.</h2>
+            <p class="dek">560+ unit tests, a README truthfulness audit, and a refactor that makes the diff rendering testable in isolation.</p>
+            <div class="footer">
+              <span class="tiny-avatar gold">MR</span>
+              <span>m.rivera</span>
+              <span class="sep">·</span>
+              <span>last week</span>
+              <span class="sep">·</span>
+              <span>14 files</span>
+            </div>
+          </article>
+        </div>
+
+      </section>
+
+      <!-- ═══ SCREEN 2: PR DETAIL ═════════════════════════ -->
+      <section class="screen screen-pr" data-screen="pr">
+
+        <div class="top-bar">
+          <button class="icon-btn" onclick="nav.back()" aria-label="Back">
+            <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="wordmark">mardoc-io · PR 61</div>
+          <button class="icon-btn" aria-label="More">
+            <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+          </button>
+        </div>
+
+        <div class="pr-header">
+          <div class="kicker start stagger">Pull request · needs review</div>
+          <h1 class="stagger">Inline comments <em>on HTML</em> files.</h1>
+          <p class="description stagger">Feature 033 closes the HTML parity gap. Reviewers can now highlight any passage in a rendered HTML document and leave a comment — the same flow markdown already supports. Flows through the existing pending-review pipeline, batched submission unchanged.</p>
+          <div class="author-row stagger">
+            <span class="tiny-avatar">JB</span>
+            <span>joe.barnett</span>
+            <span>·</span>
+            <span>opened 2 hrs ago</span>
+            <span>·</span>
+            <span>+1,684 −10</span>
+          </div>
+        </div>
+
+        <div class="toc-header">
+          <span class="label">Files changed</span>
+          <span class="count">vii in total</span>
+        </div>
+
+        <div class="file-toc">
+          <div class="file-entry stagger" onclick="nav.to('read')">
+            <span class="folio">01</span>
+            <div class="file-body">
+              <div class="file-name">public/demo.html</div>
+              <div class="file-meta">
+                <span class="change-added">+284</span>
+                <span>·</span>
+                <span>New file</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="file-entry stagger" onclick="nav.to('read')">
+            <span class="folio">02</span>
+            <div class="file-body">
+              <div class="file-name">src/lib/html-source-lines.ts</div>
+              <div class="file-meta">
+                <span class="change-added">+233</span>
+                <span>·</span>
+                <span>New file</span>
+              </div>
+              <div class="comment-badge">
+                <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                2
+              </div>
+            </div>
+          </div>
+
+          <div class="file-entry stagger" onclick="nav.to('read')">
+            <span class="folio">03</span>
+            <div class="file-body">
+              <div class="file-name">src/lib/html-selection.ts</div>
+              <div class="file-meta">
+                <span class="change-added">+128</span>
+                <span>·</span>
+                <span>New file</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="file-entry stagger" onclick="nav.to('read')">
+            <span class="folio">04</span>
+            <div class="file-body">
+              <div class="file-name">src/components/DiffViewer.tsx</div>
+              <div class="file-meta">
+                <span class="change-added">+49</span>
+                <span class="change-removed">−9</span>
+                <span>·</span>
+                <span>Modified</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="file-entry stagger" onclick="nav.to('read')">
+            <span class="folio">05</span>
+            <div class="file-body">
+              <div class="file-name">docs/features/033-html-inline-comments.md</div>
+              <div class="file-meta">
+                <span class="change-added">+92</span>
+                <span>·</span>
+                <span>New file</span>
+              </div>
+              <div class="comment-badge">
+                <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                1
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ═══ SCREEN 3: READING ═══════════════════════════ -->
+      <section class="screen screen-read" data-screen="read">
+
+        <div class="reading-bar" id="readingBar">
+          <button class="icon-btn" onclick="nav.back()" aria-label="Back">
+            <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <span class="file-label">public/demo.html</span>
+          <span class="progress">2 / 14</span>
+        </div>
+
+        <article class="article">
+          <div class="kicker start stagger">Sample document · HTML</div>
+          <h1 class="stagger">The Field Guide to Document Review in the AI Era.</h1>
+          <div class="byline stagger">Draft · 1,247 words · 5 min read</div>
+
+          <p class="first selectable stagger">Most organizations have quietly accumulated three review workflows, each of which makes a different set of people unhappy. Engineers review code in pull requests. Writers review prose in Google Docs or Notion. Everyone else reviews whatever the last meeting's action item ended up in — a spreadsheet, a Slack thread, a draft email nobody ever sends.</p>
+
+          <p class="selectable stagger">When AI-generated content enters the picture, the bottleneck becomes obvious. A language model can produce a four-thousand-word technical brief in ninety seconds. A human can review it in forty-five minutes. The constraint is no longer production; it is attention. And attention, unlike compute, does not scale by adding another GPU.</p>
+
+          <div class="pull-ornament">· · ·</div>
+
+          <h2 class="selectable">Why review is the bottleneck</h2>
+
+          <p class="selectable">Every review task falls into one of three shapes. Understanding which shape you're dealing with tells you which tool to use. Correctness — does this assert something true? Voice — does this sound like us? Structure — does this belong here, at this length, in this order?</p>
+
+          <blockquote class="selectable">If the reviewer can't read the document, they can't review the document. HTML and markdown are how AI writes; they should be how humans review.</blockquote>
+
+          <p class="selectable">A good review tool makes all three cheap. A bad one makes each of them expensive in a different way. The trick is that most teams have never named which of the three they are doing at any given moment, so the tool choice is accidental and the review gets the shape of whatever application happened to be open.</p>
+
+          <h2 class="selectable">What to try here</h2>
+
+          <p class="selectable">Highlight any sentence in this document. A small mark will appear near your finger — tap it to open a comment sheet. The passage you selected becomes a pull quote at the top of the sheet. Type a note, send it, and it queues as part of a single review you can submit all at once.</p>
+        </article>
+
+        <!-- Floating queue FAB -->
+        <button class="queue-fab" onclick="nav.to('review')">
+          <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          <span><span class="count" id="queueCount">1</span> in review</span>
+        </button>
+
+      </section>
+
+      <!-- ═══ SCREEN 4: REVIEW SUBMIT ═════════════════════ -->
+      <section class="screen screen-review" data-screen="review">
+
+        <div class="top-bar">
+          <button class="icon-btn" onclick="nav.back()" aria-label="Back">
+            <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="wordmark">Review</div>
+          <div style="width:40px"></div>
+        </div>
+
+        <div class="review-header">
+          <div class="kicker start stagger">Before you submit</div>
+          <h1 class="stagger">Your <em>review</em>.</h1>
+          <p class="lede stagger">One inline note and a verdict. Everything ships as a single GitHub review — one notification, not three.</p>
+        </div>
+
+        <div class="comment-list">
+          <div class="queued-comment stagger">
+            <div class="folio">i.</div>
+            <div class="passage">"attention, unlike compute, does not scale by adding another GPU."</div>
+            <p class="note">Can we cite a specific study or benchmark here? The line is load-bearing for the argument and a reader will ask for the source.</p>
+            <div class="edit-row">
+              <button>Edit</button>
+              <button class="remove">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="verdict-section stagger">
+          <div class="label">Verdict</div>
+          <div class="verdict-options">
+            <button class="verdict-pill active approve" onclick="selectVerdict(this)">
+              <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              Approve
+            </button>
+            <button class="verdict-pill" onclick="selectVerdict(this)">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+              Comment
+            </button>
+            <button class="verdict-pill request" onclick="selectVerdict(this)">
+              <svg viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01M4 20l8-16 8 16H4z"/></svg>
+              Request changes
+            </button>
+          </div>
+          <div class="overall-input">
+            <textarea placeholder="Add a note on the whole review (optional)…"></textarea>
+          </div>
+        </div>
+
+        <div class="submit-bar">
+          <button onclick="submitReview()">
+            <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            Submit review
+          </button>
+        </div>
+
+      </section>
+
+    </div>
+
+    <!-- Drawer -->
+    <aside class="drawer" id="drawer">
+      <div class="brand">
+        Mar<em>Doc</em>
+        <span class="tag">The field guide</span>
+      </div>
+
+      <div class="repo-card">
+        <div class="label">Current repository</div>
+        <div class="name">mardoc-io / mardoc-io.github.io</div>
+      </div>
+
+      <nav>
+        <a href="#" class="current" onclick="drawer.closeAndNav('home'); return false;">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          Review queue
+        </a>
+        <a href="#" onclick="drawer.close(); return false;">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          All discussions
+        </a>
+        <a href="#" onclick="drawer.close(); return false;">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+          Drafts
+        </a>
+        <a href="#" onclick="drawer.close(); return false;">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          History
+        </a>
+        <a href="#" onclick="drawer.close(); return false;">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2.1-1.7-2-3.5-2.5 1a7 7 0 00-2-1.2l-.4-2.7h-4l-.4 2.7a7 7 0 00-2 1.2l-2.5-1-2 3.5 2.1 1.7a7.2 7.2 0 000 2.4l-2.1 1.7 2 3.5 2.5-1a7 7 0 002 1.2l.4 2.7h4l.4-2.7a7 7 0 002-1.2l2.5 1 2-3.5-2.1-1.7c.1-.4.1-.8.1-1.2z"/></svg>
+          Settings
+        </a>
+      </nav>
+
+      <div class="spacer"></div>
+
+      <button class="theme-toggle" onclick="toggleTheme()">
+        <svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+        <span id="themeLabel">Dark mode</span>
+      </button>
+    </aside>
+
+    <!-- Backdrop -->
+    <div class="backdrop" id="backdrop" onclick="closeAll()"></div>
+
+    <!-- Bottom sheet -->
+    <div class="sheet" id="sheet">
+      <div class="handle"></div>
+      <div class="sheet-header">
+        <span class="title">New comment</span>
+        <button class="sheet-close" onclick="sheet.close()">Cancel</button>
+      </div>
+      <div class="sheet-body">
+        <div class="quoted-passage">
+          <span class="quote-mark">"</span><span id="quotedText">attention, unlike compute, does not scale</span>"
+        </div>
+        <div class="comment-input-wrap">
+          <textarea class="comment-input" id="commentInput" placeholder="Write your note — be specific, name what you're pointing at…"></textarea>
+        </div>
+        <div class="sheet-actions">
+          <button class="tag-pill active">Comment</button>
+          <button class="tag-pill">Suggest change</button>
+          <button class="tag-pill">Question</button>
+        </div>
+        <button class="sheet-submit" onclick="queueComment()">
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          Add to review
+        </button>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+      <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+      <span id="toastMsg">Comment queued</span>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── Navigation ─────────────────────────────────────────
+
+const nav = {
+  stack: ['home'],
+
+  to(screen) {
+    if (this.current() === screen) return;
+    this.stack.push(screen);
+    this._transition(screen);
+  },
+
+  back() {
+    if (this.stack.length <= 1) return;
+    this.stack.pop();
+    this._transition(this.current());
+  },
+
+  current() {
+    return this.stack[this.stack.length - 1];
+  },
+
+  _transition(target) {
+    const screens = document.querySelectorAll('.screen');
+    screens.forEach(s => {
+      if (s.dataset.screen === target) {
+        s.classList.remove('outgoing');
+        // Restart stagger animations
+        s.querySelectorAll('.stagger').forEach(el => {
+          el.style.animation = 'none';
+          // Force reflow
+          void el.offsetHeight;
+          el.style.animation = '';
+        });
+        s.classList.add('active');
+        s.scrollTop = 0;
+      } else if (s.classList.contains('active')) {
+        s.classList.remove('active');
+        s.classList.add('outgoing');
+        setTimeout(() => s.classList.remove('outgoing'), 500);
+      }
+    });
+  }
+};
+
+// ─── Drawer ─────────────────────────────────────────────
+
+const drawer = {
+  toggle() {
+    const d = document.getElementById('drawer');
+    const b = document.getElementById('backdrop');
+    d.classList.toggle('open');
+    b.classList.toggle('visible');
+  },
+  close() {
+    document.getElementById('drawer').classList.remove('open');
+    document.getElementById('backdrop').classList.remove('visible');
+  },
+  closeAndNav(screen) {
+    this.close();
+    setTimeout(() => {
+      nav.stack = [screen];
+      nav._transition(screen);
+    }, 240);
+  }
+};
+
+// ─── Bottom sheet ───────────────────────────────────────
+
+const sheet = {
+  open(passage) {
+    if (passage) document.getElementById('quotedText').textContent = passage;
+    document.getElementById('sheet').classList.add('open');
+    document.getElementById('backdrop').classList.add('visible');
+    hideSelectionCue();
+    setTimeout(() => {
+      document.getElementById('commentInput').focus();
+    }, 400);
+  },
+  close() {
+    document.getElementById('sheet').classList.remove('open');
+    document.getElementById('backdrop').classList.remove('visible');
+    document.getElementById('commentInput').value = '';
+  }
+};
+
+function closeAll() {
+  drawer.close();
+  sheet.close();
+}
+
+// ─── Selection → comment cue ────────────────────────────
+
+let lastSelection = '';
+
+function handleSelection() {
+  setTimeout(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) {
+      hideSelectionCue();
+      return;
+    }
+    const text = sel.toString().trim();
+    if (text.length < 3) {
+      hideSelectionCue();
+      return;
+    }
+    // Only within the article in the reading screen
+    const readScreen = document.querySelector('.screen-read');
+    if (!readScreen.classList.contains('active')) return;
+    const range = sel.getRangeAt(0);
+    const anchor = range.commonAncestorContainer;
+    const article = readScreen.querySelector('.article');
+    if (!article.contains(anchor.nodeType === 1 ? anchor : anchor.parentNode)) {
+      hideSelectionCue();
+      return;
+    }
+    lastSelection = text;
+    const rect = range.getBoundingClientRect();
+    showSelectionCue(rect);
+  }, 10);
+}
+
+function showSelectionCue(rect) {
+  const cue = document.getElementById('selectionCue');
+  cue.style.left = (rect.left + rect.width / 2) + 'px';
+  cue.style.top = rect.top + 'px';
+  cue.classList.add('visible');
+}
+
+function hideSelectionCue() {
+  document.getElementById('selectionCue').classList.remove('visible');
+}
+
+document.addEventListener('mouseup', handleSelection);
+document.addEventListener('touchend', handleSelection);
+document.addEventListener('selectionchange', () => {
+  // When selection clears, hide the cue
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) hideSelectionCue();
+});
+
+// ─── Comment queue ──────────────────────────────────────
+
+let queuedComments = 1;
+
+function queueComment() {
+  const input = document.getElementById('commentInput');
+  if (!input.value.trim()) {
+    input.focus();
+    return;
+  }
+  queuedComments++;
+  document.getElementById('queueCount').textContent = queuedComments;
+  sheet.close();
+  window.getSelection().removeAllRanges();
+  showToast('Comment queued');
+}
+
+// ─── Verdict selection ──────────────────────────────────
+
+function selectVerdict(btn) {
+  const allPills = btn.parentNode.querySelectorAll('.verdict-pill');
+  allPills.forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function submitReview() {
+  showToast('Review submitted · 1 GitHub notification sent');
+  setTimeout(() => {
+    queuedComments = 0;
+    document.getElementById('queueCount').textContent = queuedComments;
+    nav.stack = ['home'];
+    nav._transition('home');
+  }, 1200);
+}
+
+// ─── Toast ──────────────────────────────────────────────
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('visible'), 2200);
+}
+
+// ─── Theme ──────────────────────────────────────────────
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const current = html.dataset.theme || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  html.dataset.theme = next;
+  document.getElementById('themeLabel').textContent =
+    next === 'dark' ? 'Light mode' : 'Dark mode';
+}
+
+// ─── Scroll shadows ─────────────────────────────────────
+
+document.querySelectorAll('.screen').forEach(screen => {
+  screen.addEventListener('scroll', () => {
+    const bar = screen.querySelector('.top-bar, .reading-bar');
+    if (bar) {
+      bar.classList.toggle('stuck', screen.scrollTop > 10);
+    }
+  });
+});
+
+// ─── Live clock in status bar ──────────────────────────
+
+function updateClock() {
+  const d = new Date();
+  const h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, '0');
+  document.querySelector('.status-bar .time').textContent = `${h}:${m}`;
+}
+updateClock();
+setInterval(updateClock, 30000);
+
+// Inject the selection cue into the DOM
+const cue = document.createElement('button');
+cue.className = 'selection-cue';
+cue.id = 'selectionCue';
+cue.setAttribute('aria-label', 'Comment on selection');
+cue.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>';
+cue.addEventListener('click', () => {
+  sheet.open(lastSelection);
+});
+document.body.appendChild(cue);
+
+</script>
+</body>
+</html>
