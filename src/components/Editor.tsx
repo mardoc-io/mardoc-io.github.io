@@ -62,7 +62,7 @@ const Image = BaseImage.extend({
   },
 });
 
-import { rewriteImageUrls, loadAuthenticatedImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent, createFileAsPR, commitFileToPRBranch } from "@/lib/github-api";
+import { rewriteImageUrls, loadAuthenticatedImages, loadEmbedLocalImages, createReviewPR, createInlineComment, mapSelectionToLines, fetchFileContent, createFileAsPR, commitFileToPRBranch } from "@/lib/github-api";
 import {
   clearDraft,
   formatRelativeSavedAt,
@@ -1272,10 +1272,14 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
             setDraftPrompt({ markdown: draft.markdown, savedAt: draft.savedAt });
           }
 
-          // Fetch private repo images after TipTap renders
+          // Fetch private repo images after TipTap renders. In embed
+          // mode, also fetch local filesystem images via the bridge.
           setTimeout(() => {
             if (!cancelled && editorContainerRef.current) {
               loadAuthenticatedImages(editorContainerRef.current);
+              if (filePath) {
+                loadEmbedLocalImages(editorContainerRef.current, filePath);
+              }
             }
           }, 50);
         });
@@ -1326,6 +1330,9 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       setTimeout(() => {
         if (editorContainerRef.current) {
           loadAuthenticatedImages(editorContainerRef.current);
+          if (filePath) {
+            loadEmbedLocalImages(editorContainerRef.current, filePath);
+          }
         }
       }, 50);
     }
