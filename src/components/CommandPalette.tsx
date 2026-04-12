@@ -76,14 +76,14 @@ export default function CommandPalette({ open, commands, onClose }: CommandPalet
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] bg-black/50"
+      className="fixed inset-0 z-[100] flex flex-col md:items-start md:justify-center md:pt-[15vh] md:bg-black/50 bg-[var(--surface)]"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Command palette"
     >
       <div
-        className="w-full max-w-xl max-h-[70vh] flex flex-col bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl overflow-hidden"
+        className="flex flex-col w-full h-full bg-[var(--surface)] overflow-hidden md:h-auto md:max-w-xl md:max-h-[70vh] md:mx-auto md:border md:border-[var(--border)] md:rounded-lg md:shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search input */}

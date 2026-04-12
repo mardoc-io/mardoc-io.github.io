@@ -321,8 +321,10 @@ export default function Sidebar() {
     );
   }
 
+  // Width: fixed 256px on desktop, fills its parent on mobile so a
+  // MobileDrawer host can pick the drawer width.
   return (
-    <aside className="w-64 shrink-0 h-full border-r border-[var(--border)] bg-[var(--surface-secondary)] flex flex-col">
+    <aside className="w-full md:w-64 md:shrink-0 h-full border-r border-[var(--border)] bg-[var(--surface-secondary)] flex flex-col">
       {/* Tabs */}
       <div className="flex border-b border-[var(--border)]">
         {(!isEmbedded || isViewingPR) && (

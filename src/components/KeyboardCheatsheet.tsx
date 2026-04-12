@@ -59,14 +59,14 @@ export default function KeyboardCheatsheet({ open, onClose }: KeyboardCheatsheet
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-[100] flex md:items-center md:justify-center md:bg-black/50 bg-[var(--surface)]"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Keyboard shortcuts"
     >
       <div
-        className="w-full max-w-lg max-h-[80vh] flex flex-col bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl overflow-hidden"
+        className="flex flex-col w-full h-full bg-[var(--surface)] overflow-hidden md:h-auto md:max-w-lg md:max-h-[80vh] md:border md:border-[var(--border)] md:rounded-lg md:shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

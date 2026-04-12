@@ -433,6 +433,7 @@ body {
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 .toolbar-btn:hover {
   background: var(--surface-hover);
@@ -442,6 +443,12 @@ body {
   background: var(--accent-muted);
   color: var(--accent);
 }
+
+/* Editor toolbar: horizontal scroll on mobile (flex-nowrap +
+   overflow-x-auto) with a hidden scrollbar for a cleaner swipe feel.
+   On desktop the toolbar still uses flex-wrap so nothing changes. */
+.editor-toolbar-scroll::-webkit-scrollbar { display: none; }
+.editor-toolbar-scroll { scrollbar-width: none; }
 
 /* Dark mode highlight.js overrides (base theme is github.css light) */
 .dark .hljs {

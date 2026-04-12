@@ -100,7 +100,7 @@ export default function Outline({ markdown, editorContainerRef, onClose }: Outli
   return (
     <aside
       ref={panelRef}
-      className="w-56 shrink-0 border-r border-[var(--border)] bg-[var(--surface-secondary)] flex flex-col h-full overflow-hidden"
+      className="w-full md:w-56 md:shrink-0 md:border-r md:border-[var(--border)] bg-[var(--surface-secondary)] flex flex-col h-full overflow-hidden"
       aria-label="Document outline"
     >
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--border)]">
