@@ -80,6 +80,7 @@ import RichFindReplaceBar from "./RichFindReplaceBar";
 import type { Match as FindMatch } from "@/lib/find-replace";
 import Outline from "./Outline";
 import MobileDrawer from "./MobileDrawer";
+import MobileCommentButton from "./MobileCommentButton";
 import { useIsMobile } from "@/lib/use-viewport";
 import { MARDOC_OPEN_FIND_EVENT } from "@/lib/tiptap-search-extension";
 import {
@@ -275,9 +276,10 @@ function FloatingCommentButton({
 
   if (!pos || !text) return null;
 
+  // Hidden on mobile — MobileCommentButton replaces it.
   return (
     <div
-      className="absolute z-50"
+      className="absolute z-50 hidden md:block"
       style={{ top: pos.top, left: pos.left }}
     >
       <button
@@ -2164,11 +2166,18 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
               )}
             </div>
 
-            {/* Floating comment button */}
+            {/* Floating comment button (desktop) */}
             <FloatingCommentButton
               containerRef={editorContainerRef}
               onComment={handleStartComment}
             />
+            {/* Mobile: fixed button at the bottom of the viewport */}
+            {isMobile && (
+              <MobileCommentButton
+                containerRef={editorContainerRef}
+                onComment={handleStartComment}
+              />
+            )}
 
             {/* Link / image edit bubble */}
             {!codeView && (

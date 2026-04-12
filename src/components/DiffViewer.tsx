@@ -51,6 +51,7 @@ import { injectSourceLineAttributes } from "@/lib/html-source-lines";
 import { buildIframeSelectionScript } from "@/lib/html-selection";
 import { useIsMobile } from "@/lib/use-viewport";
 import BottomSheet from "./BottomSheet";
+import MobileCommentButton from "./MobileCommentButton";
 import { extractCommentSuggestions, mergeSuggestions } from "@/lib/suggestion-extract";
 import { parseSuggestionBody } from "@/lib/suggestion-body";
 
@@ -169,9 +170,11 @@ function FloatingToolbar({
 
   if (!pos || !text) return null;
 
+  // Hidden on mobile — the native iOS/Android selection callout
+  // covers this toolbar. MobileCommentButton replaces it.
   return (
     <div
-      className="absolute z-40"
+      className="absolute z-40 hidden md:block"
       style={{ top: `${pos.top}px`, left: `${pos.left}px`, transform: "translateX(-50%)" }}
     >
       <button
@@ -1871,6 +1874,16 @@ export default function DiffViewer({
             }}
           />
         </BottomSheet>
+      )}
+
+      {/* Mobile: fixed "Comment on selection" button at the bottom of
+          the viewport. Replaces the FloatingToolbar which is hidden on
+          mobile because the native OS selection callout covers it. */}
+      {isMobile && (
+        <MobileCommentButton
+          containerRef={contentRef}
+          onComment={handleSelectionComment}
+        />
       )}
     </div>
   );
