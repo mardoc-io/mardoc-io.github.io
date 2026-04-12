@@ -632,3 +632,48 @@ body {
 .dark .ProseMirror .mardoc-search-match-current {
   background-color: rgba(255, 140, 0, 0.55);
 }
+
+/* ─── Mobile reading view polish ─────────────────────────
+ * These styles only apply below 768px. They make the
+ * rendered diff content feel more like reading a document
+ * on a phone and less like viewing a desktop UI at 40%
+ * zoom. Desktop is untouched. */
+@media (max-width: 767px) {
+  /* Larger body text for comfortable phone reading */
+  .diff-content {
+    font-size: 16px;
+    line-height: 1.65;
+  }
+
+  /* Diff blocks: more generous padding for touch and reading */
+  .diff-block {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  /* Headings get a subtle accent marker on mobile */
+  .diff-content h2::before {
+    content: "§ ";
+    color: var(--accent);
+    font-weight: 400;
+    opacity: 0.6;
+  }
+
+  /* First rendered paragraph in a diff gets a drop cap */
+  .diff-content > p:first-of-type::first-letter {
+    font-size: 3.2em;
+    line-height: 0.85;
+    float: left;
+    padding: 4px 8px 0 0;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* Blockquotes get a stronger left border on mobile */
+  .diff-content blockquote {
+    border-left-width: 3px;
+    border-left-color: var(--accent);
+    padding-left: 16px;
+    font-style: italic;
+  }
+}

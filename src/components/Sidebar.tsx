@@ -24,6 +24,21 @@ import {
 } from "lucide-react";
 import { RepoFile, PRFile } from "@/types";
 import { useApp } from "@/lib/app-context";
+import { isMarkdownFile, isHtmlFile } from "@/lib/file-types";
+
+function fileTypeChip(name: string): { label: string; color: string } | null {
+  if (isMarkdownFile(name)) return { label: "MD", color: "text-[var(--diff-add-text)]" };
+  if (isHtmlFile(name)) return { label: "HTM", color: "text-[var(--accent)]" };
+  if (name.endsWith(".tsx")) return { label: "TSX", color: "text-[var(--inline-code)]" };
+  if (name.endsWith(".ts")) return { label: "TS", color: "text-[var(--inline-code)]" };
+  return null;
+}
+
+function prRailColor(status: string): string {
+  if (status === "merged") return "bg-[var(--accent)]";
+  if (status === "closed") return "bg-[var(--diff-remove-text)]";
+  return "bg-[var(--diff-add-text)]";
+}
 
 // ─── Repo file tree item ──────────────────────────────────────────────────
 
@@ -46,7 +61,7 @@ function FileTreeItem({
       <div>
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center gap-1.5 px-2 py-1 text-sm rounded-md hover:bg-[var(--surface-hover)] transition-colors"
+          className="w-full flex items-center gap-1.5 px-2 py-2 md:py-1 text-sm rounded-md hover:bg-[var(--surface-hover)] transition-colors"
           style={{ paddingLeft: `${depth * 16 + 8}px` }}
         >
           {expanded ? (
@@ -78,17 +93,25 @@ function FileTreeItem({
     );
   }
 
+  const chip = fileTypeChip(file.name);
+
   return (
     <button
       onClick={() => onSelect(file)}
-      className={`w-full flex items-center gap-1.5 px-2 py-1 text-sm rounded-md transition-colors ${
+      className={`w-full flex items-center gap-1.5 px-2 py-2 md:py-1 text-sm rounded-md transition-colors ${
         isSelected
           ? "bg-[var(--accent-muted)] text-[var(--accent)]"
           : "hover:bg-[var(--surface-hover)] text-[var(--text-secondary)]"
       }`}
       style={{ paddingLeft: `${depth * 16 + 8 + 18}px` }}
     >
-      <FileText size={14} className="shrink-0" />
+      {chip ? (
+        <span className={`text-[9px] font-bold font-mono leading-none px-1 py-0.5 rounded border border-current shrink-0 ${chip.color}`}>
+          {chip.label}
+        </span>
+      ) : (
+        <FileText size={14} className="shrink-0" />
+      )}
       <span className="truncate">{file.name}</span>
     </button>
   );
@@ -202,17 +225,25 @@ function PRFileTreeItem({
 
   const isSelected = node.fileIdx === selectedIdx;
 
+  const chip = fileTypeChip(node.name);
+
   return (
     <button
       onClick={() => node.fileIdx !== undefined && onSelect(node.fileIdx)}
-      className={`w-full flex items-center gap-1.5 px-2 py-1 text-xs rounded-md transition-colors ${
+      className={`w-full flex items-center gap-1.5 px-2 py-2 md:py-1 text-xs rounded-md transition-colors ${
         isSelected
           ? "bg-[var(--accent-muted)] text-[var(--accent)]"
           : "hover:bg-[var(--surface-hover)] text-[var(--text-secondary)]"
       }`}
       style={{ paddingLeft: `${depth * 14 + 8 + 16}px` }}
     >
-      {statusIcon(node.status!)}
+      {chip ? (
+        <span className={`text-[8px] font-bold font-mono leading-none px-1 py-0.5 rounded border border-current shrink-0 ${chip.color}`}>
+          {chip.label}
+        </span>
+      ) : (
+        statusIcon(node.status!)
+      )}
       <span className="truncate">{node.name}</span>
     </button>
   );
@@ -325,15 +356,15 @@ export default function Sidebar() {
   // MobileDrawer host can pick the drawer width.
   return (
     <aside className="w-full md:w-64 md:shrink-0 h-full border-r border-[var(--border)] bg-[var(--surface-secondary)] flex flex-col">
-      {/* Tabs */}
-      <div className="flex border-b border-[var(--border)]">
+      {/* Tabs — pill segment switcher on mobile, underline tabs on desktop */}
+      <div className="flex border-b border-[var(--border)] p-1.5 md:p-0 gap-1 md:gap-0 bg-[var(--surface-secondary)] md:bg-transparent">
         {(!isEmbedded || isViewingPR) && (
           <button
             onClick={() => setActiveTab("files")}
-            className={`flex-1 px-3 py-2.5 text-sm font-medium transition-colors ${
+            className={`flex-1 px-3 py-2.5 md:py-2.5 text-sm font-medium transition-colors rounded-lg md:rounded-none ${
               activeTab === "files"
-                ? "text-[var(--text-primary)] border-b-2 border-[var(--accent)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                ? "bg-[var(--accent)] text-white md:bg-transparent md:text-[var(--text-primary)] md:border-b-2 md:border-[var(--accent)]"
+                : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] md:hover:text-[var(--text-secondary)]"
             }`}
           >
             <span className="flex items-center justify-center gap-1.5">
@@ -344,9 +375,9 @@ export default function Sidebar() {
         )}
         <button
           onClick={() => setActiveTab("prs")}
-          className={`flex-1 px-3 py-2.5 text-sm font-medium transition-colors ${
+          className={`flex-1 px-3 py-2.5 md:py-2.5 text-sm font-medium transition-colors rounded-lg md:rounded-none ${
             activeTab === "prs"
-              ? "text-[var(--text-primary)] border-b-2 border-[var(--accent)]"
+              ? "bg-[var(--accent)] text-white md:bg-transparent md:text-[var(--text-primary)] md:border-b-2 md:border-[var(--accent)]"
               : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
           }`}
         >
@@ -357,7 +388,7 @@ export default function Sidebar() {
         </button>
         <button
           onClick={() => setCollapsed(true)}
-          className="px-2 py-2.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+          className="hidden md:block px-2 py-2.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
           title="Collapse sidebar"
         >
           <PanelLeftClose size={14} />
@@ -553,18 +584,23 @@ export default function Sidebar() {
           </div>
         ) : (
           <div className="space-y-1">
-            {/* State filter */}
-            <div className="flex items-center gap-1 px-1 mb-2">
+            {/* State filter — pills with status dots on mobile, compact on desktop */}
+            <div className="flex items-center gap-1.5 md:gap-1 px-1 mb-2">
               {(["open", "closed", "all"] as const).map((state) => (
                 <button
                   key={state}
                   onClick={() => setPRStateFilter(state)}
-                  className={`flex-1 text-[10px] py-1 rounded transition-colors capitalize ${
+                  className={`flex-1 text-xs md:text-[10px] py-2 md:py-1 rounded-full md:rounded flex items-center justify-center gap-1.5 transition-colors capitalize ${
                     prStateFilter === state
                       ? "bg-[var(--accent-muted)] text-[var(--accent)] font-medium"
                       : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                   }`}
                 >
+                  {state !== "all" && (
+                    <span className={`w-1.5 h-1.5 rounded-full md:hidden ${
+                      state === "open" ? "bg-[var(--diff-add-text)]" : "bg-[var(--text-muted)]"
+                    }`} />
+                  )}
                   {state}
                 </button>
               ))}
@@ -588,34 +624,39 @@ export default function Sidebar() {
                 <button
                   key={pr.id}
                   onClick={() => openPR(pr)}
-                  className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${
+                  className={`w-full text-left px-3 py-3 md:py-2.5 rounded-md transition-colors flex items-stretch gap-2.5 md:gap-2 min-h-[52px] md:min-h-0 ${
                     selectedPR?.id === pr.id
                       ? "bg-[var(--accent-muted)]"
                       : "hover:bg-[var(--surface-hover)]"
                   }`}
                 >
-                  <div className="flex items-start gap-2">
+                  {/* Status rail — colored left bar, mobile only */}
+                  <div className={`w-[3px] rounded-full shrink-0 self-stretch md:hidden ${prRailColor(pr.status)}`} />
+                  <div className="flex items-start gap-2 min-w-0 flex-1">
                     {pr.status === "merged" ? (
-                      <GitMerge size={14} className="text-purple-500 shrink-0 mt-0.5" />
+                      <GitMerge size={14} className="text-purple-500 shrink-0 mt-0.5 hidden md:block" />
                     ) : pr.status === "closed" ? (
-                      <GitPullRequest size={14} className="text-red-500 shrink-0 mt-0.5" />
+                      <GitPullRequest size={14} className="text-red-500 shrink-0 mt-0.5 hidden md:block" />
                     ) : (
-                      <GitPullRequest size={14} className="text-green-500 shrink-0 mt-0.5" />
+                      <GitPullRequest size={14} className="text-green-500 shrink-0 mt-0.5 hidden md:block" />
                     )}
                     <div className="min-w-0 flex-1">
+                      <div className="text-xs text-[var(--text-muted)] font-mono mb-0.5 md:hidden">
+                        #{pr.number} · {pr.author}
+                      </div>
                       <div className="text-sm text-[var(--text-primary)] truncate">
                         {pr.title}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mt-0.5">
-                        <span>#{pr.number} by {pr.author}</span>
+                        <span className="hidden md:inline">#{pr.number} by {pr.author}</span>
                         {pr.mdFileCount !== undefined && pr.mdFileCount > 0 && (
                           <span className="text-[9px] px-1.5 py-0 rounded-full bg-[var(--accent-muted)] text-[var(--accent)] font-medium">
-                            {pr.mdFileCount} md
+                            {pr.mdFileCount} {pr.mdFileCount === 1 ? "file" : "files"}
                           </span>
                         )}
                         {pr.mdFileCount === 0 && (
                           <span className="text-[9px] px-1.5 py-0 rounded-full bg-[var(--surface-secondary)] text-[var(--text-muted)]">
-                            no md
+                            no docs
                           </span>
                         )}
                       </div>
