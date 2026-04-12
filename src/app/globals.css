@@ -633,6 +633,31 @@ body {
   background-color: rgba(255, 140, 0, 0.55);
 }
 
+/* Failed image placeholder: loadAuthenticatedImages marks an <img>
+ * with this class when the GitHub content fetch fails (404, permission,
+ * rate limit). Replace the broken-image glyph with a clear visual state
+ * so reviewers know the image didn't load and why. */
+img.mardoc-image-failed {
+  min-width: 200px;
+  min-height: 80px;
+  padding: 14px 18px;
+  background: var(--surface-secondary);
+  border: 1px dashed var(--diff-remove-text);
+  border-radius: 8px;
+  color: var(--diff-remove-text);
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Use the alt text as the visible label */
+  object-fit: none;
+  font-style: italic;
+}
+img.mardoc-image-failed::before {
+  content: "⚠ " attr(alt);
+}
+
 /* ─── Mobile reading view polish ─────────────────────────
  * These styles only apply below 768px. They make the
  * rendered diff content feel more like reading a document

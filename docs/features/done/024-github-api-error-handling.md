@@ -6,13 +6,13 @@ GitHub API calls have no retry logic, no rate limit handling, and swallow errors
 
 ## Acceptance Criteria
 
-- [ ] Retry with exponential backoff for transient failures (network errors, 5xx responses)
+- [x] Retry with exponential backoff for transient failures (network errors, 5xx responses) — withRetry helper + Octokit hook.wrap
 - [x] Rate limit (403/429) responses are caught via circuit breaker; x-ratelimit-remaining/reset headers tracked on every response; 30s poll and propagation hedge skip when rate-limited
-- [ ] Auth failures (401/403) surface a clear message prompting re-authentication
-- [ ] `atob()` base64 decoding is wrapped in try-catch (line ~175)
-- [ ] GraphQL queries use proper variable substitution instead of string interpolation (line ~238)
-- [ ] PR file load errors (`fetchPRFiles`) are surfaced to the user, not swallowed
-- [ ] `loadAuthenticatedImages` failures show a broken-image indicator instead of silent nothing
+- [x] Auth failures (401) surface a clear message prompting re-authentication via formatApiError
+- [x] `atob()` base64 decoding is wrapped in try-catch with a clear error message and whitespace stripping
+- [x] GraphQL queries use proper variable substitution — owner/repo are passed as typed variables, PR numbers validated as safe integers
+- [x] PR file load errors (`fetchPRFiles`) are surfaced to the user via setError, not swallowed
+- [x] `loadAuthenticatedImages` failures show a broken-image indicator (mardoc-image-failed class with dashed red border and alt text)
 
 ## Dependencies
 

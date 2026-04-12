@@ -88,4 +88,18 @@ describe("base64-utf8", () => {
     // "hello world" as base64
     expect(base64ToUtf8("aGVsbG8gd29ybGQ=")).toBe("hello world");
   });
+
+  // ─── Defensive: malformed input should throw a clear error ──────────────
+
+  it("strips whitespace/newlines from base64 before decoding (GitHub format)", () => {
+    // GitHub's content API wraps base64 at 76 characters with \n.
+    // Plain atob() throws on this unless we strip the whitespace first.
+    const text = "hello world";
+    const wrapped = "aGVsbG8g\nd29ybGQ=";
+    expect(base64ToUtf8(wrapped)).toBe(text);
+  });
+
+  it("throws a clear error on malformed base64 instead of a cryptic atob error", () => {
+    expect(() => base64ToUtf8("not!valid!base64")).toThrow(/base64ToUtf8/);
+  });
 });

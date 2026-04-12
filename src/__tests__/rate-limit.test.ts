@@ -7,6 +7,9 @@ import {
   isRateLimitError,
   extractResetFromError,
   getRateLimitInfo,
+  isTransientError,
+  isAuthError,
+  formatApiError,
 } from "@/lib/rate-limit";
 
 beforeEach(() => {
@@ -122,5 +125,102 @@ describe("extractResetFromError", () => {
 
   it("returns undefined for errors without headers", () => {
     expect(extractResetFromError({ status: 403 })).toBeUndefined();
+  });
+});
+
+describe("isTransientError", () => {
+  it("flags 5xx errors as transient", () => {
+    expect(isTransientError({ status: 500 })).toBe(true);
+    expect(isTransientError({ status: 502 })).toBe(true);
+    expect(isTransientError({ status: 503 })).toBe(true);
+    expect(isTransientError({ status: 504 })).toBe(true);
+  });
+
+  it("flags 408 as transient", () => {
+    expect(isTransientError({ status: 408 })).toBe(true);
+  });
+
+  it("flags network errors as transient", () => {
+    expect(isTransientError({ code: "ENOTFOUND" })).toBe(true);
+    expect(isTransientError({ code: "ECONNRESET" })).toBe(true);
+    expect(isTransientError({ message: "fetch failed" })).toBe(true);
+    expect(isTransientError({ message: "Network error" })).toBe(true);
+  });
+
+  it("does NOT flag 4xx errors as transient", () => {
+    expect(isTransientError({ status: 400 })).toBe(false);
+    expect(isTransientError({ status: 404 })).toBe(false);
+    expect(isTransientError({ status: 422 })).toBe(false);
+  });
+
+  it("does NOT flag rate limit errors as transient (circuit breaker handles them)", () => {
+    expect(
+      isTransientError({ status: 403, message: "API rate limit exceeded" })
+    ).toBe(false);
+    expect(isTransientError({ status: 429 })).toBe(false);
+  });
+
+  it("does NOT flag 401 as transient", () => {
+    expect(isTransientError({ status: 401 })).toBe(false);
+  });
+});
+
+describe("isAuthError", () => {
+  it("flags 401 as an auth error", () => {
+    expect(isAuthError({ status: 401 })).toBe(true);
+  });
+
+  it("flags bad credentials message as auth error", () => {
+    expect(isAuthError({ status: 401, message: "Bad credentials" })).toBe(true);
+    expect(isAuthError({ message: "Bad credentials" })).toBe(true);
+  });
+
+  it("does NOT flag 403 as an auth error (could be rate limit or permission)", () => {
+    expect(isAuthError({ status: 403 })).toBe(false);
+  });
+
+  it("does NOT flag 404 or 500 as auth errors", () => {
+    expect(isAuthError({ status: 404 })).toBe(false);
+    expect(isAuthError({ status: 500 })).toBe(false);
+  });
+});
+
+describe("formatApiError", () => {
+  beforeEach(() => clearRateLimit());
+
+  it("formats a 401 with a re-authentication prompt", () => {
+    const msg = formatApiError({ status: 401, message: "Bad credentials" }, "Failed to load repository");
+    expect(msg).toContain("Failed to load repository");
+    expect(msg).toMatch(/token is invalid or expired/i);
+    expect(msg).toMatch(/Settings/i);
+  });
+
+  it("formats a rate limit error with a human reset ETA", () => {
+    const resetEpoch = Math.floor(Date.now() / 1000) + 600; // ~10 min
+    markRateLimited(resetEpoch);
+    const msg = formatApiError(
+      { status: 403, message: "API rate limit exceeded" },
+      "Failed to load PRs"
+    );
+    expect(msg).toContain("Failed to load PRs");
+    expect(msg).toMatch(/rate limit/i);
+    expect(msg).toMatch(/minute/);
+  });
+
+  it("formats a 404 with a helpful message", () => {
+    const msg = formatApiError({ status: 404 }, "Failed to load file");
+    expect(msg).toMatch(/not found/i);
+  });
+
+  it("formats a 403 (permission, not rate limit) with a token-scope hint", () => {
+    const msg = formatApiError({ status: 403, message: "Not accessible" }, "Failed to open PR");
+    expect(msg).toMatch(/access denied/i);
+    expect(msg).toMatch(/permission/i);
+  });
+
+  it("falls back to the raw message for unknown errors", () => {
+    const msg = formatApiError({ status: 418, message: "I'm a teapot" }, "Failed to brew");
+    expect(msg).toContain("Failed to brew");
+    expect(msg).toContain("I'm a teapot");
   });
 });

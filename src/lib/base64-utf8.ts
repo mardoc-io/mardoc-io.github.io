@@ -16,7 +16,18 @@ export function utf8ToBase64(s: string): string {
 }
 
 export function base64ToUtf8(b64: string): string {
-  const binary = atob(b64);
+  let binary: string;
+  try {
+    // GitHub's content API sometimes wraps base64 with newlines;
+    // atob is strict about that and throws InvalidCharacterError.
+    // Strip whitespace defensively before decoding.
+    binary = atob(b64.replace(/\s/g, ""));
+  } catch (err) {
+    throw new Error(
+      `base64ToUtf8: failed to decode base64 (${(err as Error).message}). ` +
+      `Input length: ${b64.length}.`
+    );
+  }
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);

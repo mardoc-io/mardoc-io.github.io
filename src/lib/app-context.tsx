@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { RepoFile, PullRequest, PRFile, PRComment, ViewMode } from "@/types";
 import { initOctokit, fetchRepoTree, fetchPullRequests, fetchFileContent, fetchPRFiles, fetchPRComments, fetchDefaultBranch, fetchBranches, fetchPRMarkdownCounts } from "./github-api";
+import { formatApiError } from "./rate-limit";
 import { repoFiles as mockFiles, pullRequests as mockPRs, findFile, flattenFiles } from "./mock-data";
 import { parseHash, buildFileHash, buildPRHash, buildRepoHash } from "./hash-router";
 import * as safeStorage from "./safe-storage";
@@ -293,7 +294,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const files = await fetchRepoTree(repo, branch);
         setRepoFiles(files);
       } catch (err: any) {
-        setError(`Failed to load repository: ${err.message}`);
+        setError(formatApiError(err, "Failed to load repository"));
         setRepoFiles([]);
       } finally {
         setLoadingFiles(false);
@@ -402,7 +403,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const files = await fetchRepoTree(currentRepo, branch);
         setRepoFiles(files);
       } catch (err: any) {
-        setError(`Failed to load branch: ${err.message}`);
+        setError(formatApiError(err, "Failed to load branch"));
         setRepoFiles([]);
       } finally {
         setLoadingFiles(false);
@@ -448,7 +449,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Also store it on the file object for caching
         file.content = content;
       } catch (err: any) {
-        setError(`Failed to load file: ${err.message}`);
+        setError(formatApiError(err, "Failed to load file"));
         setFileContent("");
       } finally {
         setLoadingContent(false);
@@ -553,7 +554,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setPRFiles(files);
           setPRComments(comments);
         })
-        .catch((err) => console.error("Failed to load PR details:", err))
+        .catch((err) => {
+          setError(formatApiError(err, `Failed to load PR #${pr.number}`));
+          setPRFiles([]);
+          setPRComments([]);
+        })
         .finally(() => setLoadingPRFiles(false));
     },
     [currentRepo, isDemoMode]

@@ -100,3 +100,73 @@ export function extractResetFromError(error: unknown): number | undefined {
   if (reset) return parseInt(reset, 10);
   return undefined;
 }
+
+/**
+ * Classify an error as transient (worth retrying) or permanent.
+ * Transient: network errors, 5xx server errors, 408 timeout, 502/503/504.
+ * Permanent: 4xx client errors (except 408), validation errors, auth.
+ * Rate-limit errors are NOT classified as transient here — they're handled
+ * by the circuit breaker instead (retrying would just waste requests).
+ */
+export function isTransientError(error: unknown): boolean {
+  if (isRateLimitError(error)) return false;
+  if (!error || typeof error !== "object") return false;
+  const e = error as { status?: number; code?: string; message?: string };
+
+  // Network-level failures (no response at all)
+  if (e.code === "ENOTFOUND" || e.code === "ECONNRESET" || e.code === "ETIMEDOUT") return true;
+  if (typeof e.message === "string") {
+    const msg = e.message.toLowerCase();
+    if (msg.includes("network") || msg.includes("fetch failed") || msg.includes("timeout")) return true;
+  }
+
+  // HTTP 5xx and 408
+  if (e.status === 408) return true;
+  if (typeof e.status === "number" && e.status >= 500 && e.status < 600) return true;
+
+  return false;
+}
+
+/**
+ * Return true if the error is an authentication failure (401 Bad
+ * credentials). The UI should prompt the user to re-enter their token.
+ * A 403 is NOT an auth error by itself — it's usually a permission
+ * problem or a rate limit.
+ */
+export function isAuthError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { status?: number; message?: string };
+  if (e.status === 401) return true;
+  if (typeof e.message === "string" && /bad credentials/i.test(e.message)) return true;
+  return false;
+}
+
+/**
+ * Format an API error for display in the UI. Special-cases the most
+ * common user-actionable failures with clear guidance; falls back to
+ * a formatted version of the raw message for everything else.
+ */
+export function formatApiError(error: unknown, context: string): string {
+  if (isAuthError(error)) {
+    return `${context}: your GitHub token is invalid or expired. Open Settings to re-authenticate.`;
+  }
+  if (isRateLimitError(error)) {
+    const info = getRateLimitInfo();
+    if (info.resetsAt > 0) {
+      const mins = Math.max(1, Math.ceil((info.resetsAt - Date.now()) / 60_000));
+      return `${context}: GitHub rate limit reached. Resets in ~${mins} minute${mins > 1 ? "s" : ""}.`;
+    }
+    return `${context}: GitHub rate limit reached. Please wait a few minutes.`;
+  }
+  const e = error as { status?: number; message?: string } | null;
+  if (e?.status === 404) {
+    return `${context}: not found. The resource may have been deleted or you may not have access.`;
+  }
+  if (e?.status === 403) {
+    return `${context}: access denied. Check that your token has the required permissions.`;
+  }
+  if (e?.message) {
+    return `${context}: ${e.message}`;
+  }
+  return context;
+}

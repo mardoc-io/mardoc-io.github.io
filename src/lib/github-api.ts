@@ -10,7 +10,9 @@ import {
   isRateLimitError,
   markRateLimited,
   extractResetFromError,
+  isTransientError,
 } from "@/lib/rate-limit";
+import { computeBackoff } from "@/lib/fetch-retry";
 
 let octokitInstance: Octokit | null = null;
 
@@ -19,19 +21,32 @@ export function initOctokit(token: string) {
 
   // Track rate-limit headers on every response so the circuit
   // breaker can proactively pause before we get a hard 403.
-  octokitInstance.hook.after("request", (_response, options) => {
-    const headers = (options as any)?.request?.headers ?? ((_response as any)?.headers);
+  octokitInstance.hook.after("request", (response) => {
+    const headers = (response as any)?.headers;
     if (headers) updateFromHeaders(headers);
   });
 
-  // When an API call fails with a rate-limit error, mark the
-  // breaker so the 30s poll and propagation hedge stop firing.
-  octokitInstance.hook.error("request", (error) => {
-    if (isRateLimitError(error)) {
-      const reset = extractResetFromError(error);
-      markRateLimited(reset);
+  // Wrap every request so that:
+  //   1. rate-limit errors mark the circuit breaker
+  //   2. transient errors (5xx, network) retry with backoff
+  octokitInstance.hook.wrap("request", async (request, options) => {
+    const MAX_ATTEMPTS = 3;
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        return await request(options);
+      } catch (err) {
+        lastErr = err;
+        if (isRateLimitError(err)) {
+          markRateLimited(extractResetFromError(err));
+          throw err;
+        }
+        if (attempt === MAX_ATTEMPTS || !isTransientError(err)) throw err;
+        const delay = computeBackoff(attempt, 500, 4000);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
     }
-    throw error;
+    throw lastErr;
   });
 
   return octokitInstance;
@@ -245,6 +260,13 @@ export async function fetchPullRequests(
 /**
  * Fetch markdown file counts for a batch of PRs via a single GraphQL query.
  * Returns a map of PR number → count of .md/.mdx files changed.
+ *
+ * Owner and repo are passed as GraphQL variables — NOT string-interpolated
+ * into the query — so a malicious repo name can't inject query fragments.
+ * The per-PR aliases and numbers are still interpolated because GraphQL
+ * field names can't be parameterized, but PR numbers are from GitHub's
+ * own API state and are validated as integers (the TypeScript type guards
+ * this at the callsite).
  */
 export async function fetchPRMarkdownCounts(
   repoFullName: string,
@@ -255,22 +277,28 @@ export async function fetchPRMarkdownCounts(
 
   const { owner, repo } = parseOwnerRepo(repoFullName);
 
-  // Build aliased query fragments for each PR
-  const fragments = prNumbers.map(
+  // Validate that every PR number is a safe integer — the only piece
+  // that still gets interpolated into the query. Anything else is a bug.
+  const safeNumbers = prNumbers.filter(
+    (n) => Number.isInteger(n) && n > 0 && n < Number.MAX_SAFE_INTEGER
+  );
+  if (safeNumbers.length === 0) return new Map();
+
+  const fragments = safeNumbers.map(
     (num, i) => `pr${i}: pullRequest(number: ${num}) { number files(first: 100) { nodes { path } } }`
   ).join("\n    ");
 
-  const query = `query {
-    repository(owner: "${owner}", name: "${repo}") {
+  const query = `query($owner: String!, $repo: String!) {
+    repository(owner: $owner, name: $repo) {
       ${fragments}
     }
   }`;
 
   try {
-    const result: any = await (octokit as any).graphql(query);
+    const result: any = await (octokit as any).graphql(query, { owner, repo });
     const counts = new Map<number, number>();
 
-    for (let i = 0; i < prNumbers.length; i++) {
+    for (let i = 0; i < safeNumbers.length; i++) {
       const prData = result.repository[`pr${i}`];
       if (prData?.files?.nodes) {
         const mdCount = prData.files.nodes.filter(
@@ -1084,7 +1112,7 @@ export async function loadAuthenticatedImages(
     ico: "image/x-icon", bmp: "image/bmp",
   };
 
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     Array.from(imgs).map(async (img) => {
       // Try data attributes first (preserved in dangerouslySetInnerHTML)
       let owner = img.dataset.ghOwner;
@@ -1114,8 +1142,25 @@ export async function loadAuthenticatedImages(
         }
         img.src = `data:${mime};base64,${data.content.replace(/\n/g, "")}`;
       }
+      return img;
     })
   );
+
+  // Mark failed images with a broken-image class so CSS can show a
+  // placeholder instead of a silent broken thumbnail. Uses a stable
+  // class name that globals.css styles with an icon + hover tooltip.
+  const imgArray = Array.from(imgs);
+  results.forEach((result, i) => {
+    if (result.status === "rejected") {
+      const img = imgArray[i];
+      img.classList.add("mardoc-image-failed");
+      img.setAttribute("alt", img.getAttribute("alt") || "Failed to load image");
+      img.setAttribute(
+        "title",
+        "This image could not be loaded. Your token may lack access to the source repository."
+      );
+    }
+  });
 }
 
 // ─── User repos ────────────────────────────────────────────────────────────
