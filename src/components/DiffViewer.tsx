@@ -1209,9 +1209,9 @@ export default function DiffViewer({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[var(--surface)] border-b border-[var(--border)] px-4 py-2.5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-mono text-[var(--text-secondary)]">{file.path}</span>
+      <div className="sticky top-0 z-10 bg-[var(--surface)] border-b border-[var(--border)] px-4 py-2.5 flex items-center justify-between gap-2 flex-wrap md:flex-nowrap">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-sm font-mono text-[var(--text-secondary)] truncate">{file.path}</span>
           <span
             className={`text-xs px-2 py-0.5 rounded-full font-medium ${
               file.status === "added"

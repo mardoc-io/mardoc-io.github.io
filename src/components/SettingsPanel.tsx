@@ -124,8 +124,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-[var(--surface)] rounded-xl shadow-2xl w-full max-w-lg border border-[var(--border)] max-h-[80vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex md:items-center md:justify-center md:bg-black/40 bg-[var(--surface)]">
+      <div className="bg-[var(--surface)] w-full h-full flex flex-col md:h-auto md:max-h-[80vh] md:max-w-lg md:rounded-xl md:shadow-2xl md:border md:border-[var(--border)]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <div className="flex items-center gap-2">
