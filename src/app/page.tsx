@@ -12,8 +12,10 @@ import SettingsPanel from "@/components/SettingsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import KeyboardCheatsheet from "@/components/KeyboardCheatsheet";
 import CommandPalette from "@/components/CommandPalette";
+import MobileDrawer from "@/components/MobileDrawer";
 import { shouldOpenCheatsheet } from "@/lib/keyboard-shortcuts";
 import { shouldOpenCommandPalette, type Command } from "@/lib/command-palette";
+import { useIsMobile } from "@/lib/use-viewport";
 import {
   BookOpen,
   Settings,
@@ -22,6 +24,7 @@ import {
   Loader2,
   AlertCircle,
   Keyboard,
+  Menu,
 } from "lucide-react";
 
 export default function Home() {
@@ -48,6 +51,15 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cheatsheetOpen, setCheatsheetOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const isMobile = useIsMobile();
+
+  // Auto-close the mobile drawer when the selection changes (file picked,
+  // PR opened) so the user isn't left staring at the drawer after
+  // committing to a navigation intent.
+  useEffect(() => {
+    if (isMobile) setMobileNavOpen(false);
+  }, [selectedFile, selectedPR, currentView, isMobile]);
 
   // Palette command registry. Built here because the commands close over
   // the state setters and context actions available at the page level —
@@ -117,20 +129,28 @@ export default function Home() {
     <div className="h-screen flex flex-col">
       {/* Top bar */}
       <header className="h-12 shrink-0 border-b border-[var(--border)] bg-[var(--surface)] flex items-center justify-between px-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Mobile hamburger — only shows below the 768px breakpoint */}
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            className="toolbar-btn md:hidden"
+            aria-label="Open navigation"
+          >
+            <Menu size={18} />
+          </button>
           <div className="flex items-center gap-2">
             <BookOpen size={18} className="text-[var(--accent)]" />
             <span className="font-semibold text-sm text-[var(--text-primary)]">
               mardoc.app
             </span>
           </div>
-          <div className="h-4 w-px bg-[var(--border)]" />
+          <div className="h-4 w-px bg-[var(--border)] hidden sm:block" />
           {currentRepo ? (
-            <span className="text-xs text-[var(--text-muted)] font-mono">
+            <span className="text-xs text-[var(--text-muted)] font-mono truncate hidden sm:inline">
               {currentRepo}
             </span>
           ) : (
-            <span className="text-xs text-[var(--text-muted)]">
+            <span className="text-xs text-[var(--text-muted)] hidden sm:inline">
               {isEmbedded ? "" : isDemoMode ? "Demo Mode" : "No repo selected"}
             </span>
           )}
@@ -168,7 +188,23 @@ export default function Home() {
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
-        <Sidebar />
+        {/* Desktop: sidebar sits inline in the row.
+            Mobile: sidebar lives inside a MobileDrawer overlay.
+            We use a CSS-first hide/show so the layout stays stable
+            even if useViewport hasn't resolved yet on the first paint. */}
+        <div className="hidden md:flex">
+          <Sidebar />
+        </div>
+
+        {isMobile && (
+          <MobileDrawer
+            open={mobileNavOpen}
+            onClose={() => setMobileNavOpen(false)}
+            ariaLabel="Repository and pull request navigation"
+          >
+            <Sidebar />
+          </MobileDrawer>
+        )}
 
         <main className="flex-1 overflow-hidden bg-[var(--surface)]">
           {currentView === "editor" && selectedFile ? (
