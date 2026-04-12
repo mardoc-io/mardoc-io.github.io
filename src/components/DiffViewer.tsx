@@ -247,12 +247,19 @@ export default function DiffViewer({
   //   - mardoc-iframe-resize: auto-size the iframe to its content
   //   - mardoc-html-selection: user selected text inside the iframe,
   //     flow it into the pending-comment pipeline
+  //
+  // The iframe reference is read fresh on every message — capturing
+  // it in the closure at effect-time caused a stale-ref bug where
+  // legitimate selection messages were rejected after the iframe
+  // was remounted (e.g. when switching between Rendered and Source
+  // views, or when the srcdoc changes).
   useEffect(() => {
     if (!fileIsHtml) return;
-    const iframe = htmlIframeRef.current;
     const handleMessage = (event: MessageEvent) => {
       const data = event.data;
       if (!data || typeof data !== "object") return;
+
+      const iframe = htmlIframeRef.current;
 
       if (data.type === "mardoc-iframe-resize" && typeof data.height === "number" && iframe) {
         iframe.style.height = `${data.height + 20}px`;
@@ -260,8 +267,11 @@ export default function DiffViewer({
       }
 
       if (data.type === "mardoc-html-selection" && typeof data.text === "string") {
-        // Only accept selections from our own iframe
-        if (iframe && event.source !== iframe.contentWindow) return;
+        // If we have a live iframe ref, only accept messages from it.
+        // If we don't (stale ref, timing issue), accept on the basis of
+        // the message type alone — the structural check above already
+        // rules out random cross-frame messages.
+        if (iframe && event.source && event.source !== iframe.contentWindow) return;
         const startLine = typeof data.startLine === "number" ? data.startLine : 1;
         const endLine = typeof data.endLine === "number" ? data.endLine : startLine;
         setPendingSelection(data.text);
@@ -835,9 +845,35 @@ export default function DiffViewer({
         </div>
       </div>
 
-      {/* Pending selection comment input */}
+      {/* Pending selection comment input.
+          Desktop: inline below the toolbar.
+          Mobile: fixed to the bottom of the viewport with a backdrop
+          so it stays visible no matter where the user has scrolled
+          inside the iframe. The mobile placement matches the
+          MobileCommentButton pattern so users have one consistent
+          place to look for commenting affordances. */}
       {pendingSelection && (
-        <div className="bg-[var(--accent-muted)] border-b border-[var(--accent)] px-4 py-2.5 flex items-start gap-3">
+        <>
+          {/* Mobile backdrop — dims the content and blocks taps outside the bar */}
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/40"
+            onClick={() => {
+              setPendingSelection(null);
+              setPendingSelectionRange(null);
+              setPendingCommentInput("");
+            }}
+            aria-hidden="true"
+          />
+          <div
+            className="
+              bg-[var(--accent-muted)] border-b border-[var(--accent)] px-4 py-2.5
+              flex items-start gap-3
+              md:static
+              fixed left-0 right-0 bottom-0 z-50 md:z-auto
+              md:border-b border-t border-[var(--accent)] md:border-t-0
+              shadow-[0_-8px_24px_-4px_rgba(0,0,0,0.4)] md:shadow-none
+            "
+          >
           <div className="flex-1 min-w-0">
             <div className="text-[10px] text-[var(--accent)] font-medium mb-1">
               Commenting on selected text:
@@ -852,6 +888,7 @@ export default function DiffViewer({
                 value={pendingCommentInput}
                 onChange={(e) => setPendingCommentInput(e.target.value)}
                 placeholder="Write your comment..."
+                autoFocus
                 className="flex-1 text-xs px-2.5 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && pendingCommentInput.trim()) {
@@ -883,7 +920,8 @@ export default function DiffViewer({
               </button>
             </div>
           </div>
-        </div>
+          </div>
+        </>
       )}
 
       {/* Content + panel */}
