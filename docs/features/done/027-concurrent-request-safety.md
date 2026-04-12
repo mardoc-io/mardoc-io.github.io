@@ -6,11 +6,11 @@ Fast navigation (quickly switching repos, files, or PRs) causes race conditions 
 
 ## Acceptance Criteria
 
-- [ ] `setCurrentRepo()` cancels in-flight requests when called again before completion
-- [ ] `openFile()` cancels previous file fetches when a new file is opened
-- [ ] `openPR()` cancels previous PR detail fetches when a new PR is opened
-- [ ] `suppressHashChange` uses a reliable mechanism (not `setTimeout(0)`)
-- [ ] No stale state displayed after rapid navigation
+- [x] `setCurrentRepo()` drops results from in-flight requests when called again before completion (via staleness guard)
+- [x] `openFile()` drops previous file fetch results when a new file is opened
+- [x] `openPR()` drops previous PR detail fetch results when a new PR is opened
+- [x] `suppressHashChange` replaced with value comparison against `lastWrittenHash.current` — no more setTimeout(0) race
+- [x] No stale state displayed after rapid navigation — generation counters discard out-of-order results
 
 ## Dependencies
 

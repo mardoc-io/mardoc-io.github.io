@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { RepoFile, PullRequest, PRFile, PRComment, ViewMode } from "@/types";
 import { initOctokit, fetchRepoTree, fetchPullRequests, fetchFileContent, fetchPRFiles, fetchPRComments, fetchDefaultBranch, fetchBranches, fetchPRMarkdownCounts } from "./github-api";
 import { formatApiError } from "./rate-limit";
+import { createStalenessGuard } from "./staleness-guard";
 import { repoFiles as mockFiles, pullRequests as mockPRs, findFile, flattenFiles } from "./mock-data";
 import { parseHash, buildFileHash, buildPRHash, buildRepoHash } from "./hash-router";
 import * as safeStorage from "./safe-storage";
@@ -175,14 +176,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
-  // Suppress hashchange handling when we're the ones updating the hash
-  const suppressHashChange = useRef(false);
+  // Track the last hash we wrote so the hashchange listener can
+  // distinguish self-triggered events from real user navigation.
+  // This replaces the old setTimeout(0) flag dance, which was racey
+  // when rapid setHash calls fired during a single event loop turn.
+  const lastWrittenHash = useRef<string>("");
   const setHash = useCallback((hash: string) => {
-    suppressHashChange.current = true;
+    lastWrittenHash.current = hash;
     window.location.hash = hash;
-    // Reset after the hashchange event fires
-    setTimeout(() => { suppressHashChange.current = false; }, 0);
   }, []);
+
+  // Staleness guards — each domain gets its own generation counter so
+  // quickly switching repos/files/PRs drops out-of-order responses
+  // instead of letting a late-arriving stale result overwrite the latest.
+  const repoLoadGuard = useRef(createStalenessGuard()).current;
+  const fileLoadGuard = useRef(createStalenessGuard()).current;
+  const prLoadGuard = useRef(createStalenessGuard()).current;
 
   // Initialize octokit when token changes, persist to localStorage
   const setGithubToken = useCallback((token: string | null) => {
@@ -272,6 +281,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Set current repo and load data
   const setCurrentRepo = useCallback(
     async (repo: string) => {
+      // Begin a new generation — any in-flight repo load becomes stale.
+      const isCurrent = repoLoadGuard.begin();
+      // Any in-flight file or PR loads are also stale when the repo changes.
+      fileLoadGuard.invalidate();
+      prLoadGuard.invalidate();
+
       setCurrentRepoState(repo);
       safeStorage.setItem(REPO_KEY, repo);
       setError(null);
@@ -283,37 +298,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       let branch = "main";
       try {
         branch = await fetchDefaultBranch(repo);
+        if (!isCurrent()) return;
         setDefaultBranch(branch);
         setSelectedBranchState(branch);
       } catch {
-        // Fall back to "main" if we can't determine default branch
+        if (!isCurrent()) return;
       }
 
       setLoadingFiles(true);
       try {
         const files = await fetchRepoTree(repo, branch);
+        if (!isCurrent()) return;
         setRepoFiles(files);
       } catch (err: any) {
+        if (!isCurrent()) return;
         setError(formatApiError(err, "Failed to load repository"));
         setRepoFiles([]);
       } finally {
-        setLoadingFiles(false);
+        if (isCurrent()) setLoadingFiles(false);
       }
 
       // Load PRs and branches in parallel
       await loadPRs(repo, prStateFilter);
+      if (!isCurrent()) return;
 
       setLoadingPRs(true);
       try {
         const branches = await fetchBranches(repo).catch(() => [] as { name: string; isDefault: boolean }[]);
+        if (!isCurrent()) return;
         setAvailableBranches(branches);
       } catch {
         // branches are non-critical
       } finally {
-        setLoadingPRs(false);
+        if (isCurrent()) setLoadingPRs(false);
       }
     },
-    [githubToken, prStateFilter]
+    [githubToken, prStateFilter, repoLoadGuard, fileLoadGuard, prLoadGuard]
   );
 
   const loadPRs = useCallback(async (repo: string, state: "open" | "closed" | "all") => {
@@ -424,6 +444,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Open a file and load its content (raw — caller must apply nav guard)
   const _openFileInternal = useCallback(
     async (file: RepoFile) => {
+      // New file load — any in-flight file fetch becomes stale.
+      const isCurrent = fileLoadGuard.begin();
+
       setSelectedFile(file);
       setSelectedPR(null);
       setCurrentView(isHtmlFile(file.name) ? "html-viewer" : "editor");
@@ -445,17 +468,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setLoadingContent(true);
       try {
         const content = await fetchFileContent(currentRepo, file.path, selectedBranch);
+        if (!isCurrent()) return;
         setFileContent(content);
         // Also store it on the file object for caching
         file.content = content;
       } catch (err: any) {
+        if (!isCurrent()) return;
         setError(formatApiError(err, "Failed to load file"));
         setFileContent("");
       } finally {
-        setLoadingContent(false);
+        if (isCurrent()) setLoadingContent(false);
       }
     },
-    [isDemoMode, currentRepo, githubToken, selectedBranch]
+    [isDemoMode, currentRepo, githubToken, selectedBranch, fileLoadGuard]
   );
 
   const openFile = useCallback(
@@ -525,6 +550,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Open a PR and fetch its files + comments (raw — caller must apply nav guard)
   const _openPRInternal = useCallback(
     (pr: PullRequest) => {
+      // New PR load — any in-flight PR fetch becomes stale.
+      const isCurrent = prLoadGuard.begin();
+
       setSelectedPR(pr);
       setSelectedFile(null);
       setCurrentView("pr-diff");
@@ -551,17 +579,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fetchPRComments(currentRepo, pr.number),
       ])
         .then(([files, comments]) => {
+          if (!isCurrent()) return;
           setPRFiles(files);
           setPRComments(comments);
         })
         .catch((err) => {
+          if (!isCurrent()) return;
           setError(formatApiError(err, `Failed to load PR #${pr.number}`));
           setPRFiles([]);
           setPRComments([]);
         })
-        .finally(() => setLoadingPRFiles(false));
+        .finally(() => {
+          if (isCurrent()) setLoadingPRFiles(false);
+        });
     },
-    [currentRepo, isDemoMode]
+    [currentRepo, isDemoMode, prLoadGuard]
   );
 
   const openPR = useCallback(
@@ -635,7 +667,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     const onHashChange = () => {
-      if (suppressHashChange.current) return;
+      // If the current hash matches what we just wrote, we triggered
+      // this event ourselves — ignore it. Only act on user navigation.
+      if (window.location.hash === lastWrittenHash.current) return;
       navigateToHash(window.location.hash);
     };
     window.addEventListener("hashchange", onHashChange);
