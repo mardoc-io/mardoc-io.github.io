@@ -79,6 +79,8 @@ import FindReplaceBar from "./FindReplaceBar";
 import RichFindReplaceBar from "./RichFindReplaceBar";
 import type { Match as FindMatch } from "@/lib/find-replace";
 import Outline from "./Outline";
+import MobileDrawer from "./MobileDrawer";
+import { useIsMobile } from "@/lib/use-viewport";
 import { MARDOC_OPEN_FIND_EVENT } from "@/lib/tiptap-search-extension";
 import {
   validateImageFile,
@@ -212,7 +214,7 @@ function ToolbarButton({
 }
 
 function ToolbarDivider() {
-  return <div className="w-px h-5 bg-[var(--border)] mx-1" />;
+  return <div className="w-px h-5 bg-[var(--border)] mx-1 shrink-0" />;
 }
 
 // ─── Floating Comment Button ──────────────────────────────────────────────
@@ -966,6 +968,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
   // Outline / TOC side panel. Shows the current document's headings with
   // click-to-jump and scroll-spy. Toggled from the toolbar.
   const [outlineOpen, setOutlineOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   // Image upload state — surfaced in the toolbar while a paste / drop
   // is committing to the branch. Also used by the error toast.
@@ -1770,19 +1773,33 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
 
   return (
     <div className="h-full flex">
-      {/* Outline / TOC side panel */}
-      {outlineOpen && !isNewFile && (
+      {/* Outline / TOC side panel. Inline on desktop, drawer on mobile
+          so it doesn't eat 224px of a 390px viewport. */}
+      {!isMobile && outlineOpen && !isNewFile && (
         <Outline
           markdown={outlineMarkdown}
           editorContainerRef={editorContainerRef}
           onClose={() => setOutlineOpen(false)}
         />
       )}
+      {isMobile && !isNewFile && (
+        <MobileDrawer
+          open={outlineOpen}
+          onClose={() => setOutlineOpen(false)}
+          ariaLabel="Document outline"
+        >
+          <Outline
+            markdown={outlineMarkdown}
+            editorContainerRef={editorContainerRef}
+            onClose={() => setOutlineOpen(false)}
+          />
+        </MobileDrawer>
+      )}
 
       {/* Main editor column */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Toolbar */}
-        <div className="sticky top-0 z-10 bg-[var(--surface)] border-b border-[var(--border)] px-3 py-1.5 flex items-center gap-0.5 flex-wrap">
+        <div className="sticky top-0 z-10 bg-[var(--surface)] border-b border-[var(--border)] px-3 py-1.5 flex items-center gap-0.5 flex-nowrap overflow-x-auto md:flex-wrap md:overflow-visible editor-toolbar-scroll">
           {!codeView && (<>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
