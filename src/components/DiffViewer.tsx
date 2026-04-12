@@ -49,6 +49,8 @@ import { useWideFormat } from "@/lib/use-wide-format";
 import { isHtmlFile } from "@/lib/file-types";
 import { injectSourceLineAttributes } from "@/lib/html-source-lines";
 import { buildIframeSelectionScript } from "@/lib/html-selection";
+import { useIsMobile } from "@/lib/use-viewport";
+import BottomSheet from "./BottomSheet";
 import { extractCommentSuggestions, mergeSuggestions } from "@/lib/suggestion-extract";
 import { parseSuggestionBody } from "@/lib/suggestion-body";
 
@@ -692,6 +694,14 @@ export default function DiffViewer({
   const [showPanel, setShowPanel] = useState(true);
   const { wide, toggle: toggleWide } = useWideFormat();
   const { isEmbedded } = useApp();
+  const isMobile = useIsMobile();
+
+  // On mobile the comment panel lives in a slide-up bottom sheet
+  // instead of a right-side rail. Default it closed on mobile so the
+  // document has the full viewport.
+  useEffect(() => {
+    if (isMobile) setShowPanel(false);
+  }, [isMobile]);
 
   // Single source of truth: comments prop from PRDetail (no local duplicate)
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
@@ -1073,6 +1083,44 @@ export default function DiffViewer({
     onResolveComment(commentId);
     setActiveCommentId(null);
   }, [onResolveComment]);
+
+  // Scroll-to-mark behaviour when the user taps a comment in the
+  // panel. Shared between the desktop right-rail and the mobile sheet
+  // so the flows don't diverge.
+  const handleCommentSelect = useCallback((id: string) => {
+    setActiveCommentId(id);
+    setTimeout(() => {
+      const container = contentRef.current;
+      if (!container) return;
+
+      const mark = container.querySelector(`[data-comment-id="${id}"]`);
+      if (mark) {
+        mark.scrollIntoView({ behavior: "smooth", block: "center" });
+        mark.classList.add("comment-highlight-flash");
+        setTimeout(() => mark.classList.remove("comment-highlight-flash"), 1500);
+        return;
+      }
+
+      // Fallback: find the comment's text in the DOM via tree walker
+      const comment = allPanelComments.find((c) => c.id === id);
+      if (comment && comment.selectedText) {
+        const searchText = comment.selectedText.slice(0, 40);
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+        let node: Node | null;
+        while ((node = walker.nextNode())) {
+          if (node.textContent && node.textContent.includes(searchText)) {
+            const el = node.parentElement;
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+              el.classList.add("comment-highlight-flash");
+              setTimeout(() => el.classList.remove("comment-highlight-flash"), 1500);
+            }
+            break;
+          }
+        }
+      }
+    }, 50);
+  }, [allPanelComments]);
 
   // Render block content with highlighted commented text
   const renderBlockHtml = useCallback(
@@ -1768,46 +1816,13 @@ export default function DiffViewer({
           )}
         </div>
 
-        {/* Comment side panel — always available */}
-        {showPanel && (
+        {/* Comment panel — right-side rail on desktop. On mobile it
+            gets rendered below inside a BottomSheet instead. */}
+        {showPanel && !isMobile && (
           <CommentPanel
             comments={allPanelComments}
             activeCommentId={activeCommentId}
-            onSelect={(id) => {
-              setActiveCommentId(id);
-              // Scroll to the highlighted mark in the content area
-              setTimeout(() => {
-                const container = contentRef.current;
-                if (!container) return;
-
-                const mark = container.querySelector(`[data-comment-id="${id}"]`);
-                if (mark) {
-                  mark.scrollIntoView({ behavior: "smooth", block: "center" });
-                  mark.classList.add("comment-highlight-flash");
-                  setTimeout(() => mark.classList.remove("comment-highlight-flash"), 1500);
-                  return;
-                }
-
-                // Fallback: find the comment's text in the DOM via tree walker
-                const comment = allPanelComments.find((c) => c.id === id);
-                if (comment && comment.selectedText) {
-                  const searchText = comment.selectedText.slice(0, 40);
-                  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
-                  let node: Node | null;
-                  while ((node = walker.nextNode())) {
-                    if (node.textContent && node.textContent.includes(searchText)) {
-                      const el = node.parentElement;
-                      if (el) {
-                        el.scrollIntoView({ behavior: "smooth", block: "center" });
-                        el.classList.add("comment-highlight-flash");
-                        setTimeout(() => el.classList.remove("comment-highlight-flash"), 1500);
-                      }
-                      break;
-                    }
-                  }
-                }
-              }, 50);
-            }}
+            onSelect={handleCommentSelect}
             onReply={handleReply}
             onResolve={handleResolve}
             onAccept={onAcceptSuggestion}
@@ -1819,6 +1834,32 @@ export default function DiffViewer({
           />
         )}
       </div>
+
+      {/* Mobile: comment panel lives in a slide-up sheet */}
+      {isMobile && (
+        <BottomSheet
+          open={showPanel}
+          onClose={() => {
+            setShowPanel(false);
+            setActiveCommentId(null);
+          }}
+          ariaLabel="Comments"
+        >
+          <CommentPanel
+            comments={allPanelComments}
+            activeCommentId={activeCommentId}
+            onSelect={handleCommentSelect}
+            onReply={handleReply}
+            onResolve={handleResolve}
+            onAccept={onAcceptSuggestion}
+            onDiscardPending={onDiscardPendingComment}
+            onClose={() => {
+              setShowPanel(false);
+              setActiveCommentId(null);
+            }}
+          />
+        </BottomSheet>
+      )}
     </div>
   );
 }
