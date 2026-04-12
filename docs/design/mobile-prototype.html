@@ -1,58 +1,58 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#f6f1e4">
+<meta name="theme-color" content="#282a36">
 <title>MarDoc Mobile — Design Prototype</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,400;1,9..144,600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Fraunces is loaded ONLY for the MarDoc wordmark — everything else
+     uses the same system stack the real app uses. -->
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap" rel="stylesheet">
 
 <style>
 /* ============================================================
-   MarDoc Mobile — Editorial Prototype
+   MarDoc Mobile — Design Prototype
    Feature 038 — cellphone mode viewer
 
-   Aesthetic: warm paper, ink black, oxblood accent.
-   The document is the hero; chrome recedes like marginalia.
+   Uses the existing Dracula palette from src/app/globals.css
+   as its canonical color system. Dark is the default, matching
+   mardoc.app. Only structural additions are new — the colors,
+   fonts, and rules all trace back to the real app.
    ============================================================ */
 
 :root {
-  /* Paper & ink */
-  --paper: #f7f1e1;
-  --paper-alt: #f0e8d1;
-  --paper-deep: #e8dec0;
-  --paper-bright: #fdf9ec;
-  --ink: #1a1410;
-  --ink-soft: #3d342b;
-  --ink-faint: #7a6f5e;
-  --ink-whisper: #b4a98f;
+  /* Light theme (same values as src/app/globals.css) */
+  --surface: #ffffff;
+  --surface-secondary: #f7f7f5;
+  --surface-hover: #f0f0ee;
+  --border: #e8e8e5;
+  --border-soft: #f0f0ee;
+  --text-primary: #1a1a1a;
+  --text-secondary: #5a5a5a;
+  --text-muted: #9a9a9a;
+  --accent: #2383e2;
+  --accent-hover: #1b6ec2;
+  --accent-muted: #e8f0fe;
+  --inline-code: #d63384;
+  --diff-add: #dafbe1;
+  --diff-add-text: #1a7f37;
+  --diff-remove: #ffebe9;
+  --diff-remove-text: #cf222e;
 
-  /* Accent family */
-  --oxblood: #7c2d12;
-  --oxblood-bright: #9a3412;
-  --oxblood-deep: #431407;
-  --oxblood-wash: rgba(124, 45, 18, 0.08);
-  --ember: #c2410c;
-  --gold: #a16207;
-  --sage: #4d6a55;
-
-  /* Rules */
-  --rule: #cdbf96;
-  --rule-soft: #e1d6b0;
-  --rule-strong: #9c8e65;
-
-  /* Typography */
+  /* Typography — system stack, same as real app.
+     Fraunces reserved for the wordmark only. */
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
-  --font-body: "Newsreader", Georgia, serif;
-  --font-mono: "JetBrains Mono", "SFMono-Regular", Menlo, monospace;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-mono: "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
 
   /* Layout */
-  --edge: 24px;
+  --edge: 20px;
   --screen-max: 440px;
 
   /* Motion */
@@ -60,25 +60,27 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur: 420ms;
-  --dur-fast: 220ms;
+  --dur-fast: 200ms;
 }
 
+/* Dark theme — Dracula, matches the real app */
 [data-theme="dark"] {
-  --paper: #17120c;
-  --paper-alt: #1e1810;
-  --paper-deep: #261e14;
-  --paper-bright: #1e180e;
-  --ink: #f5eddb;
-  --ink-soft: #d6ccb4;
-  --ink-faint: #8a7f68;
-  --ink-whisper: #5a5141;
-  --oxblood: #f97316;
-  --oxblood-bright: #fb923c;
-  --oxblood-deep: #fdba74;
-  --oxblood-wash: rgba(249, 115, 22, 0.1);
-  --rule: #3a3222;
-  --rule-soft: #2a2418;
-  --rule-strong: #5c5039;
+  --surface: #282a36;
+  --surface-secondary: #21222c;
+  --surface-hover: #44475a;
+  --border: #44475a;
+  --border-soft: #363949;
+  --text-primary: #f8f8f2;
+  --text-secondary: #bfc4d0;
+  --text-muted: #6272a4;
+  --accent: #bd93f9;
+  --accent-hover: #caa5fb;
+  --accent-muted: #363949;
+  --inline-code: #ffb86c;
+  --diff-add: #1e3a2a;
+  --diff-add-text: #50fa7b;
+  --diff-remove: #3d1a1e;
+  --diff-remove-text: #ff5555;
 }
 
 * {
@@ -92,8 +94,8 @@ html, body {
   font-family: var(--font-body);
   font-size: 17px;
   line-height: 1.6;
-  color: var(--ink);
-  background: #201810;
+  color: var(--text-primary);
+  background: #0b0c11;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
@@ -109,8 +111,8 @@ html, body {
   justify-content: center;
   padding: 40px 20px;
   background:
-    radial-gradient(ellipse 80% 60% at 50% 0%, #3a2a1c 0%, #1a1208 70%),
-    #0e0a04;
+    radial-gradient(ellipse 80% 60% at 50% 0%, #21222c 0%, #0f1017 70%),
+    #0b0c11;
   position: relative;
 }
 
@@ -123,30 +125,30 @@ html, body {
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.22em;
-  color: rgba(246, 241, 228, 0.35);
+  color: rgba(248, 248, 242, 0.28);
 }
 
 .phone {
   width: 100%;
   max-width: var(--screen-max);
   height: min(900px, calc(100vh - 120px));
-  background: var(--paper);
+  background: var(--surface);
   position: relative;
   overflow: hidden;
   border-radius: 50px;
   box-shadow:
-    0 50px 100px -20px rgba(0,0,0,0.6),
-    0 30px 60px -30px rgba(0,0,0,0.8),
-    0 0 0 10px #0a0605,
-    0 0 0 11px #2a1f12,
-    0 0 0 12px #3a2c1a,
-    inset 0 2px 4px rgba(255, 240, 200, 0.08);
+    0 50px 100px -20px rgba(0,0,0,0.7),
+    0 30px 60px -30px rgba(0,0,0,0.85),
+    0 0 0 10px #0a0a12,
+    0 0 0 11px #1c1d29,
+    0 0 0 12px #2d2f3f,
+    inset 0 2px 4px rgba(248, 248, 242, 0.04);
 }
 
 @media (max-width: 520px) {
   .stage {
     padding: 0;
-    background: var(--paper);
+    background: var(--surface);
   }
   .stage::before { display: none; }
   .phone {
@@ -156,24 +158,6 @@ html, body {
     border-radius: 0;
     box-shadow: none;
   }
-}
-
-/* Paper grain — subtle SVG noise */
-.phone::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.55;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.25 0 0 0 0 0.1 0 0 0 0.25 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
-  z-index: 200;
-}
-
-[data-theme="dark"] .phone::before {
-  opacity: 0.4;
-  mix-blend-mode: screen;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.9 0 0 0 0 0.8 0 0 0 0 0.5 0 0 0 0.2 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
 }
 
 /* ─── Status bar ─────────────────────────────────────── */
@@ -191,7 +175,7 @@ html, body {
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--text-primary);
   z-index: 150;
   pointer-events: none;
   letter-spacing: 0.02em;
@@ -230,7 +214,7 @@ html, body {
   pointer-events: none;
   transform: translateX(24px);
   transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
-  background: var(--paper);
+  background: var(--surface);
   will-change: opacity, transform;
 }
 
@@ -254,7 +238,7 @@ html, body {
 .top-bar {
   position: sticky;
   top: 0;
-  background: var(--paper);
+  background: var(--surface);
   z-index: 50;
   padding: 52px var(--edge) 16px;
   display: flex;
@@ -265,16 +249,16 @@ html, body {
 }
 
 .top-bar.stuck {
-  border-bottom-color: var(--rule-soft);
+  border-bottom-color: var(--border-soft);
 }
 
 .icon-btn {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  border: 1px solid var(--rule-soft);
+  border: 1px solid var(--border-soft);
   background: transparent;
-  color: var(--ink);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -285,7 +269,7 @@ html, body {
 
 .icon-btn:active {
   transform: scale(0.92);
-  background: var(--paper-alt);
+  background: var(--surface-secondary);
 }
 
 .icon-btn svg {
@@ -301,17 +285,22 @@ html, body {
 .top-bar .wordmark {
   flex: 1;
   text-align: center;
-  font-family: var(--font-display);
+  font-family: "Fraunces", Georgia, serif;
   font-weight: 600;
-  font-variation-settings: "opsz" 144;
-  font-size: 20px;
+  font-size: 22px;
   letter-spacing: -0.01em;
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .top-bar .wordmark em {
   font-style: italic;
-  color: var(--oxblood);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.top-bar .wordmark em {
+  font-style: italic;
+  color: var(--accent);
   font-weight: 500;
 }
 
@@ -325,10 +314,10 @@ html, body {
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
-  color: var(--paper);
-  background: var(--oxblood);
+  color: var(--surface);
+  background: var(--accent);
   flex-shrink: 0;
-  border: 1px solid var(--oxblood-deep);
+  border: 1px solid var(--accent);
 }
 
 /* ─── Shared kicker (used in reading + PR detail) ────── */
@@ -339,7 +328,7 @@ html, body {
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--oxblood);
+  color: var(--accent);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -350,7 +339,7 @@ html, body {
 .kicker::after {
   content: "";
   height: 1px;
-  background: var(--oxblood);
+  background: var(--accent);
   flex: 1;
   max-width: 28px;
   opacity: 0.5;
@@ -360,65 +349,192 @@ html, body {
 .kicker.start { justify-content: flex-start; }
 .kicker.start::after { max-width: 20px; }
 
-/* ─── Screen 1: Home / Review Queue (utilitarian) ────── */
+/* ─── Screen 1: Repo home ──────────────────────────── */
 
-/* Tabs sit directly under the top bar — no hero, no big number.
-   The active tab's count IS the answer to "how many are waiting." */
-.queue-tabs {
+/* Top segment switcher: Pull requests | Files.
+   MarDoc has no backend — there's no "your queue." There's a repo,
+   and a repo has files you can read and PRs you can review. */
+.segment-switcher {
   display: flex;
-  gap: 4px;
-  padding: 8px var(--edge) 12px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  border-bottom: 1px solid var(--rule-soft);
+  margin: 10px var(--edge) 0;
+  padding: 4px;
+  background: var(--surface-secondary);
+  border-radius: 10px;
+  border: 1px solid var(--border);
 }
 
-.queue-tabs::-webkit-scrollbar { display: none; }
-.queue-tabs { scrollbar-width: none; }
-
-.queue-tab {
-  flex-shrink: 0;
+.segment-switcher button {
+  flex: 1;
   padding: 9px 14px;
-  border: 1px solid var(--rule-soft);
   background: transparent;
-  border-radius: 100px;
-  font-family: var(--font-mono);
-  font-size: 11px;
+  border: none;
+  border-radius: 7px;
+  font-family: var(--font-body);
+  font-size: 13px;
   font-weight: 500;
-  color: var(--ink-faint);
-  letter-spacing: 0.02em;
+  color: var(--text-muted);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
   transition: all var(--dur-fast) var(--ease);
-  scroll-snap-align: start;
-  white-space: nowrap;
-}
-
-.queue-tab .tab-count {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 9px;
-  background: var(--rule-soft);
-  color: var(--ink-faint);
-  font-size: 10px;
+  gap: 8px;
+}
+
+.segment-switcher button svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.segment-switcher button.active {
+  background: var(--accent);
+  color: var(--surface);
+  box-shadow: 0 2px 6px rgba(189, 147, 249, 0.25);
+}
+
+/* Open / Closed filter under the segment switcher */
+.state-filter {
+  display: flex;
+  gap: 12px;
+  padding: 14px var(--edge) 8px;
+  align-items: center;
+}
+
+.state-filter .state-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px 6px 9px;
+  border-radius: 100px;
+  background: transparent;
+  border: 1px solid var(--border);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+}
+
+.state-filter .state-pill::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.state-filter .state-pill.open { color: var(--diff-add-text); }
+.state-filter .state-pill.closed { color: var(--text-muted); }
+
+.state-filter .state-pill.active {
+  background: var(--accent-muted);
+  border-color: var(--accent-muted);
+  color: var(--text-primary);
+}
+
+.state-filter .state-pill.active.open { color: var(--diff-add-text); }
+
+.state-filter .state-pill .count {
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 600;
+  opacity: 0.85;
 }
 
-.queue-tab.active {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
+.state-filter .pull-right {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
 }
 
-.queue-tab.active .tab-count {
-  background: var(--oxblood);
-  color: var(--paper);
+/* ─── Files tab — a compact file tree ─────────────── */
+
+.file-tree {
+  padding: 4px var(--edge) 120px;
+  display: none;
+}
+
+.screen-home[data-tab="files"] .file-tree { display: block; }
+.screen-home[data-tab="files"] .pr-list,
+.screen-home[data-tab="files"] .state-filter { display: none; }
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.tree-item:active { transform: translateX(3px); }
+
+.tree-item .indent {
+  width: 14px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: center;
+}
+
+.tree-item .tree-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--surface-secondary);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.tree-item .tree-icon.md { color: var(--diff-add-text); }
+.tree-item .tree-icon.html { color: var(--accent); }
+.tree-item .tree-icon.dir { color: var(--text-muted); }
+
+.tree-item .tree-body { flex: 1; min-width: 0; }
+
+.tree-item .tree-name {
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-item .tree-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.tree-item .chevron {
+  width: 10px;
+  height: 10px;
+  stroke: var(--text-muted);
+  fill: none;
+  stroke-width: 2;
+  flex-shrink: 0;
 }
 
 /* ─── PR list — compact inbox style ─────────────────── */
@@ -432,7 +548,7 @@ html, body {
   align-items: stretch;
   gap: 14px;
   padding: 16px 0;
-  border-bottom: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--border-soft);
   cursor: pointer;
   position: relative;
   transition: transform var(--dur-fast) var(--ease), background var(--dur-fast);
@@ -442,20 +558,20 @@ html, body {
 
 .pr-card:active {
   transform: translateX(3px);
-  background: var(--paper-alt);
+  background: var(--surface-secondary);
 }
 
 /* Status rail — the colored vertical bar at the left of each card */
 .pr-card .rail {
   width: 3px;
   border-radius: 3px;
-  background: var(--rule-soft);
+  background: var(--border-soft);
   flex-shrink: 0;
   align-self: stretch;
 }
-.pr-card.review .rail { background: var(--oxblood); }
-.pr-card.draft .rail { background: var(--gold); }
-.pr-card.merged .rail { background: var(--sage); }
+.pr-card.review .rail { background: var(--accent); }
+.pr-card.draft .rail { background: var(--inline-code); }
+.pr-card.merged .rail { background: var(--diff-add-text); }
 
 .pr-card .body { flex: 1; min-width: 0; }
 
@@ -465,14 +581,14 @@ html, body {
   gap: 8px;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   letter-spacing: 0.03em;
   margin-bottom: 6px;
   min-width: 0;
 }
 
 .pr-card .top-line .num {
-  color: var(--oxblood);
+  color: var(--accent);
   font-weight: 600;
   flex-shrink: 0;
 }
@@ -491,14 +607,13 @@ html, body {
 }
 
 .pr-card h2 {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: 500;
-  font-variation-settings: "opsz" 24;
   font-size: 17px;
   line-height: 1.3;
   letter-spacing: -0.005em;
   margin: 0 0 8px;
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .pr-card .status-row {
@@ -507,7 +622,7 @@ html, body {
   gap: 10px;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   letter-spacing: 0.03em;
 }
 
@@ -524,16 +639,16 @@ html, body {
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
-.pr-card.review .status-label { color: var(--oxblood); }
-.pr-card.draft .status-label { color: var(--gold); }
-.pr-card.merged .status-label { color: var(--sage); }
+.pr-card.review .status-label { color: var(--accent); }
+.pr-card.draft .status-label { color: var(--inline-code); }
+.pr-card.merged .status-label { color: var(--diff-add-text); }
 
 .pr-card .tiny-avatar {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--oxblood);
-  color: var(--paper);
+  background: var(--accent);
+  color: var(--surface);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -542,16 +657,16 @@ html, body {
   flex-shrink: 0;
 }
 
-.pr-card .tiny-avatar.sage { background: var(--sage); }
-.pr-card .tiny-avatar.gold { background: var(--gold); }
+.pr-card .tiny-avatar.sage { background: var(--diff-add-text); }
+.pr-card .tiny-avatar.gold { background: var(--inline-code); }
 
 .pr-card .thread-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 7px;
-  background: var(--oxblood-wash);
-  color: var(--oxblood);
+  background: var(--accent-muted);
+  color: var(--accent);
   border-radius: 100px;
   font-weight: 600;
 }
@@ -570,7 +685,7 @@ html, body {
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -581,7 +696,7 @@ html, body {
   content: "";
   flex: 1;
   height: 1px;
-  background: var(--rule-soft);
+  background: var(--border-soft);
 }
 
 /* ─── Screen 2: PR detail (utilitarian file browser) ── */
@@ -591,7 +706,7 @@ html, body {
   font-family: var(--font-mono);
   font-weight: 500;
   letter-spacing: 0.08em;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
@@ -605,13 +720,13 @@ html, body {
   gap: 8px;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   letter-spacing: 0.03em;
   margin-bottom: 10px;
 }
 
 .pr-header .meta-line .num {
-  color: var(--oxblood);
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -619,28 +734,27 @@ html, body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--oxblood);
+  color: var(--accent);
   padding: 2px 7px;
-  border: 1px solid var(--oxblood);
+  border: 1px solid var(--accent);
   border-radius: 3px;
 }
 
 .pr-header h1 {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: 600;
-  font-variation-settings: "opsz" 48;
   font-size: 24px;
   line-height: 1.22;
   letter-spacing: -0.01em;
   margin: 0 0 12px;
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .pr-header .description {
   font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.55;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   margin: 0 0 14px;
   max-width: 50ch;
 }
@@ -651,7 +765,7 @@ html, body {
   gap: 10px;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   letter-spacing: 0.03em;
 }
 
@@ -667,30 +781,30 @@ html, body {
   gap: 6px;
 }
 
-.pr-header .author-row .diff-added { color: var(--sage); font-weight: 600; }
-.pr-header .author-row .diff-removed { color: var(--oxblood); font-weight: 600; }
+.pr-header .author-row .diff-added { color: var(--diff-add-text); font-weight: 600; }
+.pr-header .author-row .diff-removed { color: var(--accent); font-weight: 600; }
 
 /* Quick action bar */
 .action-bar {
   display: flex;
   gap: 8px;
   padding: 12px var(--edge) 14px;
-  border-top: 1px solid var(--rule-soft);
-  border-bottom: 1px solid var(--rule-soft);
-  background: var(--paper-alt);
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-secondary);
 }
 
 .action-bar button {
   flex: 1;
   padding: 10px 12px;
-  border: 1px solid var(--rule-soft);
-  background: var(--paper);
+  border: 1px solid var(--border-soft);
+  background: var(--surface);
   border-radius: 10px;
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--ink);
+  color: var(--text-primary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -703,9 +817,9 @@ html, body {
 .action-bar button:active { transform: scale(0.95); }
 
 .action-bar button.primary {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
+  background: var(--text-primary);
+  color: var(--surface);
+  border-color: var(--text-primary);
 }
 
 .action-bar button svg {
@@ -731,14 +845,14 @@ html, body {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   font-weight: 600;
 }
 
 .files-header .count {
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--ink-faint);
+  color: var(--text-muted);
 }
 
 .file-list {
@@ -750,7 +864,7 @@ html, body {
   align-items: center;
   gap: 14px;
   padding: 14px 0;
-  border-top: 1px solid var(--rule-soft);
+  border-top: 1px solid var(--border-soft);
   cursor: pointer;
   transition: transform var(--dur-fast) var(--ease), background var(--dur-fast);
   -webkit-user-select: none;
@@ -759,15 +873,15 @@ html, body {
 
 .file-entry:active {
   transform: translateX(3px);
-  background: var(--paper-alt);
+  background: var(--surface-secondary);
 }
 
 .file-entry .icon-wrap {
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  background: var(--paper-alt);
-  border: 1px solid var(--rule-soft);
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -775,20 +889,20 @@ html, body {
   font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 700;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   letter-spacing: 0.02em;
 }
 
-.file-entry .icon-wrap.md { color: var(--sage); }
-.file-entry .icon-wrap.html { color: var(--oxblood); }
-.file-entry .icon-wrap.ts { color: var(--gold); }
+.file-entry .icon-wrap.md { color: var(--diff-add-text); }
+.file-entry .icon-wrap.html { color: var(--accent); }
+.file-entry .icon-wrap.ts { color: var(--inline-code); }
 
 .file-entry .file-body { flex: 1; min-width: 0; }
 
 .file-entry .file-path {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   line-height: 1.3;
   margin-bottom: 3px;
   white-space: nowrap;
@@ -802,7 +916,7 @@ html, body {
   font-weight: 500;
   font-size: 15px;
   line-height: 1.3;
-  color: var(--ink);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -815,16 +929,16 @@ html, body {
   margin-top: 4px;
   font-family: var(--font-mono);
   font-size: 9px;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   letter-spacing: 0.04em;
 }
 
-.file-entry .file-meta .change-added { color: var(--sage); font-weight: 600; }
-.file-entry .file-meta .change-removed { color: var(--oxblood); font-weight: 600; }
+.file-entry .file-meta .change-added { color: var(--diff-add-text); font-weight: 600; }
+.file-entry .file-meta .change-removed { color: var(--accent); font-weight: 600; }
 .file-entry .file-meta .new-tag {
   padding: 1px 6px;
-  background: var(--oxblood-wash);
-  color: var(--oxblood);
+  background: var(--accent-muted);
+  color: var(--accent);
   border-radius: 3px;
   font-weight: 600;
   text-transform: uppercase;
@@ -845,8 +959,8 @@ html, body {
   gap: 4px;
   padding: 3px 7px;
   border-radius: 10px;
-  background: var(--oxblood-wash);
-  color: var(--oxblood);
+  background: var(--accent-muted);
+  color: var(--accent);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
@@ -863,7 +977,7 @@ html, body {
 .file-entry .chevron {
   width: 10px;
   height: 10px;
-  stroke: var(--ink-whisper);
+  stroke: var(--text-muted);
   fill: none;
   stroke-width: 2;
 }
@@ -873,7 +987,7 @@ html, body {
 .screen-read .reading-bar {
   position: sticky;
   top: 0;
-  background: var(--paper);
+  background: var(--surface);
   z-index: 50;
   padding: 52px 20px 14px;
   display: flex;
@@ -884,17 +998,17 @@ html, body {
 }
 
 .screen-read .reading-bar.stuck {
-  background: rgba(247, 241, 225, 0.92);
+  background: rgba(40, 42, 54, 0.92);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
-  border-bottom-color: var(--rule-soft);
+  border-bottom-color: var(--border-soft);
 }
 
 .reading-bar .file-label {
   flex: 1;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   letter-spacing: 0.06em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -904,14 +1018,14 @@ html, body {
 .reading-bar .progress {
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--oxblood);
+  color: var(--accent);
   font-weight: 600;
   letter-spacing: 0.06em;
 }
 
 .article {
   padding: 28px 28px 180px;
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .article .kicker {
@@ -919,9 +1033,8 @@ html, body {
 }
 
 .article h1 {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: 600;
-  font-variation-settings: "opsz" 144;
   font-size: 38px;
   line-height: 1.04;
   letter-spacing: -0.02em;
@@ -933,7 +1046,7 @@ html, body {
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   margin-bottom: 28px;
   display: flex;
   gap: 10px;
@@ -944,7 +1057,7 @@ html, body {
   content: "";
   flex: 1;
   height: 1px;
-  background: var(--rule);
+  background: var(--border);
   max-width: 80px;
 }
 
@@ -953,35 +1066,32 @@ html, body {
   font-size: 18px;
   line-height: 1.65;
   margin: 0 0 20px;
-  color: var(--ink);
-  font-variation-settings: "opsz" 16;
+  color: var(--text-primary);
 }
 
 .article p.first::first-letter {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: 700;
-  font-variation-settings: "opsz" 144;
   font-size: 72px;
   line-height: 0.85;
   float: left;
   padding: 6px 10px 0 0;
-  color: var(--oxblood);
+  color: var(--accent);
   font-style: italic;
 }
 
 .article h2 {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: 600;
-  font-variation-settings: "opsz" 48;
   font-size: 24px;
   letter-spacing: -0.01em;
   margin: 36px 0 14px;
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .article h2::before {
   content: "§";
-  color: var(--oxblood);
+  color: var(--accent);
   font-style: italic;
   margin-right: 10px;
   font-weight: 400;
@@ -990,21 +1100,20 @@ html, body {
 .article blockquote {
   margin: 32px -6px;
   padding: 0 0 0 28px;
-  border-left: 3px solid var(--oxblood);
-  font-family: var(--font-display);
+  border-left: 3px solid var(--accent);
+  font-family: var(--font-body);
   font-weight: 500;
-  font-variation-settings: "opsz" 48;
   font-style: italic;
   font-size: 22px;
   line-height: 1.35;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .article .pull-ornament {
   text-align: center;
   margin: 36px 0;
-  color: var(--oxblood);
-  font-family: var(--font-display);
+  color: var(--accent);
+  font-family: var(--font-body);
   font-size: 20px;
   letter-spacing: 0.5em;
   opacity: 0.6;
@@ -1017,13 +1126,13 @@ html, body {
 
 /* Selection styling — rich oxblood underline */
 .article ::selection {
-  background: var(--oxblood-wash);
-  color: var(--oxblood-deep);
+  background: var(--accent-muted);
+  color: var(--accent);
 }
 
 [data-theme="dark"] .article ::selection {
-  background: rgba(249, 115, 22, 0.2);
-  color: var(--oxblood-bright);
+  background: rgba(189, 147, 249, 0.25);
+  color: var(--accent-hover);
 }
 
 /* Floating "pen" cue that appears on selection */
@@ -1033,15 +1142,15 @@ html, body {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: var(--oxblood);
-  color: var(--paper);
+  background: var(--accent);
+  color: var(--surface);
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow:
-    0 10px 30px -5px rgba(124, 45, 18, 0.5),
-    0 0 0 3px var(--paper),
-    0 0 0 4px var(--oxblood-wash);
+    0 10px 30px -5px rgba(189, 147, 249, 0.35),
+    0 0 0 3px var(--surface),
+    0 0 0 4px var(--accent-muted);
   opacity: 0;
   pointer-events: none;
   transform: translate(-50%, -70%) scale(0.5);
@@ -1072,8 +1181,8 @@ html, body {
   left: 50%;
   transform: translateX(-50%);
   z-index: 80;
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--text-primary);
+  color: var(--surface);
   padding: 14px 22px 14px 18px;
   border-radius: 100px;
   display: flex;
@@ -1087,7 +1196,7 @@ html, body {
   cursor: pointer;
   border: none;
   box-shadow:
-    0 20px 40px -10px rgba(26, 20, 16, 0.5),
+    0 20px 40px -10px rgba(0, 0, 0, 0.5),
     0 0 0 1px rgba(0, 0, 0, 0.1);
   transition: transform var(--dur-fast) var(--ease);
 }
@@ -1102,8 +1211,8 @@ html, body {
   height: 22px;
   padding: 0 7px;
   border-radius: 11px;
-  background: var(--oxblood);
-  color: var(--paper);
+  background: var(--accent);
+  color: var(--surface);
   font-size: 11px;
   font-weight: 700;
 }
@@ -1123,7 +1232,7 @@ html, body {
 .backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(26, 20, 16, 0.5);
+  background: rgba(0, 0, 0, 0.5);
   -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
   opacity: 0;
@@ -1142,7 +1251,7 @@ html, body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--paper);
+  background: var(--surface);
   border-radius: 28px 28px 0 0;
   z-index: 100;
   transform: translateY(100%);
@@ -1158,7 +1267,7 @@ html, body {
 .sheet .handle {
   width: 44px;
   height: 5px;
-  background: var(--rule);
+  background: var(--border);
   border-radius: 3px;
   margin: 12px auto 4px;
   flex-shrink: 0;
@@ -1177,14 +1286,14 @@ html, body {
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--oxblood);
+  color: var(--accent);
   font-weight: 600;
 }
 
 .sheet-close {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   background: none;
   border: none;
   cursor: pointer;
@@ -1199,20 +1308,19 @@ html, body {
 }
 
 .quoted-passage {
-  border-left: 3px solid var(--oxblood);
+  border-left: 3px solid var(--accent);
   padding: 4px 0 4px 18px;
   margin: 12px 0 24px;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-style: italic;
-  font-variation-settings: "opsz" 48;
   font-size: 17px;
   line-height: 1.45;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
 }
 
 .quoted-passage .quote-mark {
-  font-family: var(--font-display);
-  color: var(--oxblood);
+  font-family: var(--font-body);
+  color: var(--accent);
   font-size: 24px;
   line-height: 0;
   vertical-align: -8px;
@@ -1220,16 +1328,16 @@ html, body {
 }
 
 .comment-input-wrap {
-  background: var(--paper-bright);
-  border: 1px solid var(--rule-soft);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
   border-radius: 14px;
   padding: 16px 18px;
   margin-bottom: 16px;
 }
 
 .comment-input-wrap:focus-within {
-  border-color: var(--oxblood);
-  box-shadow: 0 0 0 3px var(--oxblood-wash);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
 }
 
 .comment-input {
@@ -1241,12 +1349,12 @@ html, body {
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.5;
-  color: var(--ink);
+  color: var(--text-primary);
   min-height: 80px;
 }
 
 .comment-input::placeholder {
-  color: var(--ink-whisper);
+  color: var(--text-muted);
   font-style: italic;
 }
 
@@ -1260,40 +1368,39 @@ html, body {
 .tag-pill {
   padding: 7px 12px;
   border-radius: 100px;
-  border: 1px solid var(--rule);
+  border: 1px solid var(--border);
   background: transparent;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.05em;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   text-transform: uppercase;
   cursor: pointer;
   transition: all var(--dur-fast) var(--ease);
 }
 
 .tag-pill.active {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
+  background: var(--text-primary);
+  color: var(--surface);
+  border-color: var(--text-primary);
 }
 
 .sheet-submit {
   width: 100%;
   padding: 18px;
-  background: var(--oxblood);
-  color: var(--paper);
+  background: var(--accent);
+  color: var(--surface);
   border: none;
   border-radius: 100px;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 16px;
   font-weight: 600;
-  font-variation-settings: "opsz" 24;
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: transform var(--dur-fast) var(--ease), background var(--dur-fast);
   box-shadow:
-    0 12px 28px -8px rgba(124, 45, 18, 0.5),
+    0 12px 28px -8px rgba(189, 147, 249, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
   display: flex;
   align-items: center;
@@ -1303,7 +1410,7 @@ html, body {
 
 .sheet-submit:active {
   transform: scale(0.98);
-  background: var(--oxblood-bright);
+  background: var(--accent-hover);
 }
 
 .sheet-submit svg {
@@ -1323,9 +1430,8 @@ html, body {
 }
 
 .review-header h1 {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: 600;
-  font-variation-settings: "opsz" 144;
   font-size: 46px;
   line-height: 0.98;
   letter-spacing: -0.025em;
@@ -1334,7 +1440,7 @@ html, body {
 
 .review-header h1 em {
   font-style: italic;
-  color: var(--oxblood);
+  color: var(--accent);
   font-weight: 500;
 }
 
@@ -1342,20 +1448,20 @@ html, body {
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.55;
-  color: var(--ink-soft);
+  color: var(--text-secondary);
   max-width: 44ch;
   margin: 0 0 4px;
 }
 
 .comment-list {
   padding: 0 var(--edge) 28px;
-  border-top: 2px solid var(--rule);
+  border-top: 2px solid var(--border);
   margin-top: 16px;
 }
 
 .queued-comment {
   padding: 22px 0;
-  border-bottom: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--border-soft);
   position: relative;
 }
 
@@ -1365,29 +1471,28 @@ html, body {
   top: 24px;
   font-family: var(--font-mono);
   font-size: 9px;
-  color: var(--oxblood);
+  color: var(--accent);
   font-weight: 600;
   letter-spacing: 0.1em;
   transform: translateX(-100%) translateX(-12px);
 }
 
 .queued-comment .passage {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-style: italic;
-  font-variation-settings: "opsz" 24;
   font-size: 14px;
   line-height: 1.4;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   margin-bottom: 10px;
   padding-left: 12px;
-  border-left: 2px solid var(--rule);
+  border-left: 2px solid var(--border);
 }
 
 .queued-comment .note {
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.5;
-  color: var(--ink);
+  color: var(--text-primary);
   margin: 0 0 10px;
 }
 
@@ -1396,7 +1501,7 @@ html, body {
   gap: 14px;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -1404,7 +1509,7 @@ html, body {
 .queued-comment .edit-row button {
   background: none;
   border: none;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   cursor: pointer;
   padding: 4px 0;
   font-family: inherit;
@@ -1414,13 +1519,13 @@ html, body {
 }
 
 .queued-comment .edit-row button:hover,
-.queued-comment .edit-row button.remove { color: var(--oxblood); }
+.queued-comment .edit-row button.remove { color: var(--accent); }
 
 .verdict-section {
   padding: 20px var(--edge) 28px;
-  background: var(--paper-alt);
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
+  background: var(--surface-secondary);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .verdict-section .label {
@@ -1428,7 +1533,7 @@ html, body {
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--oxblood);
+  color: var(--accent);
   font-weight: 600;
   margin-bottom: 14px;
 }
@@ -1443,12 +1548,12 @@ html, body {
 .verdict-pill {
   padding: 12px 16px;
   border-radius: 100px;
-  border: 1px solid var(--rule);
+  border: 1px solid var(--border);
   background: transparent;
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
-  color: var(--ink);
+  color: var(--text-primary);
   letter-spacing: 0.04em;
   cursor: pointer;
   display: flex;
@@ -1466,17 +1571,17 @@ html, body {
 }
 
 .verdict-pill.active {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--paper);
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--surface);
 }
 
-.verdict-pill.active.approve { background: var(--sage); border-color: var(--sage); }
-.verdict-pill.active.request { background: var(--oxblood); border-color: var(--oxblood); }
+.verdict-pill.active.approve { background: var(--diff-add-text); border-color: var(--diff-add-text); }
+.verdict-pill.active.request { background: var(--accent); border-color: var(--accent); }
 
 .overall-input {
-  background: var(--paper);
-  border: 1px solid var(--rule-soft);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
   border-radius: 14px;
   padding: 14px 16px;
 }
@@ -1490,38 +1595,37 @@ html, body {
   font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.5;
-  color: var(--ink);
+  color: var(--text-primary);
   min-height: 60px;
 }
 
 .overall-input textarea::placeholder {
-  color: var(--ink-whisper);
+  color: var(--text-muted);
   font-style: italic;
 }
 
 .submit-bar {
   padding: 20px var(--edge) 32px;
-  background: var(--paper);
+  background: var(--surface);
 }
 
 .submit-bar button {
   width: 100%;
   padding: 20px;
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--text-primary);
+  color: var(--surface);
   border: none;
   border-radius: 100px;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 17px;
   font-weight: 600;
-  font-variation-settings: "opsz" 24;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
   box-shadow:
-    0 14px 32px -10px rgba(26, 20, 16, 0.5),
+    0 14px 32px -10px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transition: transform var(--dur-fast) var(--ease);
 }
@@ -1547,12 +1651,12 @@ html, body {
   bottom: 0;
   width: 86%;
   max-width: 340px;
-  background: var(--paper-deep);
+  background: var(--surface-secondary);
   z-index: 120;
   transform: translateX(-100%);
   transition: transform var(--dur) var(--ease-out);
   padding: 52px 28px 28px;
-  border-right: 1px solid var(--rule);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -1561,18 +1665,17 @@ html, body {
 .drawer.open { transform: translateX(0); }
 
 .drawer .brand {
-  font-family: var(--font-display);
-  font-size: 28px;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 30px;
   font-weight: 600;
-  font-variation-settings: "opsz" 144;
   letter-spacing: -0.01em;
   padding-bottom: 16px;
-  border-bottom: 2px solid var(--rule);
+  border-bottom: 2px solid var(--border);
 }
 
 .drawer .brand em {
   font-style: italic;
-  color: var(--oxblood);
+  color: var(--accent);
   font-weight: 500;
 }
 
@@ -1582,14 +1685,14 @@ html, body {
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  color: var(--ink-faint);
+  color: var(--text-muted);
   margin-top: 6px;
   font-weight: 500;
 }
 
 .drawer .repo-card {
-  background: var(--paper);
-  border: 1px solid var(--rule);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 16px;
 }
@@ -1599,16 +1702,16 @@ html, body {
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.15em;
-  color: var(--oxblood);
+  color: var(--accent);
   font-weight: 600;
   margin-bottom: 6px;
 }
 
 .drawer .repo-card .name {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 16px;
   font-weight: 500;
-  color: var(--ink);
+  color: var(--text-primary);
   word-break: break-word;
 }
 
@@ -1623,7 +1726,7 @@ html, body {
   align-items: center;
   gap: 14px;
   padding: 12px 4px;
-  color: var(--ink);
+  color: var(--text-primary);
   font-family: var(--font-body);
   font-size: 17px;
   font-weight: 500;
@@ -1634,11 +1737,11 @@ html, body {
 
 .drawer nav a:hover,
 .drawer nav a.current {
-  color: var(--oxblood);
+  color: var(--accent);
 }
 
 .drawer nav a.current {
-  border-bottom-color: var(--oxblood);
+  border-bottom-color: var(--accent);
 }
 
 .drawer nav a svg {
@@ -1658,12 +1761,12 @@ html, body {
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  background: var(--paper);
-  border: 1px solid var(--rule);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 100px;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--ink);
+  color: var(--text-primary);
   cursor: pointer;
   width: fit-content;
 }
@@ -1671,7 +1774,7 @@ html, body {
 .drawer .theme-toggle svg {
   width: 16px;
   height: 16px;
-  stroke: var(--oxblood);
+  stroke: var(--accent);
   fill: none;
   stroke-width: 2;
 }
@@ -1683,8 +1786,8 @@ html, body {
   left: 50%;
   bottom: 32px;
   transform: translate(-50%, 100%);
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--text-primary);
+  color: var(--surface);
   padding: 14px 22px;
   border-radius: 100px;
   font-family: var(--font-mono);
@@ -1703,7 +1806,7 @@ html, body {
 .toast svg {
   width: 14px;
   height: 14px;
-  stroke: var(--oxblood-bright);
+  stroke: var(--accent-hover);
   fill: none;
   stroke-width: 2;
 }
@@ -1756,8 +1859,8 @@ html, body {
     <!-- Screens -->
     <div class="screens">
 
-      <!-- ═══ SCREEN 1: HOME — Review queue ═══════════════ -->
-      <section class="screen screen-home active" data-screen="home">
+      <!-- ═══ SCREEN 1: Repo home ═════════════════════════ -->
+      <section class="screen screen-home active" data-screen="home" data-tab="prs">
 
         <div class="top-bar">
           <button class="icon-btn" onclick="drawer.toggle()" aria-label="Menu">
@@ -1769,11 +1872,28 @@ html, body {
           </button>
         </div>
 
-        <div class="queue-tabs">
-          <button class="queue-tab active stagger">Needs review <span class="tab-count">3</span></button>
-          <button class="queue-tab stagger">Authored <span class="tab-count">2</span></button>
-          <button class="queue-tab stagger">Watching <span class="tab-count">8</span></button>
-          <button class="queue-tab stagger">All</button>
+        <div class="segment-switcher stagger">
+          <button class="active" data-tab-btn="prs" onclick="switchTab('prs')">
+            <svg viewBox="0 0 24 24"><circle cx="18" cy="6" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M6 9v6"/><path d="M18 9c0 3-4 4-6 4"/></svg>
+            Pull requests
+          </button>
+          <button data-tab-btn="files" onclick="switchTab('files')">
+            <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            Files
+          </button>
+        </div>
+
+        <!-- PR state filter — Open by default, Closed one tap away -->
+        <div class="state-filter">
+          <button class="state-pill open active stagger" onclick="switchState(this, 'open')">
+            Open
+            <span class="count">8</span>
+          </button>
+          <button class="state-pill closed stagger" onclick="switchState(this, 'closed')">
+            Closed
+            <span class="count">42</span>
+          </button>
+          <span class="pull-right stagger">mardoc-io · main</span>
         </div>
 
         <div class="pr-list">
@@ -1783,13 +1903,11 @@ html, body {
             <div class="body">
               <div class="top-line">
                 <span class="num">#61</span>
-                <span class="repo">mardoc-io/mardoc-io.github.io</span>
+                <span class="repo">feat/033-html-inline-comments</span>
                 <span class="time">2h</span>
               </div>
               <h2>Inline comments on HTML files</h2>
               <div class="status-row">
-                <span class="status-label">Needs review</span>
-                <span class="sep"></span>
                 <span class="tiny-avatar">JB</span>
                 <span>joe.barnett</span>
                 <span class="sep"></span>
@@ -1803,18 +1921,36 @@ html, body {
             </div>
           </div>
 
+          <div class="pr-card draft stagger" onclick="nav.to('pr')">
+            <div class="rail"></div>
+            <div class="body">
+              <div class="top-line">
+                <span class="num">#62</span>
+                <span class="repo">feat/038-mobile-prototype</span>
+                <span class="time">1d</span>
+              </div>
+              <h2>Cellphone mode viewer prototype</h2>
+              <div class="status-row">
+                <span class="status-label">Draft</span>
+                <span class="sep"></span>
+                <span class="tiny-avatar">JB</span>
+                <span>joe.barnett</span>
+                <span class="sep"></span>
+                <span>1 file</span>
+              </div>
+            </div>
+          </div>
+
           <div class="pr-card review stagger" onclick="nav.to('pr')">
             <div class="rail"></div>
             <div class="body">
               <div class="top-line">
                 <span class="num">#58</span>
-                <span class="repo">mardoc-io/mardoc-io.github.io</span>
+                <span class="repo">feat/image-resize-handle</span>
                 <span class="time">5h</span>
               </div>
               <h2>Drag-to-resize handle on selected images</h2>
               <div class="status-row">
-                <span class="status-label">Needs review</span>
-                <span class="sep"></span>
                 <span class="tiny-avatar sage">AL</span>
                 <span>a.lee</span>
                 <span class="sep"></span>
@@ -1828,13 +1964,11 @@ html, body {
             <div class="body">
               <div class="top-line">
                 <span class="num">#57</span>
-                <span class="repo">mardoc-io/mardoc-io.github.io</span>
+                <span class="repo">feat/private-repo-images</span>
                 <span class="time">1d</span>
               </div>
               <h2>Private repo image loading via authenticated fetch</h2>
               <div class="status-row">
-                <span class="status-label">Needs review</span>
-                <span class="sep"></span>
                 <span class="tiny-avatar gold">MR</span>
                 <span>m.rivera</span>
                 <span class="sep"></span>
@@ -1848,47 +1982,63 @@ html, body {
             </div>
           </div>
 
-          <div class="section-divider">Your drafts</div>
+        </div>
 
-          <div class="pr-card draft stagger" onclick="nav.to('pr')">
-            <div class="rail"></div>
-            <div class="body">
-              <div class="top-line">
-                <span class="num">#62</span>
-                <span class="repo">mardoc-io/mardoc-io.github.io</span>
-                <span class="time">1d</span>
-              </div>
-              <h2>Cellphone mode viewer (feature 038)</h2>
-              <div class="status-row">
-                <span class="status-label">Draft</span>
-                <span class="sep"></span>
-                <span>1 file</span>
-                <span class="sep"></span>
-                <span>+2207 −0</span>
-              </div>
+        <!-- Files tab — compact tree of markdown + HTML files in the repo -->
+        <div class="file-tree">
+          <div class="tree-item" onclick="nav.to('read')">
+            <div class="tree-icon md">MD</div>
+            <div class="tree-body">
+              <div class="tree-name">README.md</div>
+              <div class="tree-meta">root · 136 lines</div>
             </div>
+            <svg class="chevron" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
           </div>
 
-          <div class="pr-card merged stagger" onclick="nav.to('pr')">
-            <div class="rail"></div>
-            <div class="body">
-              <div class="top-line">
-                <span class="num">#60</span>
-                <span class="repo">mardoc-io/mardoc-io.github.io</span>
-                <span class="time">2d</span>
-              </div>
-              <h2>Back the README claims, harden review pipeline</h2>
-              <div class="status-row">
-                <span class="status-label">Merged</span>
-                <span class="sep"></span>
-                <span class="tiny-avatar gold">MR</span>
-                <span>m.rivera</span>
-                <span class="sep"></span>
-                <span>14 files</span>
-              </div>
+          <div class="tree-item" onclick="nav.to('read')">
+            <div class="tree-icon html">HTM</div>
+            <div class="tree-body">
+              <div class="tree-name">demo.html</div>
+              <div class="tree-meta">public/ · 284 lines</div>
             </div>
+            <svg class="chevron" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
           </div>
 
+          <div class="tree-item" onclick="nav.to('read')">
+            <div class="tree-icon md">MD</div>
+            <div class="tree-body">
+              <div class="tree-name">CLAUDE.md</div>
+              <div class="tree-meta">root · 110 lines</div>
+            </div>
+            <svg class="chevron" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+          </div>
+
+          <div class="tree-item" onclick="nav.to('read')">
+            <div class="tree-icon dir">DIR</div>
+            <div class="tree-body">
+              <div class="tree-name">docs/features/</div>
+              <div class="tree-meta">21 files</div>
+            </div>
+            <svg class="chevron" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+          </div>
+
+          <div class="tree-item" onclick="nav.to('read')">
+            <div class="tree-icon dir">DIR</div>
+            <div class="tree-body">
+              <div class="tree-name">docs/design/</div>
+              <div class="tree-meta">1 file</div>
+            </div>
+            <svg class="chevron" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+          </div>
+
+          <div class="tree-item" onclick="nav.to('read')">
+            <div class="tree-icon md">MD</div>
+            <div class="tree-body">
+              <div class="tree-name">LICENSE</div>
+              <div class="tree-meta">root · Elastic License 2.0</div>
+            </div>
+            <svg class="chevron" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+          </div>
         </div>
 
       </section>
@@ -1909,7 +2059,7 @@ html, body {
         <div class="pr-header">
           <div class="meta-line stagger">
             <span class="num">#61</span>
-            <span class="status-label">Needs review</span>
+            <span class="status-label">Open</span>
             <span>opened 2h ago</span>
           </div>
           <h1 class="stagger">Inline comments on HTML files</h1>
@@ -2151,19 +2301,19 @@ html, body {
       <nav>
         <a href="#" class="current" onclick="drawer.closeAndNav('home'); return false;">
           <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-          Review queue
+          Repository
         </a>
         <a href="#" onclick="drawer.close(); return false;">
-          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-          All discussions
+          <svg viewBox="0 0 24 24"><circle cx="18" cy="6" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M6 9v6"/><path d="M18 9c0 3-4 4-6 4"/></svg>
+          Pull requests
         </a>
         <a href="#" onclick="drawer.close(); return false;">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
-          Drafts
+          <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          Files
         </a>
         <a href="#" onclick="drawer.close(); return false;">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-          History
+          <svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4 2 8L12 17l-6.5 4 2-8L2 9h7z"/></svg>
+          Switch repository
         </a>
         <a href="#" onclick="drawer.close(); return false;">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2.1-1.7-2-3.5-2.5 1a7 7 0 00-2-1.2l-.4-2.7h-4l-.4 2.7a7 7 0 00-2 1.2l-2.5-1-2 3.5 2.1 1.7a7.2 7.2 0 000 2.4l-2.1 1.7 2 3.5 2.5-1a7 7 0 002 1.2l.4 2.7h4l.4-2.7a7 7 0 002-1.2l2.5 1 2-3.5-2.1-1.7c.1-.4.1-.8.1-1.2z"/></svg>
@@ -2261,6 +2411,23 @@ const nav = {
     });
   }
 };
+
+// ─── Home tab + state switching ─────────────────────────
+
+function switchTab(name) {
+  const home = document.querySelector('.screen-home');
+  home.dataset.tab = name;
+  document.querySelectorAll('.segment-switcher button').forEach(b => {
+    b.classList.toggle('active', b.dataset.tabBtn === name);
+  });
+}
+
+function switchState(btn, state) {
+  btn.parentNode.querySelectorAll('.state-pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  // In a real app this would re-fetch the PR list filtered by state.
+  // In the prototype we just toggle the visual affordance.
+}
 
 // ─── Drawer ─────────────────────────────────────────────
 
