@@ -124,10 +124,14 @@ function FloatingToolbar({
   const checkSelection = useCallback(() => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+      // 300ms gives mobile touch events time to fire the button's
+      // handler before the toolbar hides. On desktop this is
+      // imperceptible; on slow phones it prevents the race between
+      // selectionchange and the synthetic mousedown.
       hideTimeout.current = setTimeout(() => {
         setPos(null);
         setText("");
-      }, 150);
+      }, 300);
       return;
     }
 
@@ -179,7 +183,15 @@ function FloatingToolbar({
           setText("");
           window.getSelection()?.removeAllRanges();
         }}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-medium rounded-lg shadow-lg hover:bg-[var(--accent-hover)] transition-all whitespace-nowrap"
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onComment(text);
+          setPos(null);
+          setText("");
+          window.getSelection()?.removeAllRanges();
+        }}
+        className="flex items-center gap-1.5 px-3 py-1.5 md:py-1.5 min-h-[44px] md:min-h-0 bg-[var(--accent)] text-white text-xs font-medium rounded-lg shadow-lg hover:bg-[var(--accent-hover)] transition-all whitespace-nowrap"
         style={{ animation: "fadeInUp 0.15s ease-out" }}
       >
         <MessageSquarePlus size={13} />
@@ -1288,7 +1300,7 @@ export default function DiffViewer({
               </button>
               <button
                 onClick={() => setViewMode("split")}
-                className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                className={`text-xs px-2.5 py-1 rounded transition-colors hidden md:block ${
                   viewMode === "split"
                     ? "bg-[var(--surface)] text-[var(--text-primary)] shadow-sm"
                     : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
