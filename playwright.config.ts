@@ -38,10 +38,17 @@ export default defineConfig({
   ],
 
   webServer: {
-    // In CI the test.yml workflow runs `next build` before this,
-    // so `next start` serves the production build. Locally, `npm run dev`
-    // is faster. Both listen on 3000.
-    command: process.env.CI ? "npx next start" : "npm run dev",
+    // Locally: `npm run dev` is the fastest path and picks up HMR.
+    //
+    // In CI: the workflow runs `npx next build` before playwright,
+    // producing a fully static export in `out/`. MarDoc uses
+    // `output: "export"` in next.config.js, so `next start` is not
+    // supported. Serve the static bundle with `serve` instead — it
+    // handles client-side hash routing correctly because the shell
+    // lives at `out/index.html` and everything else is a hash route.
+    command: process.env.CI
+      ? "npx --yes serve out -l 3000 --no-clipboard"
+      : "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

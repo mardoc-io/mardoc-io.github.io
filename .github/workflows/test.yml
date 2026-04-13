@@ -46,7 +46,11 @@ jobs:
       - run: npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        # Install both chromium AND webkit — the mobile test project
+        # uses the iPhone 14 device profile which launches webkit.
+        # Without webkit, mobile tests fail with "Executable doesn't
+        # exist at .../webkit-xxxx/pw_run.sh".
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Build the app
         run: npx next build
