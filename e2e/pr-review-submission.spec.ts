@@ -132,6 +132,47 @@ test.describe("PR review submission — Request Changes flow", () => {
   });
 });
 
+test.describe("PR detail — description collapse toggle", () => {
+  // The "Description" button in the PR header used to be a broken
+  // <details> element with no children. This test guards against the
+  // regression by proving that clicking the button actually hides the
+  // description body.
+
+  test("description body is expanded by default on a PR with a description", async ({
+    page,
+  }) => {
+    await openPullRequest(page, /architecture overview/i);
+    await expect(page.locator("#pr-description-body")).toBeVisible({
+      timeout: 3_000,
+    });
+    // And the toggle button reflects the expanded state
+    await expect(
+      page.locator('button[aria-controls="pr-description-body"]')
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("clicking the Description button collapses and re-expands the body", async ({
+    page,
+  }) => {
+    await openPullRequest(page, /architecture overview/i);
+    const toggle = page.locator('button[aria-controls="pr-description-body"]');
+    const body = page.locator("#pr-description-body");
+
+    // Start expanded
+    await expect(body).toBeVisible();
+
+    // Collapse
+    await toggle.click();
+    await expect(body).toHaveCount(0);
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    // Re-expand
+    await toggle.click();
+    await expect(body).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
 test.describe("PR review submission — Comment-only flow", () => {
   test("switching radio to Comment, then submit, dismisses modal without a verdict badge", async ({
     page,

@@ -10,6 +10,8 @@ import {
   FileText,
   Loader2,
   X,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { PullRequest, PRComment, PendingSuggestion } from "@/types";
 import { useApp } from "@/lib/app-context";
@@ -56,6 +58,7 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
   } = useApp();
 
   const [comments, setComments] = useState<PRComment[]>(prComments);
+  const [descriptionOpen, setDescriptionOpen] = useState(true);
   const [reviewStatus, setReviewStatus] = useState<
     "pending" | "approved" | "changes-requested" | null
   >(null);
@@ -469,13 +472,6 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
                       {pr.baseBranch}
                     </span>
                   </span>
-                  {pr.description && (
-                    <details className="inline">
-                      <summary className="text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-secondary)] transition-colors">
-                        Description
-                      </summary>
-                    </details>
-                  )}
                 </div>
               </div>
             </div>
@@ -536,16 +532,38 @@ export default function PRDetail({ pr, onBack }: PRDetailProps) {
             </div>
           </div>
 
-          {/* Expanded description */}
+          {/* Description section — toggle + body. Lives on its own
+              row below the header meta so the full-width click target
+              is safe on mobile (the review actions on the right don't
+              overlap it). */}
           {pr.description && (
-            <div
-              className="mt-2 text-sm text-[var(--text-secondary)] prose prose-sm dark:prose-invert max-w-none max-h-40 overflow-y-auto border-t border-[var(--border)] pt-2"
-              dangerouslySetInnerHTML={{
-                __html: transformGitHubAlerts(
-                  descriptionConverter.makeHtml(transformFootnotes(pr.description))
-                ),
-              }}
-            />
+            <div className="mt-2 border-t border-[var(--border)] pt-2">
+              <button
+                type="button"
+                onClick={() => setDescriptionOpen((v) => !v)}
+                aria-expanded={descriptionOpen}
+                aria-controls="pr-description-body"
+                className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors cursor-pointer py-0.5"
+              >
+                {descriptionOpen ? (
+                  <ChevronDown size={12} />
+                ) : (
+                  <ChevronRight size={12} />
+                )}
+                Description
+              </button>
+              {descriptionOpen && (
+                <div
+                  id="pr-description-body"
+                  className="mt-1 text-sm text-[var(--text-secondary)] prose prose-sm dark:prose-invert max-w-none max-h-40 overflow-y-auto"
+                  dangerouslySetInnerHTML={{
+                    __html: transformGitHubAlerts(
+                      descriptionConverter.makeHtml(transformFootnotes(pr.description))
+                    ),
+                  }}
+                />
+              )}
+            </div>
           )}
         </div>
       </div>
