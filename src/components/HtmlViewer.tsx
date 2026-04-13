@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
-import { Code2, Eye, Maximize2, Minimize2, MessageSquare, X, GitPullRequest, Loader2 } from "lucide-react";
+import { Braces, Maximize2, Minimize2, MessageSquare, X, GitPullRequest, Loader2 } from "lucide-react";
 import { useIsMobile } from "@/lib/use-viewport";
 import { useApp } from "@/lib/app-context";
 import { injectSourceLineAttributes } from "@/lib/html-source-lines";
 import { buildIframeSelectionScript } from "@/lib/html-selection";
 import { createReviewPR, createInlineComment } from "@/lib/github-api";
+import { analyzeHtml } from "@/lib/word-count";
 
 interface HtmlViewerProps {
   content: string;
@@ -99,6 +100,11 @@ export default function HtmlViewer({ content, filePath, repoFullName, branch }: 
     }
     return content;
   }, [content, repoFullName, branch, filePath]);
+
+  // Word count + reading time. Pure function, no DOM parser, cheap
+  // to compute on each content change. Parity with the markdown
+  // Editor's stats display.
+  const stats = useMemo(() => analyzeHtml(content || ""), [content]);
 
   // Inject source-line attributes + resize + selection scripts into
   // the iframe srcdoc. Same pattern as DiffViewer's HTML handling.
@@ -231,35 +237,63 @@ export default function HtmlViewer({ content, filePath, repoFullName, branch }: 
 
   return (
     <div ref={containerRef} className="h-full flex flex-col bg-[var(--surface)]">
-      {/* Toolbar */}
+      {/* Toolbar. Button order matches the markdown Editor's toolbar
+          so the two surfaces feel like the same app. Right-side order:
+          word count → Code/Rich toggle → Fullscreen toggle → Comments
+          toggle. The Code/Rich toggle uses the same Braces icon + text
+          label pattern as the Editor. */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)] bg-[var(--bg-secondary,var(--surface))]">
         <span className="text-sm font-medium text-[var(--text)] truncate">{fileName}</span>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => setShowPanel(!showPanel)}
-            className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
-              showPanel
-                ? "text-[var(--accent)] bg-[var(--accent-muted)]"
-                : "text-[var(--text-muted)] hover:text-[var(--accent)]"
-            }`}
-            title="Toggle comments panel"
-          >
-            <MessageSquare size={14} />
-            {unresolvedCount > 0 ? `${unresolvedCount} comment${unresolvedCount > 1 ? "s" : ""}` : "Comments"}
-          </button>
+          {/* Word count + reading time — hidden when empty */}
+          {stats.words > 0 && (
+            <span
+              className="hidden sm:inline text-[10px] text-[var(--text-muted)] font-mono px-1.5 select-none"
+              title={`${stats.words.toLocaleString()} words · ~${stats.readingMinutes} min read`}
+            >
+              {stats.words.toLocaleString()} words · {stats.readingMinutes} min
+            </span>
+          )}
+
+          {/* Code / Rich toggle — same pattern as Editor */}
           <button
             onClick={() => setViewSource(!viewSource)}
-            className={`toolbar-btn ${viewSource ? "bg-[var(--accent)]/10 text-[var(--accent)]" : ""}`}
-            title={viewSource ? "Rendered view" : "View source"}
+            className={`flex items-center gap-1 px-2 py-1 text-[11px] rounded-md transition-colors ${
+              viewSource
+                ? "bg-[var(--accent-muted)] text-[var(--accent)] font-medium"
+                : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
+            }`}
+            title={viewSource ? "Switch back to rendered view" : "View raw HTML"}
           >
-            {viewSource ? <Eye size={16} /> : <Code2 size={16} />}
+            <Braces size={13} />
+            {viewSource ? "Rich" : "Code"}
           </button>
+
+          {/* Fullscreen toggle */}
           <button
             onClick={() => setFullscreen(!fullscreen)}
             className="toolbar-btn"
             title={fullscreen ? "Exit fullscreen" : "Fullscreen"}
           >
             {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+
+          {/* Comments toggle — same pattern as Editor: badge + count */}
+          <button
+            onClick={() => setShowPanel(!showPanel)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
+              showPanel
+                ? "bg-[var(--accent-muted)] text-[var(--accent)] font-medium"
+                : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
+            }`}
+            title="Toggle comments panel"
+          >
+            <MessageSquare size={13} />
+            {unresolvedCount > 0 && (
+              <span className="bg-[var(--accent)] text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                {unresolvedCount}
+              </span>
+            )}
           </button>
         </div>
       </div>

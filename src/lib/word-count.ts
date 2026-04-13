@@ -38,6 +38,63 @@ export function analyzeMarkdown(markdown: string): MarkdownStats {
 }
 
 /**
+ * HTML-aware word count. Strips script, style, and comment blocks
+ * (which shouldn't count as reading content), then removes the
+ * remaining tags, decodes common HTML entities, and delegates to the
+ * same whitespace-tokenizer used for markdown.
+ *
+ * Pure — no DOM parser, just regex — so it can run on every keystroke
+ * without a heavy pass.
+ */
+export function countHtmlWords(html: string): number {
+  if (!html) return 0;
+  const stripped = stripHtml(html);
+  const trimmed = stripped.trim();
+  if (!trimmed) return 0;
+  return trimmed.split(/\s+/).length;
+}
+
+export function analyzeHtml(html: string): MarkdownStats {
+  const words = countHtmlWords(html);
+  return { words, readingMinutes: readingMinutes(words) };
+}
+
+function stripHtml(html: string): string {
+  let s = html;
+
+  // HTML comments — drop entirely.
+  s = s.replace(/<!--[\s\S]*?-->/g, " ");
+
+  // Script, style, and noscript content — reading time shouldn't
+  // include source code or CSS. Match any of these elements
+  // case-insensitively and drop their entire inner content.
+  s = s.replace(/<(script|style|noscript)\b[^>]*>[\s\S]*?<\/\1>/gi, " ");
+
+  // All other tags — drop the tag but keep its content.
+  s = s.replace(/<[^>]+>/g, " ");
+
+  // Common named entities so "don&amp;t" counts as one word, not two.
+  s = s
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/gi, "'");
+
+  // Numeric entities (&#123; / &#x1F600;)
+  s = s.replace(/&#x([0-9a-f]+);/gi, (_m, hex) =>
+    String.fromCodePoint(parseInt(hex, 16))
+  );
+  s = s.replace(/&#(\d+);/g, (_m, num) =>
+    String.fromCodePoint(parseInt(num, 10))
+  );
+
+  return s;
+}
+
+/**
  * Strip markdown syntax and content that shouldn't count toward the word
  * count (fenced and indented code blocks, image alt text, URLs, HTML
  * comments, heading/list/blockquote markers, table pipes, horizontal rules).
