@@ -19,3 +19,8 @@ tsconfig.tsbuildinfo
 
 # debug
 npm-debug.log*
+
+# playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/

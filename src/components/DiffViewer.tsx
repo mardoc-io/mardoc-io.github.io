@@ -276,7 +276,11 @@ export default function DiffViewer({
         const endLine = typeof data.endLine === "number" ? data.endLine : startLine;
         setPendingSelection(data.text);
         setPendingSelectionRange({ startLine, endLine });
-        setShowPanel(true);
+        // Do NOT auto-open the panel here — on mobile that would
+        // render the CommentPanel in a BottomSheet that covers the
+        // pending-comment bar (both are fixed-bottom). The panel
+        // will auto-open after the comment is submitted via the
+        // existing allPanelComments effect.
       }
     };
     window.addEventListener("message", handleMessage);

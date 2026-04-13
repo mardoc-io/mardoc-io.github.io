@@ -11,5 +11,7 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // Playwright tests live in e2e/ and have their own runner
+    exclude: ["node_modules", "e2e", ".next", "out"],
   },
 });
