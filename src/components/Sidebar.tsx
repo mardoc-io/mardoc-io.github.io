@@ -650,7 +650,7 @@ export default function Sidebar() {
                       <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mt-0.5">
                         <span className="hidden md:inline">#{pr.number} by {pr.author}</span>
                         {pr.mdFileCount !== undefined && pr.mdFileCount > 0 && (
-                          <span className="text-[9px] px-1.5 py-0 rounded-full bg-[var(--accent-muted)] text-[var(--accent)] font-medium">
+                          <span className="text-[9px] px-1.5 py-0 rounded-full bg-[var(--accent-warm-muted)] text-[var(--accent-warm)] font-semibold">
                             {pr.mdFileCount} {pr.mdFileCount === 1 ? "file" : "files"}
                           </span>
                         )}
