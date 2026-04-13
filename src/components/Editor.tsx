@@ -490,6 +490,13 @@ function CommentSidePanel({
 
 export default function Editor({ content, onContentChange, filePath, repoFullName, branch }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
+  // Separate ref for the positioned content wrapper inside the scroll
+  // container. LinkImageBubble uses `position: absolute`, so its
+  // positioning must be computed relative to its offsetParent — which
+  // is the element with `position: relative`, NOT the outer scroll
+  // container. This ref points at the correct positioning parent so
+  // the bubble's top/left math matches what the browser uses to render.
+  const editorContentRef = useRef<HTMLDivElement>(null);
   const { isDemoMode, isEmbedded, refreshRepo, prBranchForNewFile, prNumberForNewFile, openPR, pullRequests, repoFiles, openFile, setEditorIsDirty } = useApp();
   const { wide, toggle: toggleWide, contentClass } = useWideFormat();
   const [comments, setComments] = useState<EditorComment[]>([]);
@@ -1691,7 +1698,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
 
         {/* Editor area */}
         <div className="flex-1 overflow-y-auto" ref={editorContainerRef as React.RefObject<HTMLDivElement>} onClick={handleEditorClick}>
-          <div className={contentClass}>
+          <div className={contentClass} ref={editorContentRef}>
             {/* File path breadcrumb */}
             <div className="text-xs text-[var(--text-muted)] mb-4 font-mono flex items-center gap-2">
               {isNewFile ? (
@@ -1735,10 +1742,12 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
 
             {/* Floating comment button (desktop) */}
             <FloatingCommentButton
-              containerRef={editorContainerRef}
+              containerRef={editorContentRef}
               onComment={handleStartComment}
             />
-            {/* Mobile: fixed button at the bottom of the viewport */}
+            {/* Mobile: fixed button at the bottom of the viewport.
+                MobileCommentButton uses position: fixed (viewport-anchored),
+                so the scroll container is fine for its contains() check. */}
             {isMobile && (
               <MobileCommentButton
                 containerRef={editorContainerRef}
@@ -1746,10 +1755,11 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
               />
             )}
 
-            {/* Link / image edit bubble */}
+            {/* Link / image edit bubble — positioned relative to the
+                contentClass wrapper (the offsetParent with relative) */}
             {!codeView && (
               <LinkImageBubble
-                containerRef={editorContainerRef}
+                containerRef={editorContentRef}
                 editor={editor}
                 target={bubbleTarget}
                 onDismiss={() => setBubbleTarget(null)}

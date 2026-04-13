@@ -7,7 +7,13 @@
  * nearest whole minute, with a floor of 1 minute for any non-empty content.
  */
 import { describe, it, expect } from "vitest";
-import { countWords, readingMinutes, analyzeMarkdown } from "@/lib/word-count";
+import {
+  countWords,
+  readingMinutes,
+  analyzeMarkdown,
+  countHtmlWords,
+  analyzeHtml,
+} from "@/lib/word-count";
 
 describe("countWords", () => {
   // ─── Trivial ────────────────────────────────────────────────────────────
@@ -183,5 +189,85 @@ describe("analyzeMarkdown (convenience wrapper)", () => {
     const result = analyzeMarkdown(md);
     expect(result.words).toBe(6);
     expect(result.readingMinutes).toBe(1);
+  });
+});
+
+// ─── HTML word count ──────────────────────────────────────────────
+
+describe("countHtmlWords", () => {
+  it("returns 0 for empty input", () => {
+    expect(countHtmlWords("")).toBe(0);
+  });
+
+  it("counts visible text and ignores tags", () => {
+    expect(countHtmlWords("<p>hello world</p>")).toBe(2);
+  });
+
+  it("counts across nested tags", () => {
+    expect(
+      countHtmlWords(
+        "<div><p>the quick <strong>brown</strong> fox</p></div>"
+      )
+    ).toBe(4);
+  });
+
+  it("ignores script content", () => {
+    const html = '<p>visible</p><script>var x = "not counted";</script>';
+    expect(countHtmlWords(html)).toBe(1);
+  });
+
+  it("ignores style content", () => {
+    const html = "<p>visible</p><style>body { color: red; }</style>";
+    expect(countHtmlWords(html)).toBe(1);
+  });
+
+  it("ignores noscript content", () => {
+    const html = "<p>visible</p><noscript>fallback text here</noscript>";
+    expect(countHtmlWords(html)).toBe(1);
+  });
+
+  it("ignores HTML comments", () => {
+    expect(countHtmlWords("<p>real <!-- hidden words --> text</p>")).toBe(2);
+  });
+
+  it("decodes named entities", () => {
+    // "it&apos;s" → "it's" → one word
+    expect(countHtmlWords("<p>it&apos;s here</p>")).toBe(2);
+  });
+
+  it("decodes numeric entities", () => {
+    expect(countHtmlWords("<p>hello&#32;world</p>")).toBe(2);
+  });
+
+  it("handles a full HTML document", () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head><title>ignored</title><style>.x{color:red}</style></head>
+<body>
+<h1>One two three</h1>
+<p>four five six</p>
+</body>
+</html>`;
+    // "ignored" is inside <title> which is a regular tag (not script/style/noscript)
+    // so it counts. "ignored One two three four five six" = 7 words.
+    expect(countHtmlWords(html)).toBe(7);
+  });
+});
+
+describe("analyzeHtml", () => {
+  it("returns zeros for empty input", () => {
+    expect(analyzeHtml("")).toEqual({ words: 0, readingMinutes: 0 });
+  });
+
+  it("returns words + reading minutes for a short HTML doc", () => {
+    const html = "<h1>hi there</h1><p>how are you today</p>";
+    expect(analyzeHtml(html)).toEqual({ words: 6, readingMinutes: 1 });
+  });
+
+  it("hits the reading-time boundary correctly", () => {
+    // 201 visible words → 2 minutes
+    const words = Array.from({ length: 201 }, () => "word").join(" ");
+    const html = `<p>${words}</p>`;
+    expect(analyzeHtml(html)).toEqual({ words: 201, readingMinutes: 2 });
   });
 });
