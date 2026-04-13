@@ -140,8 +140,24 @@ export default function Home() {
           </button>
           <div className="flex items-center gap-2">
             <BookOpen size={18} className="text-[var(--accent)]" />
-            <span className="font-semibold text-sm text-[var(--text-primary)]">
-              mar<span className="text-[var(--accent)]">doc</span>.app
+            <span
+              className="text-xl text-[var(--text-primary)] leading-none"
+              style={{
+                fontFamily: "var(--font-fraunces), Georgia, serif",
+                fontWeight: 600,
+                letterSpacing: "-0.015em",
+              }}
+            >
+              Mar
+              <span
+                className="text-[var(--accent)]"
+                style={{ fontStyle: "italic", fontWeight: 500 }}
+              >
+                Doc
+              </span>
+              <span className="text-[var(--text-muted)]" style={{ fontWeight: 500 }}>
+                .app
+              </span>
             </span>
           </div>
           <div className="h-4 w-px bg-[var(--border)] hidden sm:block" />
@@ -266,8 +282,22 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-2xl bg-[var(--accent-muted)] flex items-center justify-center mx-auto mb-5">
                   <BookOpen size={28} className="text-[var(--accent)]" />
                 </div>
-                <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-2">
-                  Welcome to mardoc.app
+                <h2
+                  className="text-3xl text-[var(--text-primary)] mb-2"
+                  style={{
+                    fontFamily: "var(--font-fraunces), Georgia, serif",
+                    fontWeight: 500,
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  Welcome to Mar
+                  <span
+                    className="text-[var(--accent)]"
+                    style={{ fontStyle: "italic" }}
+                  >
+                    Doc
+                  </span>
+                  <span className="text-[var(--text-muted)]">.app</span>
                 </h2>
                 <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-6">
                   {isEmbedded

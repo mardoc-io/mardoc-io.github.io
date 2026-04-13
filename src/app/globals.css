@@ -15,6 +15,12 @@
   --accent: #2383e2;
   --accent-hover: #1b6ec2;
   --accent-muted: #e8f0fe;
+  /* Warm accent — paired with --accent for "needs your attention"
+     highlights like PR file counts, review badges. Orange in both
+     themes (the prototype uses Dracula orange #ffb86c in dark;
+     light mode needs a warm orange that reads against #ffffff). */
+  --accent-warm: #ea580c;
+  --accent-warm-muted: #ffedd5;
   --inline-code: #d63384;
   --diff-add: #dafbe1;
   --diff-add-text: #1a7f37;
@@ -33,6 +39,8 @@
   --accent: #bd93f9;
   --accent-hover: #caa5fb;
   --accent-muted: #363949;
+  --accent-warm: #ffb86c;
+  --accent-warm-muted: #3d2e1c;
   --inline-code: #ffb86c;
   --diff-add: #1e3a2a;
   --diff-add-text: #50fa7b;
