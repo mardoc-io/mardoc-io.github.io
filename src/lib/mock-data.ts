@@ -202,11 +202,10 @@ Navigate to [github.com/settings/tokens](https://github.com/settings/tokens) and
 
 ### Required Scopes
 
-Select these scopes:
+Check these two boxes:
 
-- \`repo\` — Full control of private repositories (read/write access to code, PRs, and issues)
-
-That's it. mardoc.app only needs \`repo\` scope.
+- \`repo\` — full read/write on any repository you already have access to. Checking this top-level box ticks all six sub-scopes automatically.
+- \`read:org\` — needed if any of the repositories you want to review belong to a GitHub organization. Without it, org repos (and anything behind SAML SSO) won't show up reliably in the picker. Skip only if every repo you review is in your personal account.
 
 \`\`\`
 ✅  repo
@@ -215,16 +214,12 @@ That's it. mardoc.app only needs \`repo\` scope.
   ✅  public_repo
   ✅  repo:invite
   ✅  security_events
+✅  read:org              ← check this if you want to see org repos
 \`\`\`
 
-### Optional Scopes
+### One extra step for SSO-protected orgs
 
-These are **not required** but enable additional features:
-
-| Scope | Enables |
-|-------|---------|
-| \`read:org\` | Browsing organization repositories |
-| \`read:user\` | Displaying your profile info in the app |
+After generating the token, the token list page shows a **Configure SSO** button next to it. Click that and authorize each organization you want to see repos from. Without this step, SSO orgs stay invisible even with both scopes set.
 
 ## Step 3: Generate and Copy
 
@@ -399,7 +394,7 @@ mardoc.app is a thin layer on top of GitHub. Your repository is the source of tr
 ` + "```\n\n" + `| Permission | Why |
 |-----------|-----|
 | \`repo\` | Read files, create branches, open PRs |
-| \`read:org\` | *(optional)* Browse organization repos |
+| \`read:org\` | Browse organization repos (required if you have any) |
 
 We never store your code. Every read and write goes directly to the GitHub API. See the [PAT setup guide](docs/creating-a-github-pat.md) to get started.
 

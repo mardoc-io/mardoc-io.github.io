@@ -203,10 +203,15 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                       <li>Click "Generate new token" → "Generate new token (classic)"</li>
                       <li>Give it a note (e.g. "MarDoc") and set an expiration</li>
                       <li>
-                        Check the <strong>repo</strong> scope — this single scope covers reading
-                        code, managing pull requests, and creating review comments
+                        Check <strong>repo</strong> (reading code, PRs, and review comments)
+                        and <strong>read:org</strong> (if you want to see any organization
+                        repos — skip only if every repo is in your personal account)
                       </li>
-                      <li>Click "Generate token", copy the <code className="px-1 rounded bg-[var(--surface)]">ghp_…</code> value, and paste below</li>
+                      <li>
+                        Click "Generate token", then if any of your orgs use SSO click
+                        <strong> Configure SSO</strong> next to the token and authorize each one
+                      </li>
+                      <li>Copy the <code className="px-1 rounded bg-[var(--surface)]">ghp_…</code> value and paste below</li>
                     </ol>
                     <p className="text-[10px] text-[var(--text-muted)] mt-2 italic">
                       Classic tokens are simpler than fine-grained ones — one scope, one click.
