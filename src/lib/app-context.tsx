@@ -611,6 +611,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentRepo, selectedPR, setHash]);
 
+  // When navigateToHash arrives at a PR route before the PR list has
+  // finished loading (deep link on first paint), we can't resolve
+  // the PR synchronously — `await setCurrentRepo` returns before
+  // React commits the `setPRList` state update, so the `prList`
+  // captured in the callback's closure is still stale. Stash the
+  // pending route here and let a dedicated effect resolve it once
+  // prList has actually updated.
+  const [pendingPRRoute, setPendingPRRoute] = useState<{
+    prNumber: number;
+    prFileIdx?: number;
+  } | null>(null);
+
   // Navigate to a hash route — used on init and on hashchange
   const navigateToHash = useCallback(async (hash: string) => {
     const route = parseHash(hash);
@@ -622,12 +634,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (route.type === "file" && route.filePath) {
-      // Need to find the file in the tree — it may not be loaded yet
-      // We'll set branch if specified, then navigate
       if (route.branch && route.branch !== selectedBranch) {
         setSelectedBranchState(route.branch);
       }
-      // Create a minimal RepoFile to open
+      if (isDemoMode) {
+        const mockFile = findFile(mockFiles, route.filePath);
+        if (mockFile) {
+          await openFile(mockFile);
+          return;
+        }
+      }
       const file: RepoFile = {
         id: `hash-${route.filePath}`,
         name: route.filePath.split("/").pop() || route.filePath,
@@ -636,45 +652,82 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       await openFile(file);
     } else if (route.type === "pr" && route.prNumber) {
-      // Find the PR in the loaded list, or create a stub
+      // Fast path: PR is already in the loaded list (demo mode always,
+      // or a user clicking back to a PR they've seen in this session).
       const pr = prList.find((p) => p.number === route.prNumber);
       if (pr) {
         openPR(pr);
         if (route.prFileIdx !== undefined) {
           setSelectedPRFileIdx(route.prFileIdx);
         }
+        return;
       }
+      // Slow path: deep-link to a PR whose list has not loaded yet.
+      // Stash the route so the pending-pr effect below picks it up
+      // as soon as prList updates.
+      setPendingPRRoute({
+        prNumber: route.prNumber,
+        prFileIdx: route.prFileIdx,
+      });
     }
-  }, [currentRepo, selectedBranch, prList, setCurrentRepo, openFile, openPR]);
+  }, [currentRepo, selectedBranch, prList, isDemoMode, setCurrentRepo, openFile, openPR]);
 
-  // Handle hash route on mount and hashchange (back/forward)
+  // Resolve a pending PR deep link once prList finishes loading.
+  // Runs whenever prList changes; no-op when there is nothing pending.
   useEffect(() => {
-    // Initial hash navigation
+    if (!pendingPRRoute) return;
+    const pr = prList.find((p) => p.number === pendingPRRoute.prNumber);
+    if (!pr) return;
+    openPR(pr);
+    if (pendingPRRoute.prFileIdx !== undefined) {
+      setSelectedPRFileIdx(pendingPRRoute.prFileIdx);
+    }
+    setPendingPRRoute(null);
+  }, [prList, pendingPRRoute, openPR]);
+
+  // Handle hash route on mount and hashchange (back/forward).
+  //
+  // The effect intentionally re-runs whenever navigateToHash /
+  // openFile / openPR get new references (which happens on every
+  // state commit touching repo / prList / currentRepo). That sounds
+  // wasteful, but it's exactly what makes deep linking survive
+  // React Strict Mode's double-mount: each new mount gets a fresh
+  // set of closures bound to its own state setters, so the LATEST
+  // mount's setState calls stick.
+  //
+  // The demo-mode branches here bypass navigateToHash entirely and
+  // call openFile / openPR directly so the state updates use the
+  // current mount's setters synchronously. The authenticated
+  // branch still routes through navigateToHash (which awaits
+  // setCurrentRepo, then resolves the PR via the pendingPRRoute
+  // effect above).
+  useEffect(() => {
     if (window.location.hash) {
       const route = parseHash(window.location.hash);
       if (route.type !== "none" && githubToken) {
         navigateToHash(window.location.hash);
-      } else if (route.type !== "none" && isDemoMode && route.type === "file") {
-        // Demo mode file navigation
-        const route = parseHash(window.location.hash);
-        if (route.filePath) {
+      } else if (route.type !== "none" && isDemoMode) {
+        if (route.type === "file" && route.filePath) {
           const mockFile = findFile(mockFiles, route.filePath);
           if (mockFile) {
             openFile(mockFile);
+          }
+        } else if (route.type === "pr" && route.prNumber) {
+          const mockPR = prList.find((p) => p.number === route.prNumber);
+          if (mockPR) {
+            openPR(mockPR);
           }
         }
       }
     }
 
     const onHashChange = () => {
-      // If the current hash matches what we just wrote, we triggered
-      // this event ourselves — ignore it. Only act on user navigation.
       if (window.location.hash === lastWrittenHash.current) return;
       navigateToHash(window.location.hash);
     };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
-  }, [githubToken, isDemoMode, navigateToHash, openFile]);
+  }, [githubToken, isDemoMode, navigateToHash, openFile, openPR, prList]);
 
   // Refresh the current repo
   const refreshRepo = useCallback(async () => {
