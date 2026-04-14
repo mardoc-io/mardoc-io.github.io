@@ -113,14 +113,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isEmbedded) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      const isCopyShortcut = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c";
-      if (!isCopyShortcut) return;
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed) return;
-      const ok = document.execCommand("copy");
-      if (ok) {
+      const key = e.key.toLowerCase();
+      const isModified = e.metaKey || e.ctrlKey;
+      if (!isModified) return;
+
+      // Cmd+C: copy the current selection synchronously using
+      // execCommand before the webview shell's own clipboard
+      // handling can clear the iframe's selection.
+      if (key === "c") {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed) return;
+        const ok = document.execCommand("copy");
+        if (ok) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        return;
+      }
+
+      // Cmd+W: VS Code's keybinding-for-webview path is flaky for
+      // close-editor commands (the webview focus scope swallows the
+      // shortcut regardless of the `when` clause). Bridge it via
+      // postMessage instead — the extension host's setupPanel
+      // listener disposes the specific panel on receipt of a
+      // `close-panel` message.
+      if (key === "w") {
         e.preventDefault();
         e.stopPropagation();
+        try {
+          window.parent.postMessage({ type: "close-panel" }, "*");
+        } catch {
+          // parent may be cross-origin-restricted; swallow silently.
+        }
+        return;
       }
     };
     document.addEventListener("keydown", onKeyDown, true);

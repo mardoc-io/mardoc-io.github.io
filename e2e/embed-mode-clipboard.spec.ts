@@ -91,4 +91,43 @@ test.describe("Embed mode: clipboard", () => {
     const clipText = await page.evaluate(() => navigator.clipboard.readText());
     expect(clipText).toContain(sentinel);
   });
+
+  test("Cmd+W in embed mode posts a close-panel message to the parent", async ({
+    page,
+  }) => {
+    // Guards the app-side Cmd+W bridge: in embed mode the app
+    // intercepts Cmd+W, preventDefaults to stop VS Code's webview
+    // focus scope from swallowing it, and posts
+    // { type: 'close-panel' } to window.parent so the VS Code
+    // extension host can dispose the specific panel. Playwright's
+    // window.parent === window, so we can listen on window itself.
+    await page.goto("/?embed=true");
+    await waitForHydration(page);
+
+    // Install a capture listener before pressing the key.
+    await page.evaluate(() => {
+      (window as unknown as { __closePanelCaptured: unknown }).__closePanelCaptured = null;
+      window.addEventListener("message", (e: MessageEvent) => {
+        if (e.data && typeof e.data === "object" && (e.data as { type?: string }).type === "close-panel") {
+          (window as unknown as { __closePanelCaptured: unknown }).__closePanelCaptured = e.data;
+        }
+      });
+    });
+
+    // Focus the document so keydown listener is active
+    await page.locator("body").click();
+    await page.keyboard.press("ControlOrMeta+w");
+
+    // Poll for the message — postMessage is async, the listener runs
+    // in a microtask after preventDefault returns.
+    await expect
+      .poll(async () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __closePanelCaptured: unknown }).__closePanelCaptured
+        ),
+        { timeout: 2_000 }
+      )
+      .toEqual({ type: "close-panel" });
+  });
 });
