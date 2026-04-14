@@ -90,6 +90,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Embed-mode Cmd+C fix.
+  //
+  // When MarDoc runs inside the VS Code extension's webview, the
+  // parent shell's clipboard handling interferes with the browser's
+  // native Cmd+C path: VS Code dispatches its own clipboard command
+  // against the outer webview document (which has no selection
+  // because the selection lives inside our cross-origin iframe),
+  // and as a side effect the iframe's text selection is cleared
+  // between the two keydown firings the iframe sees for a single
+  // Cmd+C press. By the time the browser would fire its native
+  // `copy` event, there is nothing to copy — so the clipboard
+  // stays empty and the user sees "Cmd+C does nothing".
+  //
+  // Fix: in embed mode only, attach a capture-phase keydown
+  // listener that intercepts the first Cmd+C while the selection
+  // is still intact, runs execCommand('copy') synchronously (which
+  // writes the current selection to the clipboard — verified to
+  // work inside the webview iframe), and preventDefault()s so the
+  // parent shell's subsequent handling can't clobber what we just
+  // copied. Has no effect outside embed mode.
+  useEffect(() => {
+    if (!isEmbedded) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isCopyShortcut = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c";
+      if (!isCopyShortcut) return;
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed) return;
+      const ok = document.execCommand("copy");
+      if (ok) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [isEmbedded]);
+
   // Auth state — server-safe defaults, hydrated in useEffect
   const [githubToken, setGithubTokenState] = useState<string | null>(null);
   const [isDemoMode, setIsDemoMode] = useState(true);
