@@ -121,3 +121,51 @@ test.describe("Navigation: opening a PR from the sidebar", () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 });
+
+test.describe("Navigation: hash-based deep links", () => {
+  // Regression guard for a bug where opening a PR URL directly
+  // (https://mardoc.app/#/owner/repo/pull/N) showed the welcome
+  // screen instead of the PR. The root cause was a stale-closure
+  // bug in navigateToHash's PR lookup, plus the initial-hash effect
+  // short-circuiting demo mode to file routes only. Both paths now
+  // flow through navigateToHash which resolves PRs synchronously if
+  // they are already in prList (demo mode) and via a pending-pr
+  // effect if not (authenticated deep links).
+  //
+  // Demo mode ships with a "Add architecture overview as HTML
+  // document" PR at #37. Any valid owner/repo prefix resolves
+  // because demo mode does not validate the repo name against
+  // mock data.
+
+  test("deep link /#/owner/repo/pull/N opens the PR directly", async ({ page }) => {
+    await page.goto("/#/mardoc/demo/pull/37");
+    await waitForHydration(page);
+    // The PR header has an Approve button — that proves the PR view
+    // rendered instead of the welcome screen.
+    await expect(
+      page.locator("button", { hasText: /^Approve$/ }).first()
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("deep link to a non-existent PR falls back to welcome without crashing", async ({ page }) => {
+    await page.goto("/#/mardoc/demo/pull/99999");
+    await waitForHydration(page);
+    // No PR matches — the app should stay on the welcome screen,
+    // not show a blank page or crash. We assert the welcome copy is
+    // visible which also proves the app hydrated successfully.
+    await expect(
+      page.getByText(/Welcome to/i).locator("visible=true").first()
+    ).toBeVisible({ timeout: 5_000 });
+  });
+
+  test("deep link /#/owner/repo/blob/branch/file.md opens the file", async ({ page }) => {
+    await page.goto("/#/mardoc/demo/blob/main/README.md");
+    await waitForHydration(page);
+    // The ProseMirror editor surface is visible when the file loads
+    await expect(page.locator(".ProseMirror")).toBeVisible({ timeout: 10_000 });
+    // And the README's h1 text renders
+    await expect(
+      page.locator(".ProseMirror h1").first()
+    ).toBeVisible();
+  });
+});
