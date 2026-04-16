@@ -471,6 +471,8 @@ export const pullRequests: PullRequest[] = [
 
 Welcome to the **mardoc.app** — a collaborative markdown workspace backed by GitHub.
 
+![Architecture overview](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCI+PHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjMDBmIi8+PC9zdmc+)
+
 ## Installation
 
 To get started, clone the repository and install dependencies:
@@ -505,6 +507,8 @@ The application uses a modern React stack with Next.js for server-side rendering
         headContent: `# Getting Started
 
 Welcome to the **mardoc.app** — a collaborative markdown workspace backed by GitHub.
+
+![Architecture overview](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCI+PHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjMDBmIi8+PC9zdmc+)
 
 ## Prerequisites
 
