@@ -1055,6 +1055,26 @@ export async function commitBase64FileToBranch(
 // Lookup map for image metadata — survives TipTap stripping data attributes
 const imageMetaMap = new Map<string, { owner: string; repo: string; ref: string; path: string }>();
 
+// Cache of raw.githubusercontent.com URL → data: URI for images already
+// fetched via loadAuthenticatedImages. When rewriteImageUrls runs on a
+// re-render (e.g. comment state change regenerates innerHTML), it emits
+// the cached data URI so the HTML string is byte-identical to the prior
+// render, React's dangerouslySetInnerHTML diff skips DOM replacement, and
+// the browser doesn't re-decode the image. Without this cache, every
+// comment state change flashed the image: raw URL → brief blank → refetch.
+const imageDataUriCache = new Map<string, string>();
+
+/** Test helper: reset caches so unit tests don't leak state between cases. */
+export function __resetImageCachesForTests(): void {
+  imageMetaMap.clear();
+  imageDataUriCache.clear();
+}
+
+/** Test helper: preload the data URI cache to simulate a warm cache. */
+export function __setImageDataUriForTests(rawUrl: string, dataUri: string): void {
+  imageDataUriCache.set(rawUrl, dataUri);
+}
+
 export function rewriteImageUrls(
   html: string,
   repoFullName: string,
@@ -1086,7 +1106,12 @@ export function rewriteImageUrls(
 
       const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${resolvedPath}`;
       imageMetaMap.set(rawUrl, { owner, repo, ref, path: resolvedPath });
-      return `${before}${rawUrl}" data-gh-owner="${owner}" data-gh-repo="${repo}" data-gh-ref="${ref}" data-gh-path="${resolvedPath}${after}`;
+      // Use cached data URI on re-renders so the emitted HTML is stable;
+      // data-gh-* attributes stay attached so the loader can still find
+      // the image on a cache miss.
+      const cachedUri = imageDataUriCache.get(rawUrl);
+      const emittedSrc = cachedUri ?? rawUrl;
+      return `${before}${emittedSrc}" data-gh-owner="${owner}" data-gh-repo="${repo}" data-gh-ref="${ref}" data-gh-path="${resolvedPath}${after}`;
     }
   );
 }
@@ -1102,10 +1127,16 @@ export async function loadAuthenticatedImages(
   const octokit = getOctokit();
   if (!octokit) return;
 
-  // Match images with data attributes OR raw.githubusercontent.com URLs
-  const imgs = container.querySelectorAll<HTMLImageElement>(
-    'img[data-gh-path], img[src*="raw.githubusercontent.com"]'
-  );
+  // Match images with data attributes OR raw.githubusercontent.com URLs.
+  // Skip data: URIs — those are already loaded (either from a prior run
+  // or from the cache in rewriteImageUrls). This is the per-DOM guard
+  // that stops redundant octokit fetches on re-runs; the HTML-level
+  // cache in rewriteImageUrls stops DOM replacement in the first place.
+  const imgs = Array.from(
+    container.querySelectorAll<HTMLImageElement>(
+      'img[data-gh-path], img[src*="raw.githubusercontent.com"]'
+    )
+  ).filter((img) => !img.src.startsWith("data:"));
   if (imgs.length === 0) return;
 
   const mimeTypes: Record<string, string> = {
@@ -1115,7 +1146,7 @@ export async function loadAuthenticatedImages(
   };
 
   const results = await Promise.allSettled(
-    Array.from(imgs).map(async (img) => {
+    imgs.map(async (img) => {
       // Try data attributes first (preserved in dangerouslySetInnerHTML)
       let owner = img.dataset.ghOwner;
       let repo = img.dataset.ghRepo;
@@ -1131,6 +1162,10 @@ export async function loadAuthenticatedImages(
 
       if (!owner || !repo || !ref || !path) return;
 
+      // Remember the raw URL for cache key — the img.src will be
+      // mutated below, so capture it before the swap.
+      const rawUrl = img.src;
+
       const { data } = await octokit.repos.getContent({
         owner, repo, path, ref,
       });
@@ -1138,11 +1173,19 @@ export async function loadAuthenticatedImages(
       if ("content" in data && data.encoding === "base64") {
         const ext = path.split(".").pop()?.toLowerCase() || "png";
         const mime = mimeTypes[ext] || "application/octet-stream";
+        const dataUri = `data:${mime};base64,${data.content.replace(/\n/g, "")}`;
         // Preserve original src for round-trip back to markdown
         if (!img.getAttribute("data-original-src")) {
           img.setAttribute("data-original-src", img.src);
         }
-        img.src = `data:${mime};base64,${data.content.replace(/\n/g, "")}`;
+        img.src = dataUri;
+        // Only cache when the key is a raw.githubusercontent URL (it is
+        // when we reached this branch via the data-gh-path selector).
+        // Caching on a non-raw key would leak arbitrary srcs as cache
+        // keys without a matching rewriter check.
+        if (rawUrl.includes("raw.githubusercontent.com")) {
+          imageDataUriCache.set(rawUrl, dataUri);
+        }
       }
       return img;
     })
@@ -1151,10 +1194,9 @@ export async function loadAuthenticatedImages(
   // Mark failed images with a broken-image class so CSS can show a
   // placeholder instead of a silent broken thumbnail. Uses a stable
   // class name that globals.css styles with an icon + hover tooltip.
-  const imgArray = Array.from(imgs);
   results.forEach((result, i) => {
     if (result.status === "rejected") {
-      const img = imgArray[i];
+      const img = imgs[i];
       img.classList.add("mardoc-image-failed");
       img.setAttribute("alt", img.getAttribute("alt") || "Failed to load image");
       img.setAttribute(
