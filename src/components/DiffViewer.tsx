@@ -79,6 +79,39 @@ function blockToHtml(block: string): string {
   return highlightCodeBlocks(blockToHtmlRaw(block));
 }
 
+// ─── Memoized dangerouslySetInnerHTML wrapper ─────────────────────────────
+//
+// React 18 re-applies innerHTML on every re-render when the
+// dangerouslySetInnerHTML prop is an inline object literal — the
+// reconciler in updateProperties compares props by reference
+// (`_nextProp !== _lastProp`), and `{__html: "..."}` literals never
+// pass that check. setProp → setInnerHTML$1 then runs unconditionally.
+//
+// For post-render DOM mutations (mermaid SVG, syntax highlighting
+// overlays, fetched-image data: URIs) that's destructive: the
+// mutation is wiped on any unrelated re-render (e.g. a sibling state
+// change). Wrapping the block in React.memo with just the html
+// string as a prop hits `updateHostComponent`'s
+// `oldProps === newProps` bailout, so the div is never re-committed
+// and the mutation survives.
+const MarkdownBlock = React.memo(function MarkdownBlock({
+  html,
+  className,
+  onClick,
+}: {
+  html: string;
+  className?: string;
+  onClick?: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <div
+      className={className}
+      dangerouslySetInnerHTML={{ __html: html }}
+      onClick={onClick}
+    />
+  );
+});
+
 // ─── Floating Selection Toolbar ────────────────────────────────────────────
 
 function FloatingToolbar({
@@ -231,9 +264,9 @@ export default function DiffViewer({
   const htmlIframeRef = useRef<HTMLIFrameElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
   // Post-render: fetch private repo images and render mermaid diagrams (markdown only).
-  // Must re-run when comments change because renderBlockHtml injects highlight marks,
-  // which causes React to replace the dangerouslySetInnerHTML DOM — wiping any
-  // previously rendered mermaid SVGs.
+  // Re-runs when comments change because renderBlockHtml injects highlight marks for
+  // commented ranges; when those marks shift, MarkdownBlock's memo bailout misses and
+  // the DOM is re-committed, so we need to re-render mermaid for the affected blocks.
   useEffect(() => {
     if (!contentRef.current || fileIsHtml) return;
     loadAuthenticatedImages(contentRef.current);
@@ -1025,11 +1058,9 @@ export default function DiffViewer({
                   <div key={idx} className="group relative mb-1">
                     {/* Block content with highlighted selections */}
                     {block.type === "unchanged" && (
-                      <div
+                      <MarkdownBlock
                         className="rendered-block diff-content"
-                        dangerouslySetInnerHTML={{
-                          __html: renderBlockHtml(headBlockToHtml(block.headText)),
-                        }}
+                        html={renderBlockHtml(headBlockToHtml(block.headText))}
                         onClick={handleMarkClick}
                       />
                     )}
@@ -1039,10 +1070,8 @@ export default function DiffViewer({
                         <div className="flex items-center gap-1 text-xs text-[var(--diff-add-text)] font-medium mb-1">
                           <Plus size={12} /> Added
                         </div>
-                        <div
-                          dangerouslySetInnerHTML={{
-                            __html: renderBlockHtml(headBlockToHtml(block.headText)),
-                          }}
+                        <MarkdownBlock
+                          html={renderBlockHtml(headBlockToHtml(block.headText))}
                           onClick={handleMarkClick}
                         />
                       </div>
@@ -1053,10 +1082,8 @@ export default function DiffViewer({
                         <div className="flex items-center gap-1 text-xs text-[var(--diff-remove-text)] font-medium mb-1">
                           <X size={12} /> Removed
                         </div>
-                        <div
-                          dangerouslySetInnerHTML={{
-                            __html: renderBlockHtml(baseBlockToHtml(block.baseText)),
-                          }}
+                        <MarkdownBlock
+                          html={renderBlockHtml(baseBlockToHtml(block.baseText))}
                         />
                       </div>
                     )}
@@ -1066,13 +1093,11 @@ export default function DiffViewer({
                         <div className="flex items-center gap-1 text-xs text-[var(--accent)] font-medium mb-1">
                           Modified
                         </div>
-                        <div
+                        <MarkdownBlock
                           className="text-sm leading-relaxed"
-                          dangerouslySetInnerHTML={{
-                            __html: renderBlockHtml(
-                              headBlockToHtml(block.diffHtml || block.headText)
-                            ),
-                          }}
+                          html={renderBlockHtml(
+                            headBlockToHtml(block.diffHtml || block.headText)
+                          )}
                           onClick={handleMarkClick}
                         />
                       </div>
@@ -1100,10 +1125,10 @@ export default function DiffViewer({
                   </div>
                   <div className="p-6 diff-content">
                     {parseBlocks(file.baseContent).map((block, idx) => (
-                      <div
+                      <MarkdownBlock
                         key={idx}
                         className="mb-1"
-                        dangerouslySetInnerHTML={{ __html: renderBlockHtml(baseBlockToHtml(block)) }}
+                        html={renderBlockHtml(baseBlockToHtml(block))}
                         onClick={handleMarkClick}
                       />
                     ))}
@@ -1115,10 +1140,10 @@ export default function DiffViewer({
                   </div>
                   <div className="p-6 diff-content">
                     {parseBlocks(file.headContent).map((block, idx) => (
-                      <div
+                      <MarkdownBlock
                         key={idx}
                         className="mb-1"
-                        dangerouslySetInnerHTML={{ __html: renderBlockHtml(headBlockToHtml(block)) }}
+                        html={renderBlockHtml(headBlockToHtml(block))}
                         onClick={handleMarkClick}
                       />
                     ))}
@@ -1190,13 +1215,13 @@ export default function DiffViewer({
                           )}
                         </div>
                       )}
-                      <div
+                      <MarkdownBlock
                         className="rendered-block diff-content"
-                        dangerouslySetInnerHTML={{
-                          __html: hasSuggestion
+                        html={
+                          hasSuggestion
                             ? headBlockToHtml(suggestionForBlock!.editedMarkdown)
-                            : headBlockToHtml(block),
-                        }}
+                            : headBlockToHtml(block)
+                        }
                       />
                       {!hasSuggestion && (
                         <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1270,12 +1295,10 @@ export default function DiffViewer({
                   {previewBlocks.map((block, idx) => {
                     const hasSuggestion = showSuggestionsInPreview && allSuggestions.some((s) => s.blockIndex === idx);
                     return (
-                      <div
+                      <MarkdownBlock
                         key={idx}
                         className={`rendered-block mb-1 ${hasSuggestion ? "border-l-2 border-[var(--accent)] pl-3 bg-[var(--accent-muted)] rounded-r" : ""}`}
-                        dangerouslySetInnerHTML={{
-                          __html: renderBlockHtml(headBlockToHtml(block)),
-                        }}
+                        html={renderBlockHtml(headBlockToHtml(block))}
                         onClick={handleMarkClick}
                       />
                     );
