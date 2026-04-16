@@ -84,7 +84,16 @@ async function readDiffImageState(page: Page) {
 test.describe("PR mode — image stability across comment state changes", () => {
   test("diff image src is preserved across a view-mode round-trip", async ({
     page,
+    viewport,
   }) => {
+    // The "Side by Side" toggle is `hidden md:block` — desktop only.
+    // The companion selection-based test exercises the same invariant
+    // on mobile with a re-render trigger that actually exists there.
+    test.skip(
+      !viewport || viewport.width < 768,
+      "Side by Side toggle is hidden below md breakpoint"
+    );
+
     // The getting-started PR fixture includes an architecture overview
     // image in both base and head content.
     await openPullRequest(page, /getting started guide/i);
