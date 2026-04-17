@@ -2,21 +2,27 @@
  * Regression for the VS Code embed `__local__` image bug.
  *
  * When a file is opened via the VS Code extension (drag-drop or the
- * "open folder" flow), `applyInitData` in app-context prefixes the
- * workspace-relative path with `__local__/` as an app-internal
- * marker to distinguish local-file scope from GitHub-repo scope.
+ * "open folder" flow), `applyInitData` in app-context prepends a
+ * `__local__/` scope marker to the workspace-relative path to
+ * distinguish local-file scope from GitHub-repo scope in the draft
+ * store. The marker is purely an app concept — it is NOT a real
+ * directory on disk.
  *
- * That prefix is purely an app concept — it's not a real directory
- * on the user's filesystem. Before this fix, loadEmbedLocalImages
- * passed the prefix through to resolvePath, and then on to the
- * extension via requestEmbedImage, so a markdown file like
+ * Before this fix, loadEmbedLocalImages passed the prefix straight
+ * through to resolvePath and then on to the extension via
+ * requestEmbedImage. A markdown file like
  *   `__local__/docs/guide.md`  referencing  `./images/arch.png`
  * asked the extension for `__local__/docs/images/arch.png` — which
- * the extension can't find, and the image renders as broken.
+ * is not a real path on disk, so the image rendered broken.
  *
  * The fix strips the `__local__/` prefix from currentFilePath before
  * resolving, so the extension receives the real workspace-relative
  * path (`docs/images/arch.png`).
+ *
+ * A companion fix in Editor.tsx gates `rewriteImageUrls` on
+ * `!filePath.startsWith("__local__/")`. Local files leave their
+ * <img src> relative and this loader handles them; only GitHub-backed
+ * files get rewritten to raw.githubusercontent.com.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
@@ -26,41 +32,10 @@ vi.mock("@/lib/embed-image-bridge", () => ({
     .mockResolvedValue({ data: "QUFBQQ==", mimeType: "image/png" }),
 }));
 
-import { loadEmbedLocalImages, rewriteImageUrls } from "@/lib/github-api";
+import { loadEmbedLocalImages } from "@/lib/github-api";
 import { requestEmbedImage } from "@/lib/embed-image-bridge";
 
 const mockedRequest = requestEmbedImage as unknown as ReturnType<typeof vi.fn>;
-
-describe("rewriteImageUrls — __local__ path handling", () => {
-  it("strips the __local__/ prefix before building the raw.githubusercontent URL", () => {
-    // A file opened via the VS Code extension from a git repo has the
-    // `__local__/` scope marker prepended to its path but ALSO has
-    // owner/repo/branch context. rewriteImageUrls was baking the
-    // prefix into the URL → 404 on GitHub.
-    const out = rewriteImageUrls(
-      '<img src="docs/images/mvp-final-state.png" alt="arch">',
-      "Cloudzero/feature-ai-collector-macos",
-      "main",
-      "__local__/README.md"
-    );
-    expect(out).toContain(
-      'src="https://raw.githubusercontent.com/Cloudzero/feature-ai-collector-macos/main/docs/images/mvp-final-state.png"'
-    );
-    expect(out).not.toContain("__local__");
-  });
-
-  it("resolves relative paths correctly when currentFilePath is nested under __local__/", () => {
-    const out = rewriteImageUrls(
-      '<img src="../assets/logo.png">',
-      "acme/repo",
-      "main",
-      "__local__/docs/guide/intro.md"
-    );
-    expect(out).toContain(
-      'src="https://raw.githubusercontent.com/acme/repo/main/docs/assets/logo.png"'
-    );
-  });
-});
 
 describe("loadEmbedLocalImages — __local__ path handling", () => {
   const originalParent = Object.getOwnPropertyDescriptor(window, "parent");

@@ -189,7 +189,13 @@ function markdownToHtml(md: string, repoFullName?: string, branch?: string, file
   // <div align="center"><img></div> structure.
   let html = transformGitHubAlerts(showdownConverter.makeHtml(transformFootnotes(md)));
   html = unwrapCenteredImages(html);
-  if (repoFullName && branch && filePath) {
+  // Files opened via the VS Code extension carry a `__local__/` scope
+  // marker prepended by applyInitData. Those live on the user's disk,
+  // not on GitHub, so rewriting to raw.githubusercontent.com would
+  // produce a dead URL (and leak the scope marker into it). Leave the
+  // <img src> relative — loadEmbedLocalImages will resolve it against
+  // the workspace and ask the extension to read the bytes.
+  if (repoFullName && branch && filePath && !filePath.startsWith("__local__/")) {
     return rewriteImageUrls(html, repoFullName, branch, filePath);
   }
   return html;
@@ -886,7 +892,7 @@ export default function Editor({ content, onContentChange, filePath, repoFullNam
       let rawHtml = unwrapCenteredImages(
         transformGitHubAlerts(showdownConverter.makeHtml(transformFootnotes(codeContent)))
       );
-      if (repoFullName && branch && filePath) {
+      if (repoFullName && branch && filePath && !filePath.startsWith("__local__/")) {
         rawHtml = rewriteImageUrls(rawHtml, repoFullName, branch, filePath);
       }
       const html = await preRenderMermaid(rawHtml);
