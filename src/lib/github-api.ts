@@ -1228,6 +1228,13 @@ export async function loadEmbedLocalImages(
 ): Promise<void> {
   if (typeof window === "undefined" || window.parent === window) return;
 
+  // `__local__/` is an app-internal scope marker prepended by
+  // applyInitData for files opened via the VS Code extension. It's
+  // not a real directory on the user's filesystem, so strip it before
+  // resolving — otherwise the extension is asked for
+  // `__local__/docs/images/arch.png` and the read fails.
+  const workspaceFilePath = currentFilePath.replace(/^__local__\//, "");
+
   const IMAGE_MIME: Record<string, string> = {
     png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
     gif: "image/gif", svg: "image/svg+xml", webp: "image/webp",
@@ -1255,7 +1262,7 @@ export async function loadEmbedLocalImages(
   const results = await Promise.allSettled(
     candidates.map(async (img) => {
       const src = img.getAttribute("src") || "";
-      const resolved = resolvePath(currentFilePath, src);
+      const resolved = resolvePath(workspaceFilePath, src);
       const { data, mimeType } = await requestEmbedImage(resolved);
       // Prefer the mimeType from the extension; fall back to the
       // file extension in case the extension doesn't set one.
