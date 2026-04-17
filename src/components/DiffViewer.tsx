@@ -402,11 +402,20 @@ export default function DiffViewer({
     }));
   }, [comments]);
 
-  // Auto-show panel when there are comments
+  // Auto-show the panel on the 0→N transition — initial mount when a
+  // PR already has unresolved comments, or later when a new comment
+  // lands in a previously-empty thread. Guarded against same-count
+  // updates: `mergeFreshComments` returns a fresh array every 30s
+  // poll tick, and without this ref the user couldn't close the
+  // panel — the next tick's comments-reference change would reopen
+  // it even when the unresolved set was identical.
+  const prevHadUnresolvedRef = useRef(false);
   useEffect(() => {
-    if (allPanelComments.filter((c) => !c.resolved).length > 0) {
+    const hasUnresolved = allPanelComments.some((c) => !c.resolved);
+    if (hasUnresolved && !prevHadUnresolvedRef.current) {
       setShowPanel(true);
     }
+    prevHadUnresolvedRef.current = hasUnresolved;
   }, [allPanelComments]);
 
   // Focus input when pending selection is set
