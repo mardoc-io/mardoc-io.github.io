@@ -255,7 +255,7 @@ Generate a new token following the steps above, then update it in mardoc.app Set
 
 ---
 
-*Need help? Open an issue at [github.com/mardoc-io/mardoc-io.github.io](https://github.com/mardoc-io/mardoc-io.github.io/issues).*
+*Need help? Open an issue at [github.com/mardoc-app/mardoc-app.github.io](https://github.com/mardoc-app/mardoc-app.github.io/issues).*
 `,
       },
       {

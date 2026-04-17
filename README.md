@@ -86,8 +86,8 @@ Visit [mardoc.app](https://mardoc.app) in demo mode and explore sample repos and
 ## Run locally
 
 ```bash
-git clone https://github.com/mardoc-io/mardoc-io.github.io.git
-cd mardoc-io.github.io
+git clone https://github.com/mardoc-app/mardoc-app.github.io.git
+cd mardoc-app.github.io
 npm install
 npm run dev
 ```
@@ -121,4 +121,4 @@ See [elastic.co/licensing/elastic-license](https://www.elastic.co/licensing/elas
 
 Pull requests are welcome. The project uses the feature-sliced delivery style in `docs/features/` — one markdown file per story, moved to `docs/features/done/` on ship. Tests are non-negotiable: every new behavior gets unit-test coverage alongside the code. `npm test` and `npm run build` must both be clean before a PR merges.
 
-Bug reports and feature requests: [open an issue](https://github.com/mardoc-io/mardoc-io.github.io/issues).
+Bug reports and feature requests: [open an issue](https://github.com/mardoc-app/mardoc-app.github.io/issues).

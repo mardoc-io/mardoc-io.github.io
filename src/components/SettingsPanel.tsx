@@ -265,7 +265,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     type="text"
                     value={repoInput}
                     onChange={(e) => setRepoInput(e.target.value)}
-                    placeholder="e.g., mardoc-io/mardoc-io.github.io"
+                    placeholder="e.g., mardoc-app/mardoc-app.github.io"
                     className="flex-1 px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] font-mono"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleManualRepo();
