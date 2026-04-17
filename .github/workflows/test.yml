@@ -12,24 +12,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm audit --prod
+
   unit:
     name: Unit + component tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       - name: Run vitest (unit + component tests)
-        run: npm test
+        run: pnpm test
 
       - name: Verify static export builds
-        run: npx next build
+        run: pnpm exec next build
 
   e2e:
     name: E2E (Playwright)
@@ -38,22 +55,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
         # Install both chromium AND webkit — the mobile test project
         # uses the iPhone 14 device profile which launches webkit.
         # Without webkit, mobile tests fail with "Executable doesn't
         # exist at .../webkit-xxxx/pw_run.sh".
-        run: npx playwright install --with-deps chromium webkit
+        run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Build the app
-        run: npx next build
+        run: pnpm exec next build
 
       - name: Run Playwright e2e tests
-        run: npm run e2e
+        run: pnpm run e2e
