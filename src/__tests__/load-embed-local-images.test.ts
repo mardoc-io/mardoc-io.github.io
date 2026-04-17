@@ -26,10 +26,41 @@ vi.mock("@/lib/embed-image-bridge", () => ({
     .mockResolvedValue({ data: "QUFBQQ==", mimeType: "image/png" }),
 }));
 
-import { loadEmbedLocalImages } from "@/lib/github-api";
+import { loadEmbedLocalImages, rewriteImageUrls } from "@/lib/github-api";
 import { requestEmbedImage } from "@/lib/embed-image-bridge";
 
 const mockedRequest = requestEmbedImage as unknown as ReturnType<typeof vi.fn>;
+
+describe("rewriteImageUrls — __local__ path handling", () => {
+  it("strips the __local__/ prefix before building the raw.githubusercontent URL", () => {
+    // A file opened via the VS Code extension from a git repo has the
+    // `__local__/` scope marker prepended to its path but ALSO has
+    // owner/repo/branch context. rewriteImageUrls was baking the
+    // prefix into the URL → 404 on GitHub.
+    const out = rewriteImageUrls(
+      '<img src="docs/images/mvp-final-state.png" alt="arch">',
+      "Cloudzero/feature-ai-collector-macos",
+      "main",
+      "__local__/README.md"
+    );
+    expect(out).toContain(
+      'src="https://raw.githubusercontent.com/Cloudzero/feature-ai-collector-macos/main/docs/images/mvp-final-state.png"'
+    );
+    expect(out).not.toContain("__local__");
+  });
+
+  it("resolves relative paths correctly when currentFilePath is nested under __local__/", () => {
+    const out = rewriteImageUrls(
+      '<img src="../assets/logo.png">',
+      "acme/repo",
+      "main",
+      "__local__/docs/guide/intro.md"
+    );
+    expect(out).toContain(
+      'src="https://raw.githubusercontent.com/acme/repo/main/docs/assets/logo.png"'
+    );
+  });
+});
 
 describe("loadEmbedLocalImages — __local__ path handling", () => {
   const originalParent = Object.getOwnPropertyDescriptor(window, "parent");

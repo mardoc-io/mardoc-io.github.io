@@ -1082,7 +1082,13 @@ export function rewriteImageUrls(
   filePath: string
 ): string {
   const { owner, repo } = parseOwnerRepo(repoFullName);
-  const fileDir = filePath.split("/").slice(0, -1).join("/");
+  // Strip the `__local__/` scope marker — see loadEmbedLocalImages for
+  // background. Without this, a file opened via the VS Code extension
+  // gets its relative images rewritten to
+  //   https://raw.githubusercontent.com/owner/repo/ref/__local__/docs/...
+  // which is never a real object on GitHub.
+  const workspaceFilePath = filePath.replace(/^__local__\//, "");
+  const fileDir = workspaceFilePath.split("/").slice(0, -1).join("/");
 
   return html.replace(
     /(<img\s+[^>]*?src=")([^"]+)("[^>]*?>)/gi,
