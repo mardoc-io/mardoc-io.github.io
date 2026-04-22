@@ -79,6 +79,52 @@ function blockToHtml(block: string): string {
   return highlightCodeBlocks(blockToHtmlRaw(block));
 }
 
+// Decide whether two markdown blocks are plausibly an edit of each
+// other (as opposed to unrelated blocks the pair-matcher walked past
+// because neither's exact twin exists within 5 blocks).
+//
+// Without this gate, two prose blocks are treated as "compatible" by
+// a naive fence-only check, and greedy 1-to-1 word-diffing fuses
+// unrelated content: e.g. base `## Value\n<para>` paired with head
+// `## The reframe\n<para>` renders a single Modified block whose
+// heading reads "ValueThe reframe" and whose body interleaves base
+// and head sentences. The fix is to refuse word-diff when the
+// structural shape disagrees or the word-level overlap is too low,
+// and let the caller's widening/orphan path emit them as separate
+// Removed + Added blocks.
+function blocksArePlausibleEdit(a: string, b: string): boolean {
+  // Extract the leading structural token. Headings are compared at
+  // the level AND text-word-overlap layer because a heading rewrite
+  // is a common and legitimate edit, while two different headings
+  // at the same level are almost always unrelated sections.
+  const headingA = a.match(/^(#+)\s+(.*)$/m);
+  const headingB = b.match(/^(#+)\s+(.*)$/m);
+  if (headingA && headingB) {
+    if (headingA[1] !== headingB[1]) return false;
+    const wordsA = new Set(headingA[2].toLowerCase().match(/\w+/g) ?? []);
+    const wordsB = new Set(headingB[2].toLowerCase().match(/\w+/g) ?? []);
+    if (wordsA.size === 0 && wordsB.size === 0) return true;
+    const overlap = [...wordsA].filter((w) => wordsB.has(w)).length;
+    const union = new Set([...wordsA, ...wordsB]).size;
+    return union === 0 ? true : overlap / union >= 0.3;
+  }
+  // If exactly one is a heading, they're structurally different.
+  if (!!headingA !== !!headingB) return false;
+  // Prose/list/quote blocks: accept any block pair that shares
+  // enough unique words that a word-diff would be readable rather
+  // than a character-by-character salad. Jaccard threshold chosen
+  // so a typo fix (~95%) and a paragraph rewrite (~35%) pass but
+  // two unrelated paragraphs (~10%) don't.
+  const tokenize = (s: string): Set<string> =>
+    new Set(s.toLowerCase().match(/\w+/g) ?? []);
+  const wordsA = tokenize(a);
+  const wordsB = tokenize(b);
+  if (wordsA.size === 0 || wordsB.size === 0) return wordsA.size === wordsB.size;
+  const overlap = [...wordsA].filter((w) => wordsB.has(w)).length;
+  const union = new Set([...wordsA, ...wordsB]).size;
+  return overlap / union >= 0.3;
+}
+
 // ─── Memoized dangerouslySetInnerHTML wrapper ─────────────────────────────
 //
 // React 18 re-applies innerHTML on every re-render when the
@@ -592,9 +638,12 @@ export default function DiffViewer({
           // both sides (once as "removed", once as "added").
           const baseFence = baseBlocks[bi].match(/^```(\S*)/)?.[1];
           const headFence = headBlocks[hi].match(/^```(\S*)/)?.[1];
-          const compatible =
+          const fenceCompatible =
             (baseFence === undefined && headFence === undefined) ||
             (baseFence !== undefined && baseFence === headFence);
+          const compatible =
+            fenceCompatible &&
+            blocksArePlausibleEdit(baseBlocks[bi], headBlocks[hi]);
           if (!compatible) {
             const wideHead = headBlocks.slice(hi).indexOf(baseBlocks[bi]);
             const wideBase = baseBlocks.slice(bi).indexOf(headBlocks[hi]);
