@@ -581,14 +581,50 @@ export default function DiffViewer({
           }
           bi += baseLookAhead;
         } else {
-          result.push({
-            type: "modified",
-            baseText: baseBlocks[bi],
-            headText: headBlocks[hi],
-            diffHtml: computeWordDiff(baseBlocks[bi], headBlocks[hi]),
-          });
-          bi++;
-          hi++;
+          // Word-diffing across incompatible block shapes (e.g. a
+          // mermaid fence vs a prose paragraph) produces spans that
+          // straddle triple-backticks, which Showdown then parses as
+          // inline code spans and the whole block shatters. When the
+          // pair isn't homogeneous — both prose or both fenced with
+          // the same info string — widen the match window beyond the
+          // 5-block heuristic so a fenced block can re-align with its
+          // partner later in the stream instead of being orphaned on
+          // both sides (once as "removed", once as "added").
+          const baseFence = baseBlocks[bi].match(/^```(\S*)/)?.[1];
+          const headFence = headBlocks[hi].match(/^```(\S*)/)?.[1];
+          const compatible =
+            (baseFence === undefined && headFence === undefined) ||
+            (baseFence !== undefined && baseFence === headFence);
+          if (!compatible) {
+            const wideHead = headBlocks.slice(hi).indexOf(baseBlocks[bi]);
+            const wideBase = baseBlocks.slice(bi).indexOf(headBlocks[hi]);
+            if (wideHead > 0 && (wideBase === -1 || wideHead <= wideBase)) {
+              for (let i = 0; i < wideHead; i++) {
+                result.push({ type: "added", baseText: "", headText: headBlocks[hi + i] });
+              }
+              hi += wideHead;
+            } else if (wideBase > 0) {
+              for (let i = 0; i < wideBase; i++) {
+                result.push({ type: "removed", baseText: baseBlocks[bi + i], headText: "" });
+              }
+              bi += wideBase;
+            } else {
+              // Genuinely no matching partner anywhere — emit both.
+              result.push({ type: "removed", baseText: baseBlocks[bi], headText: "" });
+              result.push({ type: "added", baseText: "", headText: headBlocks[hi] });
+              bi++;
+              hi++;
+            }
+          } else {
+            result.push({
+              type: "modified",
+              baseText: baseBlocks[bi],
+              headText: headBlocks[hi],
+              diffHtml: computeWordDiff(baseBlocks[bi], headBlocks[hi]),
+            });
+            bi++;
+            hi++;
+          }
         }
       }
     }

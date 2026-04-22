@@ -503,9 +503,6 @@ npm run dev
 
 The application uses a modern React stack with Next.js for server-side rendering and TipTap for the editor component. The GitHub integration uses Octokit to interact with the GitHub API.
 
-` + "```mermaid\n" + `flowchart LR
-    U[User] --> M[mardoc.app]
-    M --> G[GitHub API]
 ` + "```\n\n" + `> **Note**: This is a prototype with mock data. GitHub integration will be added in a future release.`,
         headContent: `# Getting Started
 
