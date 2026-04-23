@@ -104,8 +104,10 @@ function blocksArePlausibleEdit(a: string, b: string): boolean {
     const wordsA = new Set(headingA[2].toLowerCase().match(/\w+/g) ?? []);
     const wordsB = new Set(headingB[2].toLowerCase().match(/\w+/g) ?? []);
     if (wordsA.size === 0 && wordsB.size === 0) return true;
-    const overlap = [...wordsA].filter((w) => wordsB.has(w)).length;
-    const union = new Set([...wordsA, ...wordsB]).size;
+    const arrA = Array.from(wordsA);
+    const arrB = Array.from(wordsB);
+    const overlap = arrA.filter((w) => wordsB.has(w)).length;
+    const union = new Set(arrA.concat(arrB)).size;
     return union === 0 ? true : overlap / union >= 0.3;
   }
   // If exactly one is a heading, they're structurally different.
@@ -120,8 +122,10 @@ function blocksArePlausibleEdit(a: string, b: string): boolean {
   const wordsA = tokenize(a);
   const wordsB = tokenize(b);
   if (wordsA.size === 0 || wordsB.size === 0) return wordsA.size === wordsB.size;
-  const overlap = [...wordsA].filter((w) => wordsB.has(w)).length;
-  const union = new Set([...wordsA, ...wordsB]).size;
+  const arrA = Array.from(wordsA);
+  const arrB = Array.from(wordsB);
+  const overlap = arrA.filter((w) => wordsB.has(w)).length;
+  const union = new Set(arrA.concat(arrB)).size;
   return overlap / union >= 0.3;
 }
 
