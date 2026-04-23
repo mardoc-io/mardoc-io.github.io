@@ -354,4 +354,16 @@ describe("computeWordDiff", () => {
     expect(html).toContain('<span class="diff-removed">');
     expect(html).toContain("gone soon");
   });
+
+  it("REGRESSION: keeps trailing newlines outside the diff span so fenced code delimiters stay on their own line", () => {
+    // If a removal swallows the trailing \n, the closing ``` ends up
+    // on the same line as </span> and Showdown stops recognising the
+    // fence — the block renders as inline code with literal
+    // `<span class="diff-removed">` text leaking through.
+    const base = "```bash\nnpm install\nnpm run dev\n```";
+    const head = "```bash\nnpm install\n```";
+    const html = computeWordDiff(base, head);
+    expect(html).not.toMatch(/\n<\/span>```/);
+    expect(html).toMatch(/<\/span>\n+```/);
+  });
 });
