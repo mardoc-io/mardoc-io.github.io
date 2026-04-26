@@ -158,9 +158,21 @@ export function computeWordDiff(oldText: string, newText: string): string {
   const changes = diffWords(oldText, newText);
   return changes
     .map((part) => {
-      if (part.added) return `<span class="diff-added">${part.value}</span>`;
-      if (part.removed) return `<span class="diff-removed">${part.value}</span>`;
-      return part.value;
+      if (!part.added && !part.removed) return part.value;
+      // Keep leading/trailing newlines outside the span so the diff
+      // marker never occupies the same line as a fenced-code delimiter
+      // (``` on its own line). Otherwise Showdown loses the fence and
+      // the whole block renders as inline code with a literal
+      // `<span class="diff-…">` visible to the reader.
+      const leading = part.value.match(/^\n+/)?.[0] ?? "";
+      const trailing = part.value.match(/\n+$/)?.[0] ?? "";
+      const core = part.value.slice(
+        leading.length,
+        part.value.length - trailing.length
+      );
+      if (!core) return part.value;
+      const cls = part.added ? "diff-added" : "diff-removed";
+      return `${leading}<span class="${cls}">${core}</span>${trailing}`;
     })
     .join("");
 }
@@ -174,13 +186,25 @@ export function computeSplitWordDiff(
   const headParts: string[] = [];
 
   for (const part of changes) {
-    if (part.added) {
-      headParts.push(`<span class="diff-added">${part.value}</span>`);
-    } else if (part.removed) {
-      baseParts.push(`<span class="diff-removed">${part.value}</span>`);
-    } else {
+    if (!part.added && !part.removed) {
       baseParts.push(part.value);
       headParts.push(part.value);
+    } else {
+      const leading = part.value.match(/^\n+/)?.[0] ?? "";
+      const trailing = part.value.match(/\n+$/)?.[0] ?? "";
+      const core = part.value.slice(
+        leading.length,
+        part.value.length - trailing.length
+      );
+      if (!core) {
+        if (part.added) headParts.push(part.value);
+        else baseParts.push(part.value);
+      } else {
+        const cls = part.added ? "diff-added" : "diff-removed";
+        const wrapped = `${leading}<span class="${cls}">${core}</span>${trailing}`;
+        if (part.added) headParts.push(wrapped);
+        else baseParts.push(wrapped);
+      }
     }
   }
 

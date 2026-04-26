@@ -1,4 +1,8 @@
 import { RepoFile, PullRequest } from "@/types";
+import {
+  PR_REGRESSION_REALISTIC_BASE,
+  PR_REGRESSION_REALISTIC_HEAD,
+} from "./pr-regression-realistic-fixture";
 
 const MOCK_HTML_DOC = `<!DOCTYPE html>
 <html lang="en">
@@ -503,9 +507,6 @@ npm run dev
 
 The application uses a modern React stack with Next.js for server-side rendering and TipTap for the editor component. The GitHub integration uses Octokit to interact with the GitHub API.
 
-` + "```mermaid\n" + `flowchart LR
-    U[User] --> M[mardoc.app]
-    M --> G[GitHub API]
 ` + "```\n\n" + `> **Note**: This is a prototype with mock data. GitHub integration will be added in a future release.`,
         headContent: `# Getting Started
 
@@ -791,6 +792,33 @@ The editor supports GitHub webhooks for real-time synchronization. Configure you
 ### Known Issues
 - GitHub API integration is mocked (coming in v0.2.0)
 - Real-time collaboration not yet supported`,
+      },
+    ],
+    comments: [],
+  },
+  {
+    // Regression fixture for PR #99 — captured from merged PR #74
+    // in this repo (docs/features/037-ai-page-translation.md). A
+    // realistic prose rewrite with multi-heading restructuring: the
+    // head inserts a whole new "The reframe" section and rewrites
+    // "Value". Exists to exercise the block-pair matcher against
+    // real-world content (the synthetic demo PRs all happen to
+    // align in ways real files don't).
+    id: "pr-regression-realistic",
+    number: 74,
+    title: "docs: rethink feature 037 — translations are files, not cache",
+    author: "joe.barnett",
+    status: "open",
+    createdAt: "2026-04-10T10:00:00Z",
+    baseBranch: "main",
+    headBranch: "docs/feature-037-rethink",
+    description: "Realistic prose rewrite regression fixture (captured from merged PR #74).",
+    files: [
+      {
+        path: "docs/features/037-ai-page-translation.md",
+        status: "modified",
+        baseContent: PR_REGRESSION_REALISTIC_BASE,
+        headContent: PR_REGRESSION_REALISTIC_HEAD,
       },
     ],
     comments: [],
