@@ -164,3 +164,25 @@ export function computeWordDiff(oldText: string, newText: string): string {
     })
     .join("");
 }
+
+export function computeSplitWordDiff(
+  oldText: string,
+  newText: string
+): { base: string; head: string } {
+  const changes = diffWords(oldText, newText);
+  const baseParts: string[] = [];
+  const headParts: string[] = [];
+
+  for (const part of changes) {
+    if (part.added) {
+      headParts.push(`<span class="diff-added">${part.value}</span>`);
+    } else if (part.removed) {
+      baseParts.push(`<span class="diff-removed">${part.value}</span>`);
+    } else {
+      baseParts.push(part.value);
+      headParts.push(part.value);
+    }
+  }
+
+  return { base: baseParts.join(""), head: headParts.join("") };
+}
