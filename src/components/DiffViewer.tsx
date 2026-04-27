@@ -21,6 +21,7 @@ import {
   Eye,
   Code,
   FileCode,
+  Hash,
 } from "lucide-react";
 import ContextMenu from "./ContextMenu";
 import { mapSelectionToLines, rewriteImageUrls, loadAuthenticatedImages, loadEmbedLocalImages } from "@/lib/github-api";
@@ -68,6 +69,8 @@ interface DiffBlock {
   diffHtml?: string;
   splitDiffBase?: string;
   splitDiffHead?: string;
+  baseLine?: number;
+  headLine?: number;
 }
 
 
@@ -91,6 +94,15 @@ function blockToHtml(block: string): string {
 // unrelated content: e.g. base `## Value\n<para>` paired with head
 // `## The reframe\n<para>` renders a single Modified block whose
 // heading reads "ValueThe reframe" and whose body interleaves base
+function LineGutter({ line }: { line?: number }) {
+  if (line == null) return null;
+  return (
+    <span className="line-gutter select-none text-[10px] font-mono text-[var(--text-muted)] opacity-60 mr-2 inline-block w-8 text-right shrink-0">
+      {line}
+    </span>
+  );
+}
+
 // and head sentences. The fix is to refuse word-diff when the
 // structural shape disagrees or the word-level overlap is too low,
 // and let the caller's widening/orphan path emit them as separate
@@ -283,6 +295,7 @@ export default function DiffViewer({
   const [htmlShowBase, setHtmlShowBase] = useState(false);
   const fileIsHtml = isHtmlFile(file.path);
   const [showPanel, setShowPanel] = useState(true);
+  const [showLineNumbers, setShowLineNumbers] = useState(false);
   const { wide, toggle: toggleWide } = useWideFormat();
   const { isEmbedded } = useApp();
   const isMobile = useIsMobile();
@@ -495,11 +508,16 @@ export default function DiffViewer({
     [repoFullName, headBranch, file.path]
   );
 
-  // Parsed head blocks with line ranges for suggest mode
+  // Parsed blocks with line ranges
   const headBlocks = useMemo(() => parseBlocks(file.headContent), [file.headContent]);
   const headBlockRanges = useMemo(
     () => computeBlockLineRanges(file.headContent, headBlocks),
     [file.headContent, headBlocks]
+  );
+  const baseBlocks = useMemo(() => parseBlocks(file.baseContent), [file.baseContent]);
+  const baseBlockRanges = useMemo(
+    () => computeBlockLineRanges(file.baseContent, baseBlocks),
+    [file.baseContent, baseBlocks]
   );
 
   // Suggest mode: start editing a block
@@ -602,83 +620,78 @@ export default function DiffViewer({
   }, [editingBlockIndex]);
 
   const diffBlocks = useMemo(() => {
-    const baseBlocks = parseBlocks(file.baseContent);
-    const headBlocks = parseBlocks(file.headContent);
+    const bBlocks = parseBlocks(file.baseContent);
+    const hBlocks = parseBlocks(file.headContent);
+    const bRanges = computeBlockLineRanges(file.baseContent, bBlocks);
+    const hRanges = computeBlockLineRanges(file.headContent, hBlocks);
     const result: DiffBlock[] = [];
     let bi = 0;
     let hi = 0;
 
-    while (bi < baseBlocks.length || hi < headBlocks.length) {
-      if (bi >= baseBlocks.length) {
-        result.push({ type: "added", baseText: "", headText: headBlocks[hi] });
+    while (bi < bBlocks.length || hi < hBlocks.length) {
+      if (bi >= bBlocks.length) {
+        result.push({ type: "added", baseText: "", headText: hBlocks[hi], headLine: hRanges[hi]?.startLine });
         hi++;
-      } else if (hi >= headBlocks.length) {
-        result.push({ type: "removed", baseText: baseBlocks[bi], headText: "" });
+      } else if (hi >= hBlocks.length) {
+        result.push({ type: "removed", baseText: bBlocks[bi], headText: "", baseLine: bRanges[bi]?.startLine });
         bi++;
-      } else if (baseBlocks[bi] === headBlocks[hi]) {
-        result.push({ type: "unchanged", baseText: baseBlocks[bi], headText: headBlocks[hi] });
+      } else if (bBlocks[bi] === hBlocks[hi]) {
+        result.push({ type: "unchanged", baseText: bBlocks[bi], headText: hBlocks[hi], baseLine: bRanges[bi]?.startLine, headLine: hRanges[hi]?.startLine });
         bi++;
         hi++;
       } else {
-        const headLookAhead = headBlocks.slice(hi, hi + 5).indexOf(baseBlocks[bi]);
-        const baseLookAhead = baseBlocks.slice(bi, bi + 5).indexOf(headBlocks[hi]);
+        const headLookAhead = hBlocks.slice(hi, hi + 5).indexOf(bBlocks[bi]);
+        const baseLookAhead = bBlocks.slice(bi, bi + 5).indexOf(hBlocks[hi]);
 
         if (headLookAhead > 0 && (baseLookAhead === -1 || headLookAhead <= baseLookAhead)) {
           for (let i = 0; i < headLookAhead; i++) {
-            result.push({ type: "added", baseText: "", headText: headBlocks[hi + i] });
+            result.push({ type: "added", baseText: "", headText: hBlocks[hi + i], headLine: hRanges[hi + i]?.startLine });
           }
           hi += headLookAhead;
         } else if (baseLookAhead > 0) {
           for (let i = 0; i < baseLookAhead; i++) {
-            result.push({ type: "removed", baseText: baseBlocks[bi + i], headText: "" });
+            result.push({ type: "removed", baseText: bBlocks[bi + i], headText: "", baseLine: bRanges[bi + i]?.startLine });
           }
           bi += baseLookAhead;
         } else {
-          // Word-diffing across incompatible block shapes (e.g. a
-          // mermaid fence vs a prose paragraph) produces spans that
-          // straddle triple-backticks, which Showdown then parses as
-          // inline code spans and the whole block shatters. When the
-          // pair isn't homogeneous — both prose or both fenced with
-          // the same info string — widen the match window beyond the
-          // 5-block heuristic so a fenced block can re-align with its
-          // partner later in the stream instead of being orphaned on
-          // both sides (once as "removed", once as "added").
-          const baseFence = baseBlocks[bi].match(/^```(\S*)/)?.[1];
-          const headFence = headBlocks[hi].match(/^```(\S*)/)?.[1];
+          const baseFence = bBlocks[bi].match(/^```(\S*)/)?.[1];
+          const headFence = hBlocks[hi].match(/^```(\S*)/)?.[1];
           const fenceCompatible =
             (baseFence === undefined && headFence === undefined) ||
             (baseFence !== undefined && baseFence === headFence);
           const compatible =
             fenceCompatible &&
-            blocksArePlausibleEdit(baseBlocks[bi], headBlocks[hi]);
+            blocksArePlausibleEdit(bBlocks[bi], hBlocks[hi]);
           if (!compatible) {
-            const wideHead = headBlocks.slice(hi).indexOf(baseBlocks[bi]);
-            const wideBase = baseBlocks.slice(bi).indexOf(headBlocks[hi]);
+            const wideHead = hBlocks.slice(hi).indexOf(bBlocks[bi]);
+            const wideBase = bBlocks.slice(bi).indexOf(hBlocks[hi]);
             if (wideHead > 0 && (wideBase === -1 || wideHead <= wideBase)) {
               for (let i = 0; i < wideHead; i++) {
-                result.push({ type: "added", baseText: "", headText: headBlocks[hi + i] });
+                result.push({ type: "added", baseText: "", headText: hBlocks[hi + i], headLine: hRanges[hi + i]?.startLine });
               }
               hi += wideHead;
             } else if (wideBase > 0) {
               for (let i = 0; i < wideBase; i++) {
-                result.push({ type: "removed", baseText: baseBlocks[bi + i], headText: "" });
+                result.push({ type: "removed", baseText: bBlocks[bi + i], headText: "", baseLine: bRanges[bi + i]?.startLine });
               }
               bi += wideBase;
             } else {
-              result.push({ type: "removed", baseText: baseBlocks[bi], headText: "" });
-              result.push({ type: "added", baseText: "", headText: headBlocks[hi] });
+              result.push({ type: "removed", baseText: bBlocks[bi], headText: "", baseLine: bRanges[bi]?.startLine });
+              result.push({ type: "added", baseText: "", headText: hBlocks[hi], headLine: hRanges[hi]?.startLine });
               bi++;
               hi++;
             }
           } else {
-            const split = computeSplitWordDiff(baseBlocks[bi], headBlocks[hi]);
+            const split = computeSplitWordDiff(bBlocks[bi], hBlocks[hi]);
             result.push({
               type: "modified",
-              baseText: baseBlocks[bi],
-              headText: headBlocks[hi],
-              diffHtml: computeWordDiff(baseBlocks[bi], headBlocks[hi]),
+              baseText: bBlocks[bi],
+              headText: hBlocks[hi],
+              diffHtml: computeWordDiff(bBlocks[bi], hBlocks[hi]),
               splitDiffBase: split.base,
               splitDiffHead: split.head,
+              baseLine: bRanges[bi]?.startLine,
+              headLine: hRanges[hi]?.startLine,
             });
             bi++;
             hi++;
@@ -898,6 +911,16 @@ export default function DiffViewer({
                 }`
               : "Comments"}
           </button>
+
+          {!fileIsHtml && (
+            <button
+              onClick={() => setShowLineNumbers(!showLineNumbers)}
+              className={`toolbar-btn ${showLineNumbers ? "active" : ""}`}
+              title={showLineNumbers ? "Hide line numbers" : "Show line numbers"}
+            >
+              <Hash size={14} />
+            </button>
+          )}
 
           <button
             onClick={toggleWide}
@@ -1158,8 +1181,17 @@ export default function DiffViewer({
                 </div>
 
                 {diffBlocks.map((block, idx) => (
-                  <div key={idx} className="group relative mb-1">
-                    {/* Block content with highlighted selections */}
+                  <div key={idx} className={`group relative mb-1 ${showLineNumbers ? "flex items-start" : ""}`}>
+                    {showLineNumbers && (
+                      <div className="pt-1 shrink-0">
+                        {(block.type === "removed") ? (
+                          <LineGutter line={block.baseLine} />
+                        ) : (
+                          <LineGutter line={block.headLine} />
+                        )}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
                     {block.type === "unchanged" && (
                       <MarkdownBlock
                         className="rendered-block diff-content"
@@ -1205,6 +1237,7 @@ export default function DiffViewer({
                         />
                       </div>
                     )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1236,26 +1269,35 @@ export default function DiffViewer({
                   <React.Fragment key={idx}>
                     {block.type === "unchanged" && (
                       <>
-                        <div className="p-4 border-r border-[var(--border)] diff-content">
-                          <MarkdownBlock
-                            html={renderBlockHtml(baseBlockToHtml(block.baseText))}
-                            onClick={handleMarkClick}
-                          />
+                        <div className="p-4 border-r border-[var(--border)] diff-content flex items-start">
+                          {showLineNumbers && <LineGutter line={block.baseLine} />}
+                          <div className="flex-1 min-w-0">
+                            <MarkdownBlock
+                              html={renderBlockHtml(baseBlockToHtml(block.baseText))}
+                              onClick={handleMarkClick}
+                            />
+                          </div>
                         </div>
-                        <div className="p-4 diff-content">
-                          <MarkdownBlock
-                            html={renderBlockHtml(headBlockToHtml(block.headText))}
-                            onClick={handleMarkClick}
-                          />
+                        <div className="p-4 diff-content flex items-start">
+                          {showLineNumbers && <LineGutter line={block.headLine} />}
+                          <div className="flex-1 min-w-0">
+                            <MarkdownBlock
+                              html={renderBlockHtml(headBlockToHtml(block.headText))}
+                              onClick={handleMarkClick}
+                            />
+                          </div>
                         </div>
                       </>
                     )}
                     {block.type === "removed" && (
                       <>
-                        <div className="p-4 border-r border-[var(--border)] bg-[var(--diff-remove)] diff-content">
-                          <MarkdownBlock
-                            html={renderBlockHtml(baseBlockToHtml(block.baseText))}
-                          />
+                        <div className="p-4 border-r border-[var(--border)] bg-[var(--diff-remove)] diff-content flex items-start">
+                          {showLineNumbers && <LineGutter line={block.baseLine} />}
+                          <div className="flex-1 min-w-0">
+                            <MarkdownBlock
+                              html={renderBlockHtml(baseBlockToHtml(block.baseText))}
+                            />
+                          </div>
                         </div>
                         <div className="p-4 border-r-0" />
                       </>
@@ -1263,26 +1305,35 @@ export default function DiffViewer({
                     {block.type === "added" && (
                       <>
                         <div className="p-4 border-r border-[var(--border)]" />
-                        <div className="p-4 bg-[var(--diff-add)] diff-content">
-                          <MarkdownBlock
-                            html={renderBlockHtml(headBlockToHtml(block.headText))}
-                            onClick={handleMarkClick}
-                          />
+                        <div className="p-4 bg-[var(--diff-add)] diff-content flex items-start">
+                          {showLineNumbers && <LineGutter line={block.headLine} />}
+                          <div className="flex-1 min-w-0">
+                            <MarkdownBlock
+                              html={renderBlockHtml(headBlockToHtml(block.headText))}
+                              onClick={handleMarkClick}
+                            />
+                          </div>
                         </div>
                       </>
                     )}
                     {block.type === "modified" && (
                       <>
-                        <div className="p-4 border-r border-[var(--border)] bg-[var(--diff-remove)] diff-content">
-                          <MarkdownBlock
-                            html={renderBlockHtml(baseBlockToHtml(block.splitDiffBase || block.baseText))}
-                          />
+                        <div className="p-4 border-r border-[var(--border)] bg-[var(--diff-remove)] diff-content flex items-start">
+                          {showLineNumbers && <LineGutter line={block.baseLine} />}
+                          <div className="flex-1 min-w-0">
+                            <MarkdownBlock
+                              html={renderBlockHtml(baseBlockToHtml(block.splitDiffBase || block.baseText))}
+                            />
+                          </div>
                         </div>
-                        <div className="p-4 bg-[var(--diff-add)] diff-content">
-                          <MarkdownBlock
-                            html={renderBlockHtml(headBlockToHtml(block.splitDiffHead || block.headText))}
-                            onClick={handleMarkClick}
-                          />
+                        <div className="p-4 bg-[var(--diff-add)] diff-content flex items-start">
+                          {showLineNumbers && <LineGutter line={block.headLine} />}
+                          <div className="flex-1 min-w-0">
+                            <MarkdownBlock
+                              html={renderBlockHtml(headBlockToHtml(block.splitDiffHead || block.headText))}
+                              onClick={handleMarkClick}
+                            />
+                          </div>
                         </div>
                       </>
                     )}
@@ -1434,12 +1485,18 @@ export default function DiffViewer({
                   {previewBlocks.map((block, idx) => {
                     const hasSuggestion = showSuggestionsInPreview && allSuggestions.some((s) => s.blockIndex === idx);
                     return (
-                      <MarkdownBlock
-                        key={idx}
-                        className={`rendered-block mb-1 ${hasSuggestion ? "border-l-2 border-[var(--accent)] pl-3 bg-[var(--accent-muted)] rounded-r" : ""}`}
-                        html={renderBlockHtml(headBlockToHtml(block))}
-                        onClick={handleMarkClick}
-                      />
+                      <div key={idx} className={`${showLineNumbers ? "flex items-start" : ""} mb-1`}>
+                        {showLineNumbers && (
+                          <div className="pt-1 shrink-0">
+                            <LineGutter line={headBlockRanges[idx]?.startLine} />
+                          </div>
+                        )}
+                        <MarkdownBlock
+                          className={`rendered-block flex-1 min-w-0 ${hasSuggestion ? "border-l-2 border-[var(--accent)] pl-3 bg-[var(--accent-muted)] rounded-r" : ""}`}
+                          html={renderBlockHtml(headBlockToHtml(block))}
+                          onClick={handleMarkClick}
+                        />
+                      </div>
                     );
                   })}
                 </div>
