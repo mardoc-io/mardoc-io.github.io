@@ -176,3 +176,37 @@ export function computeWordDiff(oldText: string, newText: string): string {
     })
     .join("");
 }
+
+export function computeSplitWordDiff(
+  oldText: string,
+  newText: string
+): { base: string; head: string } {
+  const changes = diffWords(oldText, newText);
+  const baseParts: string[] = [];
+  const headParts: string[] = [];
+
+  for (const part of changes) {
+    if (!part.added && !part.removed) {
+      baseParts.push(part.value);
+      headParts.push(part.value);
+    } else {
+      const leading = part.value.match(/^\n+/)?.[0] ?? "";
+      const trailing = part.value.match(/\n+$/)?.[0] ?? "";
+      const core = part.value.slice(
+        leading.length,
+        part.value.length - trailing.length
+      );
+      if (!core) {
+        if (part.added) headParts.push(part.value);
+        else baseParts.push(part.value);
+      } else {
+        const cls = part.added ? "diff-added" : "diff-removed";
+        const wrapped = `${leading}<span class="${cls}">${core}</span>${trailing}`;
+        if (part.added) headParts.push(wrapped);
+        else baseParts.push(wrapped);
+      }
+    }
+  }
+
+  return { base: baseParts.join(""), head: headParts.join("") };
+}

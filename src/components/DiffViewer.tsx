@@ -6,6 +6,7 @@ import {
   computeBlockLineRanges,
   blockToHtml as blockToHtmlRaw,
   computeWordDiff,
+  computeSplitWordDiff,
 } from "@/lib/diff-blocks";
 import { PRFile, PRComment, PendingSuggestion } from "@/types";
 import {
@@ -65,6 +66,8 @@ interface DiffBlock {
   baseText: string;
   headText: string;
   diffHtml?: string;
+  splitDiffBase?: string;
+  splitDiffHead?: string;
 }
 
 
@@ -662,18 +665,20 @@ export default function DiffViewer({
               }
               bi += wideBase;
             } else {
-              // Genuinely no matching partner anywhere — emit both.
               result.push({ type: "removed", baseText: baseBlocks[bi], headText: "" });
               result.push({ type: "added", baseText: "", headText: headBlocks[hi] });
               bi++;
               hi++;
             }
           } else {
+            const split = computeSplitWordDiff(baseBlocks[bi], headBlocks[hi]);
             result.push({
               type: "modified",
               baseText: baseBlocks[bi],
               headText: headBlocks[hi],
               diffHtml: computeWordDiff(baseBlocks[bi], headBlocks[hi]),
+              splitDiffBase: split.base,
+              splitDiffHead: split.head,
             });
             bi++;
             hi++;
@@ -1205,8 +1210,8 @@ export default function DiffViewer({
               </div>
             </div>
           ) : viewMode === "split" ? (
-            /* Split view — with commenting support */
-            <div className="relative h-full" ref={contentRef}>
+            /* Split view — single scroll, aligned rows, diff-colored */
+            <div className="relative h-full overflow-y-auto" ref={contentRef}>
               <FloatingToolbar
                 containerRef={contentRef}
                 onComment={handleSelectionComment}
@@ -1216,37 +1221,73 @@ export default function DiffViewer({
                 onComment={handleSelectionComment}
                 onSuggestChange={handleSuggestFromContext}
               />
-              <div className="flex h-full">
-                <div className="flex-1 border-r border-[var(--border)] overflow-y-auto">
-                  <div className="px-4 py-2 text-xs text-[var(--text-muted)] bg-[var(--diff-remove)] border-b border-[var(--border)] font-medium sticky top-0">
-                    base: {file.path}
-                  </div>
-                  <div className="p-6 diff-content">
-                    {parseBlocks(file.baseContent).map((block, idx) => (
-                      <MarkdownBlock
-                        key={idx}
-                        className="mb-1"
-                        html={renderBlockHtml(baseBlockToHtml(block))}
-                        onClick={handleMarkClick}
-                      />
-                    ))}
-                  </div>
+              {/* Sticky header row */}
+              <div className="grid grid-cols-2 sticky top-0 z-10">
+                <div className="px-4 py-2 text-xs text-[var(--text-muted)] bg-[var(--diff-remove)] border-b border-r border-[var(--border)] font-medium">
+                  base: {file.path}
                 </div>
-                <div className="flex-1 overflow-y-auto">
-                  <div className="px-4 py-2 text-xs text-[var(--text-muted)] bg-[var(--diff-add)] border-b border-[var(--border)] font-medium sticky top-0">
-                    head: {file.path}
-                  </div>
-                  <div className="p-6 diff-content">
-                    {parseBlocks(file.headContent).map((block, idx) => (
-                      <MarkdownBlock
-                        key={idx}
-                        className="mb-1"
-                        html={renderBlockHtml(headBlockToHtml(block))}
-                        onClick={handleMarkClick}
-                      />
-                    ))}
-                  </div>
+                <div className="px-4 py-2 text-xs text-[var(--text-muted)] bg-[var(--diff-add)] border-b border-[var(--border)] font-medium">
+                  head: {file.path}
                 </div>
+              </div>
+              {/* Aligned diff rows */}
+              <div className="grid grid-cols-2">
+                {diffBlocks.map((block, idx) => (
+                  <React.Fragment key={idx}>
+                    {block.type === "unchanged" && (
+                      <>
+                        <div className="p-4 border-r border-[var(--border)] diff-content">
+                          <MarkdownBlock
+                            html={renderBlockHtml(baseBlockToHtml(block.baseText))}
+                            onClick={handleMarkClick}
+                          />
+                        </div>
+                        <div className="p-4 diff-content">
+                          <MarkdownBlock
+                            html={renderBlockHtml(headBlockToHtml(block.headText))}
+                            onClick={handleMarkClick}
+                          />
+                        </div>
+                      </>
+                    )}
+                    {block.type === "removed" && (
+                      <>
+                        <div className="p-4 border-r border-[var(--border)] bg-[var(--diff-remove)] diff-content">
+                          <MarkdownBlock
+                            html={renderBlockHtml(baseBlockToHtml(block.baseText))}
+                          />
+                        </div>
+                        <div className="p-4 border-r-0" />
+                      </>
+                    )}
+                    {block.type === "added" && (
+                      <>
+                        <div className="p-4 border-r border-[var(--border)]" />
+                        <div className="p-4 bg-[var(--diff-add)] diff-content">
+                          <MarkdownBlock
+                            html={renderBlockHtml(headBlockToHtml(block.headText))}
+                            onClick={handleMarkClick}
+                          />
+                        </div>
+                      </>
+                    )}
+                    {block.type === "modified" && (
+                      <>
+                        <div className="p-4 border-r border-[var(--border)] bg-[var(--diff-remove)] diff-content">
+                          <MarkdownBlock
+                            html={renderBlockHtml(baseBlockToHtml(block.splitDiffBase || block.baseText))}
+                          />
+                        </div>
+                        <div className="p-4 bg-[var(--diff-add)] diff-content">
+                          <MarkdownBlock
+                            html={renderBlockHtml(headBlockToHtml(block.splitDiffHead || block.headText))}
+                            onClick={handleMarkClick}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </React.Fragment>
+                ))}
               </div>
             </div>
           ) : viewMode === "suggest" ? (
