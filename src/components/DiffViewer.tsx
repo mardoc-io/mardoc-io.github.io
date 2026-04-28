@@ -446,27 +446,37 @@ export default function DiffViewer({
     return result;
   }, [fileIsHtml, file.baseContent, file.headContent]);
 
-  // Map PR comments into panel format for display
+  // Map PR comments into panel format, filtered to the current file.
+  // Review comments (rc-*) match on path; pending comments match on
+  // pendingPath; issue comments (ic-*, no path) are PR-level and
+  // excluded from per-file views.
   const allPanelComments: PanelComment[] = useMemo(() => {
-    return comments.map((c) => ({
-      id: c.id,
-      selectedText: c.selectedText || "",
-      body: c.body,
-      author: c.author,
-      avatarColor: c.avatarColor,
-      createdAt: c.createdAt,
-      blockIndex: c.blockIndex || 0,
-      resolved: c.resolved,
-      replies: (c.replies || []).map((r) => ({
-        author: r.author,
-        avatarColor: r.avatarColor,
-        body: r.body,
-        createdAt: r.createdAt,
-      })),
-      source: c.pending ? ("local" as const) : ("github" as const),
-      pending: c.pending,
-    }));
-  }, [comments]);
+    const filePath = file.path;
+    return comments
+      .filter((c) => {
+        if (c.pending) return c.pendingPath === filePath;
+        if (c.path) return c.path === filePath;
+        return false;
+      })
+      .map((c) => ({
+        id: c.id,
+        selectedText: c.selectedText || "",
+        body: c.body,
+        author: c.author,
+        avatarColor: c.avatarColor,
+        createdAt: c.createdAt,
+        blockIndex: c.blockIndex || 0,
+        resolved: c.resolved,
+        replies: (c.replies || []).map((r) => ({
+          author: r.author,
+          avatarColor: r.avatarColor,
+          body: r.body,
+          createdAt: r.createdAt,
+        })),
+        source: c.pending ? ("local" as const) : ("github" as const),
+        pending: c.pending,
+      }));
+  }, [comments, file.path]);
 
   // Auto-show the panel on the 0→N transition — initial mount when a
   // PR already has unresolved comments, or later when a new comment

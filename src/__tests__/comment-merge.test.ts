@@ -90,6 +90,21 @@ describe("mergeFreshComments", () => {
     expect(mergeFreshComments([], fresh)).toEqual(fresh);
   });
 
+  it("preserves path field through merge", () => {
+    const prev = [
+      comment({ id: "rc-1", path: "docs/readme.md" }),
+      comment({ id: "c-local", pending: true, pendingPath: "docs/guide.md", body: "draft" }),
+    ];
+    const fresh = [
+      comment({ id: "rc-1", path: "docs/readme.md", body: "refreshed" }),
+      comment({ id: "rc-2", path: "docs/guide.md" }),
+    ];
+    const merged = mergeFreshComments(prev, fresh);
+    expect(merged.find((c) => c.id === "rc-1")?.path).toBe("docs/readme.md");
+    expect(merged.find((c) => c.id === "rc-2")?.path).toBe("docs/guide.md");
+    expect(merged.find((c) => c.id === "c-local")?.pendingPath).toBe("docs/guide.md");
+  });
+
   it("handles a mix of fresh, pending, and stale correctly", () => {
     const prev = [
       comment({ id: "rc-old" }),          // non-pending, will be dropped (not in fresh)
