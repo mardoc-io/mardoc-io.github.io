@@ -41,6 +41,7 @@ import CommentPanel, { type PanelComment } from "./CommentPanel";
 import SuggestBlockEditor from "./SuggestBlockEditor";
 import { extractCommentSuggestions, mergeSuggestions } from "@/lib/suggestion-extract";
 import { parseSuggestionBody } from "@/lib/suggestion-body";
+import { injectCommentHighlights } from "@/lib/highlight-comments";
 
 interface DiffViewerProps {
   file: PRFile;
@@ -803,50 +804,16 @@ export default function DiffViewer({
     }, 50);
   }, [allPanelComments]);
 
-  // Render block content with highlighted commented text
+  // Render block content with highlighted commented text.
+  // Uses DOMParser to match against text content (not raw HTML),
+  // so highlights work across tag boundaries and never match
+  // inside attributes.
   const renderBlockHtml = useCallback(
     (rawHtml: string) => {
-      const activeComments = allPanelComments.filter((c) => !c.resolved && c.selectedText);
-      if (activeComments.length === 0) return rawHtml;
-
-      const matches: { start: number; end: number; commentId: string }[] = [];
-
-      for (const sc of activeComments) {
-        const escapedText = sc.selectedText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const regex = new RegExp(escapedText, "gi");
-        let match: RegExpExecArray | null;
-        while ((match = regex.exec(rawHtml)) !== null) {
-          matches.push({
-            start: match.index,
-            end: match.index + match[0].length,
-            commentId: sc.id,
-          });
-          break;
-        }
-      }
-
-      if (matches.length === 0) return rawHtml;
-
-      matches.sort((a, b) => b.start - a.start);
-
-      const filtered: typeof matches = [];
-      for (const m of matches) {
-        const hasOverlap = filtered.some(
-          (existing) => m.start < existing.end && m.end > existing.start
-        );
-        if (!hasOverlap) filtered.push(m);
-      }
-
-      let html = rawHtml;
-      for (const m of filtered) {
-        const original = html.slice(m.start, m.end);
-        html =
-          html.slice(0, m.start) +
-          `<mark class="selection-comment-highlight" data-comment-id="${m.commentId}">${original}</mark>` +
-          html.slice(m.end);
-      }
-
-      return html;
+      const activeComments = allPanelComments
+        .filter((c) => !c.resolved && c.selectedText)
+        .map((c) => ({ selectedText: c.selectedText, commentId: c.id }));
+      return injectCommentHighlights(rawHtml, activeComments);
     },
     [allPanelComments]
   );
