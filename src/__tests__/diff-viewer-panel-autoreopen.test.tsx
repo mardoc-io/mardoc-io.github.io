@@ -80,6 +80,7 @@ function makeMarkdownFile(): PRFile {
 function makeComment(overrides: Partial<PRComment> = {}): PRComment {
   return {
     id: "rc-1",
+    path: "docs/notes.md",
     author: "alice",
     avatarColor: "#264653",
     body: "Could you clarify?",

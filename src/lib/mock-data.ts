@@ -581,10 +581,36 @@ The application uses a modern React stack with Next.js for server-side rendering
     M --> G[GitHub API]
 ` + "```\n\n" + `> **Note**: This is a prototype with mock data. Full GitHub integration coming in v0.2.0.`,
       },
+      {
+        path: "docs/contributing.md",
+        status: "added",
+        baseContent: "",
+        headContent: `# Contributing
+
+Thank you for your interest in contributing to mardoc.app!
+
+## Getting Started
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## Code Style
+
+- Use TypeScript for all new code
+- Follow the existing patterns in the codebase
+- Write tests for new functionality
+
+## Reporting Issues
+
+Please use GitHub Issues to report bugs or request features.`,
+      },
     ],
     comments: [
       {
         id: "c1",
+        path: "docs/getting-started.md",
         author: "sarah.chen",
         avatarColor: "#e76f51",
         body: "Great addition! The prerequisites section is really helpful for newcomers.",
@@ -603,11 +629,24 @@ The application uses a modern React stack with Next.js for server-side rendering
       },
       {
         id: "c2",
+        path: "docs/getting-started.md",
         author: "alex.kim",
         avatarColor: "#2a9d8f",
         body: "Should we mention that Docker is also an option? We have a docker-compose setup.",
         createdAt: "2026-03-30T16:30:00Z",
         blockIndex: 3,
+        resolved: false,
+        replies: [],
+      },
+      {
+        id: "c4",
+        path: "docs/contributing.md",
+        author: "alex.kim",
+        avatarColor: "#2a9d8f",
+        body: "Can we add a section about running the test suite before submitting?",
+        createdAt: "2026-03-30T17:00:00Z",
+        blockIndex: 1,
+        selectedText: "Fork the repository",
         resolved: false,
         replies: [],
       },
@@ -746,6 +785,7 @@ The editor supports GitHub webhooks for real-time synchronization. Configure you
     comments: [
       {
         id: "c3",
+        path: "docs/api-reference.md",
         author: "joe.barnett",
         avatarColor: "#264653",
         body: "We should also document the GraphQL API rate limits — they use a point system instead of simple request counts.",

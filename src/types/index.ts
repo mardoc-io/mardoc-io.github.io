@@ -19,6 +19,7 @@ export interface PRComment {
   id: string;
   githubId?: number; // numeric GitHub comment ID for API calls (replies, resolve)
   threadId?: string; // GraphQL node ID for the review thread (resolve/unresolve)
+  path?: string; // file path this comment is attached to (from GitHub review comment)
   author: string;
   avatarColor: string;
   body: string;

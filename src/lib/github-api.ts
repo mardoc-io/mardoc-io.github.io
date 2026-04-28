@@ -450,6 +450,7 @@ export async function fetchPRComments(
         id: `rc-${c.id}`,
         githubId: c.id,
         threadId: thread?.threadId,
+        path: c.path,
         author: c.user?.login || "unknown",
         avatarColor: getColor(c.user?.login || "unknown"),
         body: c.body,
