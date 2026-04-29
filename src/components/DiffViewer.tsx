@@ -461,13 +461,24 @@ export default function DiffViewer({
       })
       .map((c) => {
         // For GitHub comments with line ranges but no selectedText,
-        // extract the text from the file content so highlights work.
+        // extract the text from the file content and strip markdown
+        // syntax so it matches against the rendered HTML text layer.
         let selectedText = c.selectedText || "";
         if (!selectedText && c.startLine && c.endLine && file.headContent) {
           const lines = file.headContent.split("\n");
-          selectedText = lines
+          const raw = lines
             .slice(c.startLine - 1, c.endLine)
             .join("\n")
+            .trim();
+          selectedText = raw
+            .replace(/^#{1,6}\s+/gm, "")
+            .replace(/\*\*(.+?)\*\*/g, "$1")
+            .replace(/\*(.+?)\*/g, "$1")
+            .replace(/`(.+?)`/g, "$1")
+            .replace(/^>\s?/gm, "")
+            .replace(/^[-*+]\s+/gm, "")
+            .replace(/^\d+\.\s+/gm, "")
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
             .trim();
         }
 
