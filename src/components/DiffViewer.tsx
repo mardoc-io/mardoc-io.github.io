@@ -41,6 +41,7 @@ import CommentPanel, { type PanelComment } from "./CommentPanel";
 import SuggestBlockEditor from "./SuggestBlockEditor";
 import { extractCommentSuggestions, mergeSuggestions } from "@/lib/suggestion-extract";
 import { parseSuggestionBody } from "@/lib/suggestion-body";
+import { injectCommentHighlights } from "@/lib/highlight-comments";
 
 interface DiffViewerProps {
   file: PRFile;
@@ -458,25 +459,51 @@ export default function DiffViewer({
         if (c.path) return c.path === filePath;
         return false;
       })
-      .map((c) => ({
-        id: c.id,
-        selectedText: c.selectedText || "",
-        body: c.body,
-        author: c.author,
-        avatarColor: c.avatarColor,
-        createdAt: c.createdAt,
-        blockIndex: c.blockIndex || 0,
-        resolved: c.resolved,
-        replies: (c.replies || []).map((r) => ({
-          author: r.author,
-          avatarColor: r.avatarColor,
-          body: r.body,
-          createdAt: r.createdAt,
-        })),
-        source: c.pending ? ("local" as const) : ("github" as const),
-        pending: c.pending,
-      }));
-  }, [comments, file.path]);
+      .map((c) => {
+        // For GitHub comments with line ranges but no selectedText,
+        // extract the text from the file content and strip markdown
+        // syntax so it matches against the rendered HTML text layer.
+        let selectedText = c.selectedText || "";
+        if (!selectedText && c.startLine && c.endLine && file.headContent) {
+          const lines = file.headContent.split("\n");
+          const raw = lines
+            .slice(c.startLine - 1, c.endLine)
+            .join("\n")
+            .trim();
+          selectedText = raw
+            .replace(/^#{1,6}\s+/gm, "")
+            .replace(/\*\*(.+?)\*\*/g, "$1")
+            .replace(/\*(.+?)\*/g, "$1")
+            .replace(/`(.+?)`/g, "$1")
+            .replace(/^>\s?/gm, "")
+            .replace(/^[-*+]\s+/gm, "")
+            .replace(/^\d+\.\s+/gm, "")
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+            .trim();
+        }
+
+        return {
+          id: c.id,
+          selectedText,
+          body: c.body,
+          author: c.author,
+          avatarColor: c.avatarColor,
+          createdAt: c.createdAt,
+          blockIndex: c.blockIndex || 0,
+          startLine: c.startLine,
+          endLine: c.endLine,
+          resolved: c.resolved,
+          replies: (c.replies || []).map((r) => ({
+            author: r.author,
+            avatarColor: r.avatarColor,
+            body: r.body,
+            createdAt: r.createdAt,
+          })),
+          source: c.pending ? ("local" as const) : ("github" as const),
+          pending: c.pending,
+        };
+      });
+  }, [comments, file.path, file.headContent]);
 
   // Auto-show the panel on the 0→N transition — initial mount when a
   // PR already has unresolved comments, or later when a new comment
@@ -803,50 +830,16 @@ export default function DiffViewer({
     }, 50);
   }, [allPanelComments]);
 
-  // Render block content with highlighted commented text
+  // Render block content with highlighted commented text.
+  // Uses DOMParser to match against text content (not raw HTML),
+  // so highlights work across tag boundaries and never match
+  // inside attributes.
   const renderBlockHtml = useCallback(
     (rawHtml: string) => {
-      const activeComments = allPanelComments.filter((c) => !c.resolved && c.selectedText);
-      if (activeComments.length === 0) return rawHtml;
-
-      const matches: { start: number; end: number; commentId: string }[] = [];
-
-      for (const sc of activeComments) {
-        const escapedText = sc.selectedText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const regex = new RegExp(escapedText, "gi");
-        let match: RegExpExecArray | null;
-        while ((match = regex.exec(rawHtml)) !== null) {
-          matches.push({
-            start: match.index,
-            end: match.index + match[0].length,
-            commentId: sc.id,
-          });
-          break;
-        }
-      }
-
-      if (matches.length === 0) return rawHtml;
-
-      matches.sort((a, b) => b.start - a.start);
-
-      const filtered: typeof matches = [];
-      for (const m of matches) {
-        const hasOverlap = filtered.some(
-          (existing) => m.start < existing.end && m.end > existing.start
-        );
-        if (!hasOverlap) filtered.push(m);
-      }
-
-      let html = rawHtml;
-      for (const m of filtered) {
-        const original = html.slice(m.start, m.end);
-        html =
-          html.slice(0, m.start) +
-          `<mark class="selection-comment-highlight" data-comment-id="${m.commentId}">${original}</mark>` +
-          html.slice(m.end);
-      }
-
-      return html;
+      const activeComments = allPanelComments
+        .filter((c) => !c.resolved && c.selectedText)
+        .map((c) => ({ selectedText: c.selectedText, commentId: c.id }));
+      return injectCommentHighlights(rawHtml, activeComments);
     },
     [allPanelComments]
   );

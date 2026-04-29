@@ -25,6 +25,8 @@ export interface PRComment {
   body: string;
   createdAt: string;
   blockIndex?: number; // which rendered block this comment is on
+  startLine?: number; // start of the commented line range (1-indexed, from GitHub API)
+  endLine?: number; // end of the commented line range (1-indexed, from GitHub API)
   selectedText?: string; // the text that was selected when the comment was created
   resolved: boolean;
   replies: PRCommentReply[];
