@@ -456,6 +456,8 @@ export async function fetchPRComments(
         body: c.body,
         createdAt: c.created_at,
         blockIndex: c.line || c.original_line || 0,
+        startLine: (c as any).start_line || c.line || c.original_line || undefined,
+        endLine: c.line || c.original_line || undefined,
         resolved: thread?.isResolved ?? false,
         replies: (replyMap.get(c.id) || []).map((r) => ({
           id: `rc-${r.id}`,

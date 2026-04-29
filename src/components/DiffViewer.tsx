@@ -459,25 +459,40 @@ export default function DiffViewer({
         if (c.path) return c.path === filePath;
         return false;
       })
-      .map((c) => ({
-        id: c.id,
-        selectedText: c.selectedText || "",
-        body: c.body,
-        author: c.author,
-        avatarColor: c.avatarColor,
-        createdAt: c.createdAt,
-        blockIndex: c.blockIndex || 0,
-        resolved: c.resolved,
-        replies: (c.replies || []).map((r) => ({
-          author: r.author,
-          avatarColor: r.avatarColor,
-          body: r.body,
-          createdAt: r.createdAt,
-        })),
-        source: c.pending ? ("local" as const) : ("github" as const),
-        pending: c.pending,
-      }));
-  }, [comments, file.path]);
+      .map((c) => {
+        // For GitHub comments with line ranges but no selectedText,
+        // extract the text from the file content so highlights work.
+        let selectedText = c.selectedText || "";
+        if (!selectedText && c.startLine && c.endLine && file.headContent) {
+          const lines = file.headContent.split("\n");
+          selectedText = lines
+            .slice(c.startLine - 1, c.endLine)
+            .join("\n")
+            .trim();
+        }
+
+        return {
+          id: c.id,
+          selectedText,
+          body: c.body,
+          author: c.author,
+          avatarColor: c.avatarColor,
+          createdAt: c.createdAt,
+          blockIndex: c.blockIndex || 0,
+          startLine: c.startLine,
+          endLine: c.endLine,
+          resolved: c.resolved,
+          replies: (c.replies || []).map((r) => ({
+            author: r.author,
+            avatarColor: r.avatarColor,
+            body: r.body,
+            createdAt: r.createdAt,
+          })),
+          source: c.pending ? ("local" as const) : ("github" as const),
+          pending: c.pending,
+        };
+      });
+  }, [comments, file.path, file.headContent]);
 
   // Auto-show the panel on the 0→N transition — initial mount when a
   // PR already has unresolved comments, or later when a new comment
